@@ -42,264 +42,264 @@ const Q = (r,c) => ({Riposo:r, Corsa:c, Calcio:c});
 
 const FOOD_DB = {
   protein_equiv_chicken:[
-    {name:'Petto di pollo',        qty:Q(160,180), uom:'g', limitKey:'white_meat_fresh'},
-    {name:'Merluzzo',              qty:Q(150,180), uom:'g', limitKey:'fish_fresh'},
-    {name:'Salmone',               qty:Q(160,180), uom:'g', limitKey:'fish_fresh'},
-    {name:'Orata',                 qty:Q(160,180), uom:'g', limitKey:'fish_fresh'},
-    {name:'Spigola',               qty:Q(160,180), uom:'g', limitKey:'fish_fresh'},
-    {name:'Sgombro',               qty:Q(160,180), uom:'g', limitKey:'fish_fresh'},
-    {name:'Sogliola',              qty:Q(160,180), uom:'g', limitKey:'fish_fresh'},
-    {name:'Tonno al naturale',     qty:Q(100,120), uom:'g', limitKey:'tuna_canned'},
-    {name:'Salmone affumicato',    qty:Q(75,80),   uom:'g', limitKey:'fish_smoked'},
-    {name:'Polpo',                 qty:Q(200,220), uom:'g', limitKey:'fish_fresh'},
-    {name:'Calamari',              qty:Q(220,250), uom:'g', limitKey:'fish_fresh'},
-    {name:'Gamberi sgusciati',     qty:Q(220,250), uom:'g', limitKey:'fish_fresh'},
-    {name:'Seppie',                qty:Q(220,250), uom:'g', limitKey:'fish_fresh'},
-    {name:'Molluschi sgusciati',   qty:Q(220,250), uom:'g', limitKey:'fish_fresh'},
-    {name:'Bresaola',              qty:Q(80,100),  uom:'g', limitKey:'cured_lean'},
-    {name:'Prosciutto crudo magro',qty:Q(80,100),  uom:'g', limitKey:'cured_lean'},
-    {name:'Uova',                  qty:Q(120,120), uom:'g', limitKey:'eggs'},
-    {name:'Albume',                qty:Q(50,50),   uom:'g', limitKey:'eggs'},
-    {name:'Carne rossa magra',     qty:Q(130,150), uom:'g', limitKey:'red_meat'},
-    {name:'Vitello',               qty:Q(130,150), uom:'g', limitKey:'red_meat'},
-    {name:'Ceci cotti',            qty:Q(150,160), uom:'g', limitKey:'legumes_cooked'},
-    {name:'Ceci secchi',           qty:Q(75,80),   uom:'g', limitKey:'legumes_dry'},
-    {name:'Fagioli borlotti cotti',qty:Q(150,160), uom:'g', limitKey:'legumes_cooked'},
-    {name:'Fagioli cannellini cotti',qty:Q(150,160),uom:'g',limitKey:'legumes_cooked'},
-    {name:'Fagioli cotti',         qty:Q(150,160), uom:'g', limitKey:'legumes_cooked'},
-    {name:'Lenticchie cotte',      qty:Q(150,160), uom:'g', limitKey:'legumes_cooked'},
-    {name:'Lenticchie secche',     qty:Q(75,80),   uom:'g', limitKey:'legumes_dry'},
-    {name:'Fagioli secchi',        qty:Q(75,80),   uom:'g', limitKey:'legumes_dry'},
-    {name:'Fagioli cannellini secchi',qty:Q(75,80),uom:'g', limitKey:'legumes_dry'},
-    {name:'Piselli secchi',        qty:Q(75,80),   uom:'g', limitKey:'legumes_dry'},
-    {name:'Piselli cotti',         qty:Q(150,160), uom:'g', limitKey:'legumes_cooked'},
-    {name:'Fiocchi di latte',      qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
-    {name:'Mozzarella',            qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
-    {name:'Ricotta',               qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
-    {name:'Formaggio Linea Osella',qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
-    {name:'Formaggio stagionato',  qty:Q(120,150), uom:'g', limitKey:'hard_cheese'},
-    {name:'Feta',                  qty:Q(80,100),  uom:'g', limitKey:'hard_cheese'},
-    {name:'Stracchino light',      qty:Q(120,150), uom:'g', limitKey:'fresh_cheese'},
-    {name:'Formaggio fresco snack',qty:Q(40,40),   uom:'g', limitKey:'fresh_cheese'},
-    {name:'Yogurt greco',          qty:Q(170,200), uom:'g', limitKey:'yogurt_skyr'},
+    {name:'Petto di pollo',        qty:Q(160,180), uom:'g', kcal:110, limitKey:'white_meat_fresh'},
+    {name:'Merluzzo',              qty:Q(150,180), uom:'g', kcal:82,  limitKey:'fish_fresh'},
+    {name:'Salmone',               qty:Q(160,180), uom:'g', kcal:208, limitKey:'fish_fresh'},
+    {name:'Orata',                 qty:Q(160,180), uom:'g', kcal:96,  limitKey:'fish_fresh'},
+    {name:'Spigola',               qty:Q(160,180), uom:'g', kcal:97,  limitKey:'fish_fresh'},
+    {name:'Sgombro',               qty:Q(160,180), uom:'g', kcal:205, limitKey:'fish_fresh'},
+    {name:'Sogliola',              qty:Q(160,180), uom:'g', kcal:83,  limitKey:'fish_fresh'},
+    {name:'Tonno al naturale',     qty:Q(100,120), uom:'g', kcal:116, limitKey:'tuna_canned'},
+    {name:'Salmone affumicato',    qty:Q(75,80),   uom:'g', kcal:142, limitKey:'fish_smoked'},
+    {name:'Polpo',                 qty:Q(200,220), uom:'g', kcal:82,  limitKey:'fish_fresh'},
+    {name:'Calamari',              qty:Q(220,250), uom:'g', kcal:92,  limitKey:'fish_fresh'},
+    {name:'Gamberi sgusciati',     qty:Q(220,250), uom:'g', kcal:85,  limitKey:'fish_fresh'},
+    {name:'Seppie',                qty:Q(220,250), uom:'g', kcal:79,  limitKey:'fish_fresh'},
+    {name:'Molluschi sgusciati',   qty:Q(220,250), uom:'g', kcal:75,  limitKey:'fish_fresh'},
+    {name:'Bresaola',              qty:Q(80,100),  uom:'g', kcal:151, limitKey:'cured_lean'},
+    {name:'Prosciutto crudo magro',qty:Q(80,100),  uom:'g', kcal:159, limitKey:'cured_lean'},
+    {name:'Uova',                  qty:Q(120,120), uom:'g', kcal:143, limitKey:'eggs'},
+    {name:'Albume',                qty:Q(50,50),   uom:'g', kcal:52,  limitKey:'eggs'},
+    {name:'Carne rossa magra',     qty:Q(130,150), uom:'g', kcal:158, limitKey:'red_meat'},
+    {name:'Vitello',               qty:Q(130,150), uom:'g', kcal:107, limitKey:'red_meat'},
+    {name:'Ceci cotti',            qty:Q(150,160), uom:'g', kcal:164, limitKey:'legumes_cooked'},
+    {name:'Ceci secchi',           qty:Q(75,80),   uom:'g', kcal:364, limitKey:'legumes_dry'},
+    {name:'Fagioli borlotti cotti',qty:Q(150,160), uom:'g', kcal:132, limitKey:'legumes_cooked'},
+    {name:'Fagioli cannellini cotti',qty:Q(150,160),uom:'g',kcal:127, limitKey:'legumes_cooked'},
+    {name:'Fagioli cotti',         qty:Q(150,160), uom:'g', kcal:130, limitKey:'legumes_cooked'},
+    {name:'Lenticchie cotte',      qty:Q(150,160), uom:'g', kcal:116, limitKey:'legumes_cooked'},
+    {name:'Lenticchie secche',     qty:Q(75,80),   uom:'g', kcal:353, limitKey:'legumes_dry'},
+    {name:'Fagioli secchi',        qty:Q(75,80),   uom:'g', kcal:335, limitKey:'legumes_dry'},
+    {name:'Fagioli cannellini secchi',qty:Q(75,80),uom:'g', kcal:335, limitKey:'legumes_dry'},
+    {name:'Piselli secchi',        qty:Q(75,80),   uom:'g', kcal:350, limitKey:'legumes_dry'},
+    {name:'Piselli cotti',         qty:Q(150,160), uom:'g', kcal:84,  limitKey:'legumes_cooked'},
+    {name:'Fiocchi di latte',      qty:Q(150,170), uom:'g', kcal:103, limitKey:'fresh_cheese'},
+    {name:'Mozzarella',            qty:Q(150,170), uom:'g', kcal:280, limitKey:'fresh_cheese'},
+    {name:'Ricotta',               qty:Q(150,170), uom:'g', kcal:174, limitKey:'fresh_cheese'},
+    {name:'Formaggio Linea Osella',qty:Q(150,170), uom:'g', kcal:100, limitKey:'fresh_cheese'},
+    {name:'Formaggio stagionato',  qty:Q(120,150), uom:'g', kcal:402, limitKey:'hard_cheese'},
+    {name:'Feta',                  qty:Q(80,100),  uom:'g', kcal:264, limitKey:'hard_cheese'},
+    {name:'Stracchino light',      qty:Q(120,150), uom:'g', kcal:134, limitKey:'fresh_cheese'},
+    {name:'Formaggio fresco snack',qty:Q(40,40),   uom:'g', kcal:134, limitKey:'fresh_cheese'},
+    {name:'Yogurt greco',          qty:Q(170,200), uom:'g', kcal:59,  limitKey:'yogurt_skyr'},
   ],
   lunch_carb_pasta:[
-    {name:'Pasta integrale', qty:Q(80,90),   uom:'g', limitKey:'pasta_family'},
-    {name:'Pasta normale',   qty:Q(80,90),   uom:'g', limitKey:'pasta_family'},
-    {name:'Pasta all uovo',  qty:Q(80,100),  uom:'g', limitKey:'pasta_family'},
-    {name:'Spaghetti di riso',qty:Q(80,100), uom:'g', limitKey:'pasta_family'},
-    {name:'Riso',            qty:Q(80,100),  uom:'g', limitKey:'rice_family'},
-    {name:'Riso basmati',    qty:Q(80,100),  uom:'g', limitKey:'rice_family'},
-    {name:'Riso jasmine',    qty:Q(80,100),  uom:'g', limitKey:'rice_family'},
-    {name:'Farro',           qty:Q(80,100),  uom:'g', limitKey:'grain_alt_family'},
-    {name:'Orzo',            qty:Q(80,100),  uom:'g', limitKey:'grain_alt_family'},
-    {name:'Quinoa',          qty:Q(80,100),  uom:'g', limitKey:'grain_alt_family'},
-    {name:'Miglio',          qty:Q(80,100),  uom:'g', limitKey:'grain_alt_family'},
-    {name:'Cous cous',       qty:Q(80,100),  uom:'g', limitKey:'grain_alt_family'},
-    {name:'Spatzle',         qty:Q(80,100),  uom:'g', limitKey:'pasta_family'},
-    {name:'Gnocchi',         qty:Q(200,225), uom:'g', limitKey:'gnocchi_family'},
-    {name:'Piadina',         qty:Q(1,1),     uom:'pz',limitKey:'piadina_family'},
+    {name:'Pasta integrale', qty:Q(80,90),   uom:'g', kcal:356, limitKey:'pasta_family'},
+    {name:'Pasta normale',   qty:Q(80,90),   uom:'g', kcal:352, limitKey:'pasta_family'},
+    {name:'Pasta all uovo',  qty:Q(80,100),  uom:'g', kcal:368, limitKey:'pasta_family'},
+    {name:'Spaghetti di riso',qty:Q(80,100), uom:'g', kcal:362, limitKey:'pasta_family'},
+    {name:'Riso',            qty:Q(80,100),  uom:'g', kcal:360, limitKey:'rice_family'},
+    {name:'Riso basmati',    qty:Q(80,100),  uom:'g', kcal:360, limitKey:'rice_family'},
+    {name:'Riso jasmine',    qty:Q(80,100),  uom:'g', kcal:360, limitKey:'rice_family'},
+    {name:'Farro',           qty:Q(80,100),  uom:'g', kcal:341, limitKey:'grain_alt_family'},
+    {name:'Orzo',            qty:Q(80,100),  uom:'g', kcal:354, limitKey:'grain_alt_family'},
+    {name:'Quinoa',          qty:Q(80,100),  uom:'g', kcal:368, limitKey:'grain_alt_family'},
+    {name:'Miglio',          qty:Q(80,100),  uom:'g', kcal:378, limitKey:'grain_alt_family'},
+    {name:'Cous cous',       qty:Q(80,100),  uom:'g', kcal:376, limitKey:'grain_alt_family'},
+    {name:'Spatzle',         qty:Q(80,100),  uom:'g', kcal:300, limitKey:'pasta_family'},
+    {name:'Gnocchi',         qty:Q(200,225), uom:'g', kcal:109, limitKey:'gnocchi_family'},
+    {name:'Piadina',         qty:Q(1,1),     uom:'pz',kcal:290, limitKey:'piadina_family'},
   ],
   dinner_carb_bread:[
-    {name:'Pane integrale',    qty:Q(60,80),  uom:'g', limitKey:'bread_family'},
-    {name:'Pane bianco',       qty:Q(60,80),  uom:'g', limitKey:'bread_family'},
-    {name:'Pane di segale',    qty:Q(60,80),  uom:'g', limitKey:'bread_family'},
-    {name:'Patate',            qty:Q(220,250),uom:'g', limitKey:'potato_family'},
-    {name:'Patate dolci',      qty:Q(220,250),uom:'g', limitKey:'potato_family'},
-    {name:'Pure di patate',    qty:Q(220,250),uom:'g', limitKey:'pure_family'},
-    {name:'Crackers integrali',qty:Q(40,50),  uom:'g', limitKey:'crackers_family'},
-    {name:'Grissini integrali',qty:Q(40,50),  uom:'g', limitKey:'grissini_family'},
-    {name:'Gallette di mais',  qty:Q(8.75,8.75),uom:'pz',limitKey:'gallette_family'},
+    {name:'Pane integrale',    qty:Q(60,80),  uom:'g', kcal:224, limitKey:'bread_family'},
+    {name:'Pane bianco',       qty:Q(60,80),  uom:'g', kcal:275, limitKey:'bread_family'},
+    {name:'Pane di segale',    qty:Q(60,80),  uom:'g', kcal:259, limitKey:'bread_family'},
+    {name:'Patate',            qty:Q(220,250),uom:'g', kcal:77,  limitKey:'potato_family'},
+    {name:'Patate dolci',      qty:Q(220,250),uom:'g', kcal:86,  limitKey:'potato_family'},
+    {name:'Pure di patate',    qty:Q(220,250),uom:'g', kcal:83,  limitKey:'pure_family'},
+    {name:'Crackers integrali',qty:Q(40,50),  uom:'g', kcal:412, limitKey:'crackers_family'},
+    {name:'Grissini integrali',qty:Q(40,50),  uom:'g', kcal:380, limitKey:'grissini_family'},
+    {name:'Gallette di mais',  qty:Q(8.75,8.75),uom:'pz',kcal:38,limitKey:'gallette_family'},
   ],
   oats_breakfast:[
-    {name:'Avena',                     qty:Q(60,60), uom:'g',  limitKey:'oats_family'},
-    {name:'Muesli',                    qty:Q(60,60), uom:'g',  limitKey:'oats_family'},
-    {name:'Fette biscottate integrali',qty:Q(4,4),   uom:'pz', limitKey:'fette_family'},
-    {name:'Gallette di mais',          qty:Q(8.75,8.75), uom:'pz', limitKey:'gallette_family'},
+    {name:'Avena',                     qty:Q(60,60), uom:'g',  kcal:379, limitKey:'oats_family'},
+    {name:'Muesli',                    qty:Q(60,60), uom:'g',  kcal:363, limitKey:'oats_family'},
+    {name:'Fette biscottate integrali',qty:Q(4,4),   uom:'pz', kcal:38,  limitKey:'fette_family'},
+    {name:'Gallette di mais',          qty:Q(8.75,8.75), uom:'pz', kcal:38, limitKey:'gallette_family'},
   ],
   milk_portion:[
-    {name:'Latte',      qty:Q(250,250),uom:'ml',limitKey:'milk_default'},
-    {name:'Cappuccino', qty:Q(200,200),uom:'ml',limitKey:'milk_default'},
-    {name:'Spremuta di arancia',qty:Q(150,150),uom:'ml',limitKey:'juice_portion'},
+    {name:'Latte',      qty:Q(250,250),uom:'ml',kcal:49, limitKey:'milk_default'},
+    {name:'Cappuccino', qty:Q(200,200),uom:'ml',kcal:40, limitKey:'milk_default'},
+    {name:'Spremuta di arancia',qty:Q(150,150),uom:'ml',kcal:45, limitKey:'juice_portion'},
   ],
   fruit_portion:[
-    {name:'Mela',          qty:Q(1,1),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Banana',        qty:Q(1,1),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Pera',          qty:Q(1,1),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Arancia',       qty:Q(1,1),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Kiwi',          qty:Q(2,2),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Pesche',        qty:Q(2,2),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Mandaranci',    qty:Q(2,2),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Prugne',        qty:Q(2,2),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Clementine',    qty:Q(2,2),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Albicocche',    qty:Q(4,4),    uom:'pz',   limitKey:'fruit_portion'},
-    {name:'Fragole',       qty:Q(250,250),uom:'g',    limitKey:'fruit_portion'},
-    {name:'Mirtilli',      qty:Q(150,150),uom:'g',    limitKey:'fruit_portion'},
-    {name:'Frutti di bosco',qty:Q(150,150),uom:'g',   limitKey:'fruit_portion'},
-    {name:'Uva',           qty:Q(130,130),uom:'g',    limitKey:'fruit_portion'},
-    {name:'Ananas',        qty:Q(200,200),uom:'g',    limitKey:'fruit_portion'},
-    {name:'Ciliegie',      qty:Q(150,150),uom:'g',    limitKey:'fruit_portion'},
-    {name:'Anguria',       qty:Q(1,1),    uom:'fetta',limitKey:'fruit_portion'},
-    {name:'Melone',        qty:Q(2,2),    uom:'fetta',limitKey:'fruit_portion'},
+    {name:'Mela',          qty:Q(1,1),    uom:'pz',   kcal:80,  limitKey:'fruit_portion'},
+    {name:'Banana',        qty:Q(1,1),    uom:'pz',   kcal:90,  limitKey:'fruit_portion'},
+    {name:'Pera',          qty:Q(1,1),    uom:'pz',   kcal:85,  limitKey:'fruit_portion'},
+    {name:'Arancia',       qty:Q(1,1),    uom:'pz',   kcal:60,  limitKey:'fruit_portion'},
+    {name:'Kiwi',          qty:Q(2,2),    uom:'pz',   kcal:30,  limitKey:'fruit_portion'},
+    {name:'Pesche',        qty:Q(2,2),    uom:'pz',   kcal:35,  limitKey:'fruit_portion'},
+    {name:'Mandaranci',    qty:Q(2,2),    uom:'pz',   kcal:25,  limitKey:'fruit_portion'},
+    {name:'Prugne',        qty:Q(2,2),    uom:'pz',   kcal:20,  limitKey:'fruit_portion'},
+    {name:'Clementine',    qty:Q(2,2),    uom:'pz',   kcal:25,  limitKey:'fruit_portion'},
+    {name:'Albicocche',    qty:Q(4,4),    uom:'pz',   kcal:15,  limitKey:'fruit_portion'},
+    {name:'Fragole',       qty:Q(250,250),uom:'g',    kcal:33,  limitKey:'fruit_portion'},
+    {name:'Mirtilli',      qty:Q(150,150),uom:'g',    kcal:57,  limitKey:'fruit_portion'},
+    {name:'Frutti di bosco',qty:Q(150,150),uom:'g',   kcal:45,  limitKey:'fruit_portion'},
+    {name:'Uva',           qty:Q(130,130),uom:'g',    kcal:67,  limitKey:'fruit_portion'},
+    {name:'Ananas',        qty:Q(200,200),uom:'g',    kcal:50,  limitKey:'fruit_portion'},
+    {name:'Ciliegie',      qty:Q(150,150),uom:'g',    kcal:63,  limitKey:'fruit_portion'},
+    {name:'Anguria',       qty:Q(1,1),    uom:'fetta',kcal:80,  limitKey:'fruit_portion'},
+    {name:'Melone',        qty:Q(2,2),    uom:'fetta',kcal:60,  limitKey:'fruit_portion'},
   ],
   yogurt_portion:[
-    {name:'Skyr',        qty:Q(170,170),uom:'g',limitKey:'yogurt_skyr'},
-    {name:'Yogurt greco',qty:Q(170,200),uom:'g',limitKey:'yogurt_skyr'},
+    {name:'Skyr',        qty:Q(170,170),uom:'g',kcal:63, limitKey:'yogurt_skyr'},
+    {name:'Yogurt greco',qty:Q(170,200),uom:'g',kcal:59, limitKey:'yogurt_skyr'},
   ],
   nuts_snack:[
-    {name:'Mandorle',          qty:Q(20,20),uom:'g',limitKey:'nuts'},
-    {name:'Noci',              qty:Q(20,20),uom:'g',limitKey:'nuts'},
-    {name:'Nocciole',          qty:Q(20,20),uom:'g',limitKey:'nuts'},
-    {name:'Anacardi',          qty:Q(20,20),uom:'g',limitKey:'nuts'},
-    {name:'Arachidi non salate',qty:Q(20,20),uom:'g',limitKey:'nuts'},
-    {name:'Olive nere',        qty:Q(15,15),uom:'g',limitKey:'olive_default'},
-    {name:'Olive verdi',       qty:Q(15,15),uom:'g',limitKey:'olive_default'},
-    {name:'Grana snack',       qty:Q(10,10),uom:'g',limitKey:'hard_cheese'},
-    {name:'Formaggio fresco snack',qty:Q(40,40),uom:'g',limitKey:'fresh_cheese'},
-    {name:'Burro di arachidi', qty:Q(20,20),uom:'g',limitKey:'pb'},
-    {name:'Marmellata zero zucc',qty:Q(20,20),uom:'g',limitKey:'jam_default'},
+    {name:'Mandorle',          qty:Q(20,20),uom:'g',kcal:579, limitKey:'nuts'},
+    {name:'Noci',              qty:Q(20,20),uom:'g',kcal:654, limitKey:'nuts'},
+    {name:'Nocciole',          qty:Q(20,20),uom:'g',kcal:628, limitKey:'nuts'},
+    {name:'Anacardi',          qty:Q(20,20),uom:'g',kcal:553, limitKey:'nuts'},
+    {name:'Arachidi non salate',qty:Q(20,20),uom:'g',kcal:567, limitKey:'nuts'},
+    {name:'Olive nere',        qty:Q(15,15),uom:'g',kcal:115, limitKey:'olive_default'},
+    {name:'Olive verdi',       qty:Q(15,15),uom:'g',kcal:100, limitKey:'olive_default'},
+    {name:'Grana snack',       qty:Q(10,10),uom:'g',kcal:402, limitKey:'hard_cheese'},
+    {name:'Formaggio fresco snack',qty:Q(40,40),uom:'g',kcal:134, limitKey:'fresh_cheese'},
+    {name:'Burro di arachidi', qty:Q(20,20),uom:'g',kcal:588, limitKey:'pb'},
+    {name:'Marmellata zero zucc',qty:Q(20,20),uom:'g',kcal:30,  limitKey:'jam_default'},
   ],
   oil_portion:[
-    {name:'Olio EVO',qty:Q(10,10),uom:'g',limitKey:'oil_evo'},
+    {name:'Olio EVO',qty:Q(10,10),uom:'g',kcal:884,limitKey:'oil_evo'},
   ],
   vegetable_side:[
-    {name:'Zucchine',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Broccoli',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Spinaci',            qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Insalata mista',     qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Carote',             qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Cavolfiore',         qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Fagiolini',          qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Peperoni',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Melanzane',          qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Asparagi',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Pomodori',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Pomodorini',         qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Rucola',             qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Finocchi',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Broccoletti di rapa',qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Bieta',              qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Zucca',              qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Lattuga',            qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Sedano',             qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Cicoria',            qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Rape',               qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
-    {name:'Funghi',             qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Zucchine',           qty:Q(200,200),uom:'g',kcal:17, limitKey:'vegetable_daily'},
+    {name:'Broccoli',           qty:Q(200,200),uom:'g',kcal:34, limitKey:'vegetable_daily'},
+    {name:'Spinaci',            qty:Q(200,200),uom:'g',kcal:23, limitKey:'vegetable_daily'},
+    {name:'Insalata mista',     qty:Q(200,200),uom:'g',kcal:15, limitKey:'vegetable_daily'},
+    {name:'Carote',             qty:Q(200,200),uom:'g',kcal:41, limitKey:'vegetable_daily'},
+    {name:'Cavolfiore',         qty:Q(200,200),uom:'g',kcal:25, limitKey:'vegetable_daily'},
+    {name:'Fagiolini',          qty:Q(200,200),uom:'g',kcal:31, limitKey:'vegetable_daily'},
+    {name:'Peperoni',           qty:Q(200,200),uom:'g',kcal:31, limitKey:'vegetable_daily'},
+    {name:'Melanzane',          qty:Q(200,200),uom:'g',kcal:25, limitKey:'vegetable_daily'},
+    {name:'Asparagi',           qty:Q(200,200),uom:'g',kcal:20, limitKey:'vegetable_daily'},
+    {name:'Pomodori',           qty:Q(200,200),uom:'g',kcal:18, limitKey:'vegetable_daily'},
+    {name:'Pomodorini',         qty:Q(200,200),uom:'g',kcal:18, limitKey:'vegetable_daily'},
+    {name:'Rucola',             qty:Q(200,200),uom:'g',kcal:25, limitKey:'vegetable_daily'},
+    {name:'Finocchi',           qty:Q(200,200),uom:'g',kcal:31, limitKey:'vegetable_daily'},
+    {name:'Broccoletti di rapa',qty:Q(200,200),uom:'g',kcal:22, limitKey:'vegetable_daily'},
+    {name:'Bieta',              qty:Q(200,200),uom:'g',kcal:19, limitKey:'vegetable_daily'},
+    {name:'Zucca',              qty:Q(200,200),uom:'g',kcal:26, limitKey:'vegetable_daily'},
+    {name:'Lattuga',            qty:Q(200,200),uom:'g',kcal:15, limitKey:'vegetable_daily'},
+    {name:'Sedano',             qty:Q(200,200),uom:'g',kcal:16, limitKey:'vegetable_daily'},
+    {name:'Cicoria',            qty:Q(200,200),uom:'g',kcal:23, limitKey:'vegetable_daily'},
+    {name:'Rape',               qty:Q(200,200),uom:'g',kcal:22, limitKey:'vegetable_daily'},
+    {name:'Funghi',             qty:Q(200,200),uom:'g',kcal:22, limitKey:'vegetable_daily'},
   ],
-  pre_run_banana:[{name:'Banana pre-corsa',      qty:{Riposo:0,Corsa:1,Calcio:0},  uom:'pz',limitKey:'fruit_portion'}],
-  pre_run_bread: [{name:'Pane bianco pre-corsa',  qty:{Riposo:0,Corsa:30,Calcio:0}, uom:'g', limitKey:'bread_family'}],
-  pre_soccer_bread:[{name:'Pane pre-calcio',      qty:{Riposo:0,Corsa:0,Calcio:60}, uom:'g', limitKey:'bread_family'}],
+  pre_run_banana:[{name:'Banana pre-corsa',      qty:{Riposo:0,Corsa:1,Calcio:0},  uom:'pz',kcal:90,  limitKey:'fruit_portion'}],
+  pre_run_bread: [{name:'Pane bianco pre-corsa',  qty:{Riposo:0,Corsa:30,Calcio:0}, uom:'g', kcal:275, limitKey:'bread_family'}],
+  pre_soccer_bread:[{name:'Pane pre-calcio',      qty:{Riposo:0,Corsa:0,Calcio:60}, uom:'g', kcal:275, limitKey:'bread_family'}],
   pre_soccer_jam:[
-    {name:'Marmellata pre-calcio',qty:{Riposo:0,Corsa:0,Calcio:20},uom:'g',limitKey:'jam_default'},
-    {name:'Miele pre-calcio',     qty:{Riposo:0,Corsa:0,Calcio:10},uom:'g',limitKey:'honey_default'},
+    {name:'Marmellata pre-calcio',qty:{Riposo:0,Corsa:0,Calcio:20},uom:'g',kcal:260,limitKey:'jam_default'},
+    {name:'Miele pre-calcio',     qty:{Riposo:0,Corsa:0,Calcio:10},uom:'g',kcal:304,limitKey:'honey_default'},
   ],
-  post_workout_milk:  [{name:'Latte post-workout',   qty:{Riposo:0,Corsa:250,Calcio:250},uom:'ml',limitKey:'milk_default'}],
-  post_workout_banana:[{name:'Banana post-workout',  qty:{Riposo:0,Corsa:1,Calcio:1},   uom:'pz',limitKey:'fruit_portion'}],
-  post_workout_avocado:[{name:'Avocado',             qty:{Riposo:0,Corsa:70,Calcio:70}, uom:'g', limitKey:'avocado'}],
+  post_workout_milk:  [{name:'Latte post-workout',   qty:{Riposo:0,Corsa:250,Calcio:250},uom:'ml',kcal:49, limitKey:'milk_default'}],
+  post_workout_banana:[{name:'Banana post-workout',  qty:{Riposo:0,Corsa:1,Calcio:1},   uom:'pz',kcal:90, limitKey:'fruit_portion'}],
+  post_workout_avocado:[{name:'Avocado',             qty:{Riposo:0,Corsa:70,Calcio:70}, uom:'g', kcal:160, limitKey:'avocado'}],
 };
 
 // ── WEEKEND FOOD GROUPS ───────────────────────────────────────
 FOOD_DB.philly_portion = [
-  {name:'Philadelphia light', qty:Q(40,40), uom:'g', limitKey:'fresh_cheese'},
-  {name:'Ricotta',            qty:Q(40,50), uom:'g', limitKey:'fresh_cheese'},
-  {name:'Stracchino light',   qty:Q(40,50), uom:'g', limitKey:'fresh_cheese'},
+  {name:'Philadelphia light', qty:Q(40,40), uom:'g', kcal:130, limitKey:'fresh_cheese'},
+  {name:'Ricotta',            qty:Q(40,50), uom:'g', kcal:174, limitKey:'fresh_cheese'},
+  {name:'Stracchino light',   qty:Q(40,50), uom:'g', kcal:134, limitKey:'fresh_cheese'},
 ];
 FOOD_DB.sat_bread = [
-  {name:'Pane di segale',  qty:Q(80,80), uom:'g', limitKey:'bread_family'},
-  {name:'Pane integrale',  qty:Q(80,80), uom:'g', limitKey:'bread_family'},
-  {name:'Pane bianco',     qty:Q(80,80), uom:'g', limitKey:'bread_family'},
+  {name:'Pane di segale',  qty:Q(80,80), uom:'g', kcal:259, limitKey:'bread_family'},
+  {name:'Pane integrale',  qty:Q(80,80), uom:'g', kcal:224, limitKey:'bread_family'},
+  {name:'Pane bianco',     qty:Q(80,80), uom:'g', kcal:275, limitKey:'bread_family'},
 ];
 FOOD_DB.sat_protein_lunch = [
-  {name:'Uova',              qty:Q(120,120), uom:'g', limitKey:'eggs'},
-  {name:'Petto di pollo',    qty:Q(160,180), uom:'g', limitKey:'white_meat_fresh'},
-  {name:'Merluzzo',          qty:Q(150,180), uom:'g', limitKey:'fish_fresh'},
-  {name:'Tonno al naturale', qty:Q(100,120), uom:'g', limitKey:'tuna_canned'},
-  {name:'Bresaola',          qty:Q(80,100),  uom:'g', limitKey:'cured_lean'},
-  {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
-  {name:'Ricotta',           qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
+  {name:'Uova',              qty:Q(120,120), uom:'g', kcal:143, limitKey:'eggs'},
+  {name:'Petto di pollo',    qty:Q(160,180), uom:'g', kcal:110, limitKey:'white_meat_fresh'},
+  {name:'Merluzzo',          qty:Q(150,180), uom:'g', kcal:82,  limitKey:'fish_fresh'},
+  {name:'Tonno al naturale', qty:Q(100,120), uom:'g', kcal:116, limitKey:'tuna_canned'},
+  {name:'Bresaola',          qty:Q(80,100),  uom:'g', kcal:151, limitKey:'cured_lean'},
+  {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', kcal:103, limitKey:'fresh_cheese'},
+  {name:'Ricotta',           qty:Q(150,170), uom:'g', kcal:174, limitKey:'fresh_cheese'},
 ];
 FOOD_DB.sat_veg_lunch = [
-  {name:'Bietole',       qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
-  {name:'Spinaci',       qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
-  {name:'Zucchine',      qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
-  {name:'Broccoli',      qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
-  {name:'Insalata mista',qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
-  {name:'Peperoni',      qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
-  {name:'Asparagi',      qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
+  {name:'Bietole',       qty:Q(200,200), uom:'g', kcal:19, limitKey:'vegetable_daily'},
+  {name:'Spinaci',       qty:Q(200,200), uom:'g', kcal:23, limitKey:'vegetable_daily'},
+  {name:'Zucchine',      qty:Q(200,200), uom:'g', kcal:17, limitKey:'vegetable_daily'},
+  {name:'Broccoli',      qty:Q(200,200), uom:'g', kcal:34, limitKey:'vegetable_daily'},
+  {name:'Insalata mista',qty:Q(200,200), uom:'g', kcal:15, limitKey:'vegetable_daily'},
+  {name:'Peperoni',      qty:Q(200,200), uom:'g', kcal:31, limitKey:'vegetable_daily'},
+  {name:'Asparagi',      qty:Q(200,200), uom:'g', kcal:20, limitKey:'vegetable_daily'},
 ];
 FOOD_DB.parmigiano_snack = [
-  {name:'Parmigiano Reggiano',   qty:Q(30,30), uom:'g', limitKey:'hard_cheese'},
-  {name:'Grana snack',           qty:Q(30,30), uom:'g', limitKey:'hard_cheese'},
-  {name:'Formaggio fresco snack',qty:Q(40,40), uom:'g', limitKey:'fresh_cheese'},
+  {name:'Parmigiano Reggiano',   qty:Q(30,30), uom:'g', kcal:402, limitKey:'hard_cheese'},
+  {name:'Grana snack',           qty:Q(30,30), uom:'g', kcal:402, limitKey:'hard_cheese'},
+  {name:'Formaggio fresco snack',qty:Q(40,40), uom:'g', kcal:134, limitKey:'fresh_cheese'},
 ];
 FOOD_DB.free_meal_dinner = [
-  {name:'Pizza 🍕 (pasto libero)',      qty:Q(1,1), uom:'porz', limitKey:null},
-  {name:'Lasagna (pasto libero)',       qty:Q(1,1), uom:'porz', limitKey:null},
-  {name:'Pasta al pesto (pasto libero)',qty:Q(1,1), uom:'porz', limitKey:null},
-  {name:'Pasto libero a scelta',        qty:Q(1,1), uom:'porz', limitKey:null},
+  {name:'Pizza 🍕 (pasto libero)',      qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Lasagna (pasto libero)',       qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Pasta al pesto (pasto libero)',qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Pasto libero a scelta',        qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
 ];
 FOOD_DB.sun_breakfast_sweet = [
-  {name:'Cappuccino',qty:Q(200,200), uom:'ml', limitKey:'milk_default'},
-  {name:'Latte',     qty:Q(250,250), uom:'ml', limitKey:'milk_default'},
+  {name:'Cappuccino',qty:Q(200,200), uom:'ml', kcal:40, limitKey:'milk_default'},
+  {name:'Latte',     qty:Q(250,250), uom:'ml', kcal:49, limitKey:'milk_default'},
 ];
 FOOD_DB.sun_biscuits = [
-  {name:'Biscotti',                   qty:Q(40,40), uom:'g',  limitKey:'bread_family'},
-  {name:'Fette biscottate integrali', qty:Q(4,4),   uom:'pz', limitKey:'fette_family'},
-  {name:'Gallette di mais',           qty:Q(8.75,8.75), uom:'pz', limitKey:'gallette_family'},
+  {name:'Biscotti',                   qty:Q(40,40), uom:'g',  kcal:470, limitKey:'bread_family'},
+  {name:'Fette biscottate integrali', qty:Q(4,4),   uom:'pz', kcal:38,  limitKey:'fette_family'},
+  {name:'Gallette di mais',           qty:Q(8.75,8.75), uom:'pz', kcal:38, limitKey:'gallette_family'},
 ];
 FOOD_DB.free_meal_lunch = [
-  {name:'Lasagna (pasto libero)',          qty:Q(1,1), uom:'porz', limitKey:null},
-  {name:'Pasta al pesto (pasto libero)',   qty:Q(1,1), uom:'porz', limitKey:null},
-  {name:'Pasta al ragù (pasto libero)',    qty:Q(1,1), uom:'porz', limitKey:null},
-  {name:'Risotto (pasto libero)',          qty:Q(1,1), uom:'porz', limitKey:null},
-  {name:'Pasto libero a scelta',           qty:Q(1,1), uom:'porz', limitKey:null},
+  {name:'Lasagna (pasto libero)',          qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Pasta al pesto (pasto libero)',   qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Pasta al ragù (pasto libero)',    qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Risotto (pasto libero)',          qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Pasto libero a scelta',           qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
 ];
 FOOD_DB.sun_dinner_protein = [
-  {name:'Uova',              qty:Q(120,120), uom:'g', limitKey:'eggs'},
-  {name:'Petto di pollo',    qty:Q(160,180), uom:'g', limitKey:'white_meat_fresh'},
-  {name:'Merluzzo',          qty:Q(150,180), uom:'g', limitKey:'fish_fresh'},
-  {name:'Tonno al naturale', qty:Q(100,120), uom:'g', limitKey:'tuna_canned'},
-  {name:'Bresaola',          qty:Q(80,100),  uom:'g', limitKey:'cured_lean'},
-  {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
+  {name:'Uova',              qty:Q(120,120), uom:'g', kcal:143, limitKey:'eggs'},
+  {name:'Petto di pollo',    qty:Q(160,180), uom:'g', kcal:110, limitKey:'white_meat_fresh'},
+  {name:'Merluzzo',          qty:Q(150,180), uom:'g', kcal:82,  limitKey:'fish_fresh'},
+  {name:'Tonno al naturale', qty:Q(100,120), uom:'g', kcal:116, limitKey:'tuna_canned'},
+  {name:'Bresaola',          qty:Q(80,100),  uom:'g', kcal:151, limitKey:'cured_lean'},
+  {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', kcal:103, limitKey:'fresh_cheese'},
 ];
 FOOD_DB.breakfast_dairy = [
-  {name:'Yogurt greco',          qty:Q(170,170), uom:'g',  limitKey:'yogurt_skyr'},
-  {name:'Skyr',                  qty:Q(170,170), uom:'g',  limitKey:'yogurt_skyr'},
-  {name:'Kefir',                 qty:Q(200,200), uom:'ml', limitKey:'yogurt_skyr'},
-  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  limitKey:'fresh_cheese'},
-  {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  limitKey:'fresh_cheese'},
-  {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  limitKey:'fresh_cheese'},
-  {name:'Formaggio Linea Osella',qty:Q(40,40),   uom:'g',  limitKey:'fresh_cheese'},
+  {name:'Yogurt greco',          qty:Q(170,170), uom:'g',  kcal:59,  limitKey:'yogurt_skyr'},
+  {name:'Skyr',                  qty:Q(170,170), uom:'g',  kcal:63,  limitKey:'yogurt_skyr'},
+  {name:'Kefir',                 qty:Q(200,200), uom:'ml', kcal:52,  limitKey:'yogurt_skyr'},
+  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  kcal:174, limitKey:'fresh_cheese'},
+  {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  kcal:103, limitKey:'fresh_cheese'},
+  {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'fresh_cheese'},
+  {name:'Formaggio Linea Osella',qty:Q(40,40),   uom:'g',  kcal:100, limitKey:'fresh_cheese'},
 ];
 FOOD_DB.speciali_farine = [
-  {name:'Farina 0',           qty:Q(20,20), uom:'g', limitKey:'flour_special'},
-  {name:'Farina 00',          qty:Q(20,20), uom:'g', limitKey:'flour_special'},
-  {name:'Farina integrale',   qty:Q(20,20), uom:'g', limitKey:'flour_special'},
-  {name:'Farina di ceci',     qty:Q(30,30), uom:'g', limitKey:'flour_special'},
-  {name:'Farina di mais',     qty:Q(20,20), uom:'g', limitKey:'flour_special'},
-  {name:'Farina di cocco',    qty:Q(15,15), uom:'g', limitKey:'flour_special'},
-  {name:'Farina di mandorla', qty:Q(20,20), uom:'g', limitKey:'flour_special'},
-  {name:"Sciroppo d'amaro",   qty:Q(5,5),   uom:'g', limitKey:'syrup_special'},
+  {name:'Farina 0',           qty:Q(20,20), uom:'g', kcal:364, limitKey:'flour_special'},
+  {name:'Farina 00',          qty:Q(20,20), uom:'g', kcal:364, limitKey:'flour_special'},
+  {name:'Farina integrale',   qty:Q(20,20), uom:'g', kcal:340, limitKey:'flour_special'},
+  {name:'Farina di ceci',     qty:Q(30,30), uom:'g', kcal:387, limitKey:'flour_special'},
+  {name:'Farina di mais',     qty:Q(20,20), uom:'g', kcal:362, limitKey:'flour_special'},
+  {name:'Farina di cocco',    qty:Q(15,15), uom:'g', kcal:604, limitKey:'flour_special'},
+  {name:'Farina di mandorla', qty:Q(20,20), uom:'g', kcal:571, limitKey:'flour_special'},
+  {name:"Sciroppo d'amaro",   qty:Q(5,5),   uom:'g', kcal:0,   limitKey:'syrup_special'},
 ];
 // Nuovi gruppi per i template feriali personalizzati
 FOOD_DB.feta_portion = [
-  {name:'Feta',               qty:Q(80,100),  uom:'g', limitKey:'hard_cheese'},
-  {name:'Formaggio stagionato',qty:Q(80,100), uom:'g', limitKey:'hard_cheese'},
-  {name:'Parmigiano Reggiano', qty:Q(30,30),  uom:'g', limitKey:'hard_cheese'},
+  {name:'Feta',               qty:Q(80,100),  uom:'g', kcal:264, limitKey:'hard_cheese'},
+  {name:'Formaggio stagionato',qty:Q(80,100), uom:'g', kcal:402, limitKey:'hard_cheese'},
+  {name:'Parmigiano Reggiano', qty:Q(30,30),  uom:'g', kcal:402, limitKey:'hard_cheese'},
 ];
 FOOD_DB.latte_riso_portion = [
-  {name:'Latte di riso',     qty:Q(250,250), uom:'ml', limitKey:'milk_default'},
-  {name:'Latte',             qty:Q(250,250), uom:'ml', limitKey:'milk_default'},
-  {name:'Cappuccino',        qty:Q(200,200), uom:'ml', limitKey:'milk_default'},
+  {name:'Latte di riso',     qty:Q(250,250), uom:'ml', kcal:47, limitKey:'milk_default'},
+  {name:'Latte',             qty:Q(250,250), uom:'ml', kcal:49, limitKey:'milk_default'},
+  {name:'Cappuccino',        qty:Q(200,200), uom:'ml', kcal:40, limitKey:'milk_default'},
 ];
 FOOD_DB.ciocco_snack = [
-  {name:'Cioccolato fondente',qty:Q(20,20), uom:'g', limitKey:null},
-  {name:'Cacao amaro',        qty:Q(5,5),   uom:'g', limitKey:null},
+  {name:'Cioccolato fondente',qty:Q(20,20), uom:'g', kcal:598, limitKey:null},
+  {name:'Cacao amaro',        qty:Q(5,5),   uom:'g', kcal:228, limitKey:null},
 ];
 FOOD_DB.ricotta_protein = [
-  {name:'Ricotta',         qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
-  {name:'Fiocchi di latte',qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
-  {name:'Formaggio Linea Osella',qty:Q(150,170),uom:'g',limitKey:'fresh_cheese'},
+  {name:'Ricotta',         qty:Q(150,170), uom:'g', kcal:174, limitKey:'fresh_cheese'},
+  {name:'Fiocchi di latte',qty:Q(150,170), uom:'g', kcal:103, limitKey:'fresh_cheese'},
+  {name:'Formaggio Linea Osella',qty:Q(150,170),uom:'g',kcal:100,limitKey:'fresh_cheese'},
 ];
 
 // ── TEMPLATES FERIALI (Mon–Fri) per tipo giorno ────────────────
@@ -725,7 +725,8 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
 // ── OGGI VIEW ─────────────────────────────────────────────────
 function OggiView({
   weekPlan,weekDates,todayISO,selectedDayIndex,setSelectedDayIndex,dailyLog,
-  toggleLogItem,updateLogQty,editQty,setEditQty,setSwapModal,setAddModal
+  toggleLogItem,updateLogQty,editQty,setEditQty,setSwapModal,setAddModal,
+  getDailyCalories,setExtraModal
 }){
   const di=selectedDayIndex>=0&&selectedDayIndex<7?selectedDayIndex:0;
   const selectedISO=toISO(weekDates[di]);
@@ -780,6 +781,7 @@ function OggiView({
         <div style={{height:'4px',borderRadius:'2px',background:'var(--border)',overflow:'hidden'}}>
           <div style={{height:'100%',width:`${pct}%`,background:'var(--accent)',borderRadius:'2px',transition:'width 0.4s'}}/>
         </div>
+        {(()=>{const kcal=getDailyCalories(selectedISO,di);return kcal>0?<div style={{fontSize:'13px',color:'var(--accent)',fontWeight:600,marginTop:'8px',display:'flex',alignItems:'center',gap:'6px'}}><span>🔥</span><span>{kcal.toLocaleString('it-IT')} kcal consumate</span></div>:null;})()}
       </div>
 
       {/* Meals */}
@@ -843,6 +845,34 @@ function OggiView({
           })}
         </div>
       ))}
+      {(weekPlan.extraMeals?.[di]||[]).length>0&&(
+        <div style={S.card({padding:'12px 14px'})}>
+          <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px',marginBottom:'10px'}}>EXTRA</div>
+          {(weekPlan.extraMeals[di]||[]).map((ei,i)=>{
+            const food=(FOOD_DB[ei.context]||[]).find(f=>f.name===ei.name);
+            if(!food)return null;
+            const key=`extra_${di}_${i}`;
+            const le=(dailyLog[selectedISO]||{})[key]||{};
+            const qty=le.qtyOverride??food.qty?.[type]??food.qty?.Riposo??0;
+            return(
+              <div key={key} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:'1px solid var(--border)',opacity:le.checked?0.6:1}}>
+                <button onClick={()=>toggleLogItem(selectedISO,key)}
+                  style={{width:'22px',height:'22px',borderRadius:'6px',border:'1.5px solid #56505a',background:'var(--surface)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  {le.checked&&<span style={{color:'var(--accent)',fontSize:'12px',fontWeight:700}}>✓</span>}
+                </button>
+                <span style={{flex:1,fontSize:'13px',color:'var(--text)',textDecoration:le.checked?'line-through':'none'}}>{food.name}</span>
+                <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 10px',borderRadius:'999px'}}>{qty} {food.uom}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div style={{padding:'8px 0'}}>
+        <button onClick={()=>setExtraModal({dayIndex:di,type})}
+          style={{width:'100%',padding:'12px',background:'var(--surface)',border:'1px dashed var(--border)',borderRadius:'12px',color:'var(--text2)',fontSize:'13px',fontWeight:500,cursor:'pointer'}}>
+          ＋ Pasto extra
+        </button>
+      </div>
     </div>
   );
 }
@@ -1015,6 +1045,73 @@ function AddFoodModal({modal,onAdd,onClose}){
   );
 }
 
+function ExtraFoodModal({modal,onAdd,onClose}){
+  const {type}=modal;
+  const allContexts=Object.keys(FOOD_DB);
+  const CONTEXT_LABELS={
+    protein_equiv_chicken:'Proteine',lunch_carb_pasta:'Carboidrati pranzo',
+    dinner_carb_bread:'Carboidrati cena/colazione',oats_breakfast:'Cereali colazione',
+    milk_portion:'Latte e bevande',fruit_portion:'Frutta',yogurt_portion:'Yogurt',
+    nuts_snack:'Frutta secca e snack',oil_portion:'Olio',vegetable_side:'Verdure',
+    breakfast_dairy:'Latticini colazione',speciali_farine:'Farine speciali',
+    latte_riso_portion:'Latte e alternative',ciocco_snack:'Cioccolato',
+    sat_bread:'Pane',sat_protein_lunch:'Proteine',sat_veg_lunch:'Verdure',
+    parmigiano_snack:'Formaggi snack',philly_portion:'Formaggi spalmabili',
+    feta_portion:'Formaggi stagionati',
+    ricotta_protein:'Ricotta e latticini',
+    pre_run_banana:'Pre-corsa',pre_run_bread:'Pre-corsa pane',
+    pre_soccer_bread:'Pre-calcio pane',pre_soccer_jam:'Pre-calcio dolce',
+    post_workout_milk:'Post-workout latte',post_workout_banana:'Post-workout banana',
+    post_workout_avocado:'Post-workout avocado',
+    free_meal_dinner:'Pasto libero cena',free_meal_lunch:'Pasto libero pranzo',
+    sun_breakfast_sweet:'Colazione domenica',sun_biscuits:'Biscotti',
+    sun_dinner_protein:'Proteine domenica',
+  };
+  const [context,setContext]=useState(allContexts[0]||'');
+  const [search,setSearch]=useState('');
+  const options=(FOOD_DB[context]||[]).filter(f=>{
+    const qty=f.qty?.[type]??f.qty?.Riposo??0;
+    if(qty===0)return false;
+    if(search)return f.name.toLowerCase().includes(search.toLowerCase());
+    return true;
+  });
+  return(
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'flex-end'}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 -8px 24px rgba(26,26,26,0.08)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
+          <div style={{fontFamily:'var(--display)',fontSize:'18px',color:'var(--text)'}}>Pasto Extra</div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text2)',fontSize:'20px'}}>×</button>
+        </div>
+        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)}
+          style={{width:'100%',padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:'14px',marginBottom:'12px',boxSizing:'border-box'}}/>
+        <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
+          {allContexts.map(ctx=>(
+            <button key={ctx} onClick={()=>{setContext(ctx);setSearch('');}}
+              style={{border:'1px solid var(--border)',borderRadius:'7px',padding:'5px 9px',
+                background:context===ctx?'var(--accent-soft)':'var(--card)',
+                color:context===ctx?'var(--accent)':'var(--text2)',fontSize:'11px',fontWeight:600}}>
+              {CONTEXT_LABELS[ctx]||ctx.replaceAll('_',' ')}
+            </button>
+          ))}
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+          {options.map((food,i)=>(
+            <button key={i} onClick={()=>onAdd(modal.dayIndex,context,food.name)}
+              style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
+                borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer'}}>
+              <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
+              <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
+                {food.qty[type]??food.qty.Riposo} {food.uom}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── APP ROOT ──────────────────────────────────────────────────
 export default function App(){
   const [tab,setTab]=useState('home');
@@ -1023,6 +1120,7 @@ export default function App(){
   const [dailyLog,setDailyLog]=useState({});
   const [swapModal,setSwapModal]=useState(null);
   const [addModal,setAddModal]=useState(null);
+  const [extraModal,setExtraModal]=useState(null);
   const [editQty,setEditQty]=useState(null);
   const [expandedDay,setExpandedDay]=useState(null);
   const [selectedDayIndex,setSelectedDayIndex]=useState(()=>{const g=new Date().getDay();return g===0?6:g-1;});
@@ -1048,6 +1146,12 @@ export default function App(){
 
   const setMealOverrides=(di,meal,items)=>{
     saveWP({...weekPlan,overrides:{...weekPlan.overrides,[di]:{...(weekPlan.overrides?.[di]||{}),[meal]:items}}});
+  };
+
+  const addExtraFood=(di,context,name)=>{
+    const cur=weekPlan.extraMeals?.[di]||[];
+    saveWP({...weekPlan,extraMeals:{...(weekPlan.extraMeals||{}),[di]:[...cur,{context,name}]}});
+    setExtraModal(null);
   };
 
   const swapFood=(di,meal,ii,newFood)=>{
@@ -1087,6 +1191,33 @@ export default function App(){
       }));
     });
     return totals;
+  };
+
+  const getDailyCalories=(dayISO,di)=>{
+    const dayLog=dailyLog[dayISO]||{};
+    const items=getDayItems(weekPlan,di);
+    const type=weekPlan.types[di];
+    let total=0;
+    const extraItems=weekPlan.extraMeals?.[di]||[];
+    MEAL_ORDER.forEach(m=>(items[m]||[]).forEach(item=>{
+      const le=dayLog[item.key];
+      if(le?.checked&&item.kcal!=null){
+        const qty=le.qtyOverride??item.qty?.[type]??item.qty?.Riposo??0;
+        const kcal=['g','ml'].includes(item.uom)?(item.kcal*qty/100):(item.kcal*qty);
+        total+=kcal;
+      }
+    }));
+    // also count extra meal items
+    extraItems.forEach((ei,i)=>{
+      const food=(FOOD_DB[ei.context]||[]).find(f=>f.name===ei.name);
+      if(!food||food.kcal==null)return;
+      const le=dayLog[`extra_${di}_${i}`];
+      if(!le?.checked)return;
+      const qty=le.qtyOverride??food.qty?.[type]??food.qty?.Riposo??0;
+      const kcal=['g','ml'].includes(food.uom)?(food.kcal*qty/100):(food.kcal*qty);
+      total+=kcal;
+    });
+    return Math.round(total);
   };
 
   const getDayCompliance=(iso,di)=>{
@@ -1143,7 +1274,8 @@ export default function App(){
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
           dailyLog={dailyLog} toggleLogItem={toggleLog} updateLogQty={updateQty}
           editQty={editQty} setEditQty={setEditQty} setSwapModal={setSwapModal}
-          setAddModal={setAddModal}/>}
+          setAddModal={setAddModal} getDailyCalories={getDailyCalories}
+          setExtraModal={setExtraModal}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
           weekPlan={weekPlan} dailyLog={dailyLog} getDayCompliance={getDayCompliance}/>}
       </div>
@@ -1163,6 +1295,7 @@ export default function App(){
 
       {swapModal&&<SwapModal modal={swapModal} weekPlan={weekPlan} onSwap={swapFood} onClose={()=>setSwapModal(null)}/>}
       {addModal&&<AddFoodModal modal={addModal} onAdd={addFood} onClose={()=>setAddModal(null)}/>}
+      {extraModal&&<ExtraFoodModal modal={extraModal} onAdd={addExtraFood} onClose={()=>setExtraModal(null)}/>}
     </div>
   );
 }
