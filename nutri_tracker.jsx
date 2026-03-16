@@ -553,7 +553,7 @@ function getDayItems(weekPlan, dayIndex){
     const items=src.map((item,i)=>{
       const fd=getFD(item.context,item.name);
       const qty=item.qtyOverride!==undefined?item.qtyOverride:(fd?.qty?.[type]??fd?.qty?.Riposo??0);
-      return{key:`${meal}_${i}`,meal,context:item.context,name:item.name,qty,uom:fd?.uom??'g',limitKey:fd?.limitKey};
+      return{key:`${meal}_${i}`,meal,context:item.context,name:item.name,qty,uom:fd?.uom??'g',kcal:fd?.kcal,limitKey:fd?.limitKey};
     }).filter(it=>it.qty>0);
     if(items.length>0)result[meal]=items;
   }
@@ -1202,7 +1202,7 @@ export default function App(){
     MEAL_ORDER.forEach(m=>(items[m]||[]).forEach(item=>{
       if(item.kcal==null)return;
       const le=dayLog[item.key];
-      const qty=le?.qtyOverride??item.qty?.[type]??item.qty?.Riposo??0;
+      const qty=le?.qtyOverride??item.qty??0;
       if(qty===0)return;
       const kcal=['g','ml'].includes(item.uom)?(item.kcal*qty/100):(item.kcal*qty);
       total+=kcal;
