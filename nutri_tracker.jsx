@@ -163,27 +163,28 @@ const FOOD_DB = {
     {name:'Olio EVO',qty:Q(10,10),uom:'g',limitKey:'oil_evo'},
   ],
   vegetable_side:[
-    {name:'Zucchine',           qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Broccoli',           qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Spinaci',            qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Insalata mista',     qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Carote',             qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Cavolfiore',         qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Fagiolini',          qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Peperoni',           qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Melanzane',          qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Asparagi',           qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Pomodori',           qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Pomodorini',         qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Rucola',             qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Finocchi',           qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Broccoletti di rapa',qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Bieta',              qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Zucca',              qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Lattuga',            qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Sedano',             qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Cicoria',            qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
-    {name:'Rape',               qty:Q(200,200),uom:'g',limitKey:'vegetable_free'},
+    {name:'Zucchine',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Broccoli',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Spinaci',            qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Insalata mista',     qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Carote',             qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Cavolfiore',         qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Fagiolini',          qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Peperoni',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Melanzane',          qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Asparagi',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Pomodori',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Pomodorini',         qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Rucola',             qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Finocchi',           qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Broccoletti di rapa',qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Bieta',              qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Zucca',              qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Lattuga',            qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Sedano',             qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Cicoria',            qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Rape',               qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
+    {name:'Funghi',             qty:Q(200,200),uom:'g',limitKey:'vegetable_daily'},
   ],
   pre_run_banana:[{name:'Banana pre-corsa',      qty:{Riposo:0,Corsa:1,Calcio:0},  uom:'pz',limitKey:'fruit_portion'}],
   pre_run_bread: [{name:'Pane bianco pre-corsa',  qty:{Riposo:0,Corsa:30,Calcio:0}, uom:'g', limitKey:'bread_family'}],
@@ -218,13 +219,13 @@ FOOD_DB.sat_protein_lunch = [
   {name:'Ricotta',           qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
 ];
 FOOD_DB.sat_veg_lunch = [
-  {name:'Bietole',       qty:Q(200,200), uom:'g', limitKey:'vegetable_free'},
-  {name:'Spinaci',       qty:Q(200,200), uom:'g', limitKey:'vegetable_free'},
-  {name:'Zucchine',      qty:Q(200,200), uom:'g', limitKey:'vegetable_free'},
-  {name:'Broccoli',      qty:Q(200,200), uom:'g', limitKey:'vegetable_free'},
-  {name:'Insalata mista',qty:Q(200,200), uom:'g', limitKey:'vegetable_free'},
-  {name:'Peperoni',      qty:Q(200,200), uom:'g', limitKey:'vegetable_free'},
-  {name:'Asparagi',      qty:Q(200,200), uom:'g', limitKey:'vegetable_free'},
+  {name:'Bietole',       qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
+  {name:'Spinaci',       qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
+  {name:'Zucchine',      qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
+  {name:'Broccoli',      qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
+  {name:'Insalata mista',qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
+  {name:'Peperoni',      qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
+  {name:'Asparagi',      qty:Q(200,200), uom:'g', limitKey:'vegetable_daily'},
 ];
 FOOD_DB.parmigiano_snack = [
   {name:'Parmigiano Reggiano',   qty:Q(30,30), uom:'g', limitKey:'hard_cheese'},
@@ -523,6 +524,7 @@ const LIMIT_GROUPS = [
   {key:'hard_cheese',label:'Formaggi stagionati',icon:'🫕',val:120,uom:'g'},
   {key:'cured_lean',label:'Affettati magri',icon:'🍖',val:350,uom:'g'},
   {key:'fruit_portion',label:'Frutta fresca',icon:'🍎',val:18,uom:'pz'},
+  {key:'vegetable_daily',label:'Verdure',icon:'🥦',val:3500,uom:'g'},
 ];
 
 // ── HELPERS ──────────────────────────────────────────────────
@@ -789,8 +791,8 @@ function OggiView({
             </div>
             <button
               onClick={()=>{
-                const mealContexts=[...new Set((dayItems[meal]||[]).map(i=>i.context).filter(Boolean))];
-                if(mealContexts.length>0)setAddModal({dayIndex:di,meal,type,contexts:mealContexts});
+                const mealContexts=[...new Set([...(dayItems[meal]||[]).map(i=>i.context).filter(Boolean),'vegetable_side'])];
+                setAddModal({dayIndex:di,meal,type,contexts:mealContexts});
               }}
               style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',fontSize:'12px',padding:'2px 8px'}}>
               + aggiungi
@@ -1079,7 +1081,7 @@ export default function App(){
       const items=getDayItems(weekPlan,di);
       MEAL_ORDER.forEach(m=>(items[m]||[]).forEach(item=>{
         const le=dayLog[item.key];
-        if(le?.checked&&item.limitKey&&item.limitKey!=='vegetable_free'){
+        if(le?.checked&&item.limitKey){
           totals[item.limitKey]=(totals[item.limitKey]||0)+(le.qtyOverride??item.qty);
         }
       }));
