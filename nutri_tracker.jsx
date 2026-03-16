@@ -78,6 +78,7 @@ const FOOD_DB = {
     {name:'Ricotta',               qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
     {name:'Formaggio Linea Osella',qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
     {name:'Formaggio stagionato',  qty:Q(120,150), uom:'g', limitKey:'hard_cheese'},
+    {name:'Feta',                  qty:Q(80,100),  uom:'g', limitKey:'hard_cheese'},
     {name:'Stracchino light',      qty:Q(120,150), uom:'g', limitKey:'fresh_cheese'},
     {name:'Formaggio fresco snack',qty:Q(40,40),   uom:'g', limitKey:'fresh_cheese'},
     {name:'Yogurt greco',          qty:Q(170,200), uom:'g', limitKey:'yogurt_skyr'},
@@ -260,6 +261,15 @@ FOOD_DB.sun_dinner_protein = [
   {name:'Bresaola',          qty:Q(80,100),  uom:'g', limitKey:'cured_lean'},
   {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
 ];
+FOOD_DB.breakfast_dairy = [
+  {name:'Yogurt greco',          qty:Q(170,170), uom:'g',  limitKey:'yogurt_skyr'},
+  {name:'Skyr',                  qty:Q(170,170), uom:'g',  limitKey:'yogurt_skyr'},
+  {name:'Kefir',                 qty:Q(200,200), uom:'ml', limitKey:'yogurt_skyr'},
+  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  limitKey:'fresh_cheese'},
+  {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  limitKey:'fresh_cheese'},
+  {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  limitKey:'fresh_cheese'},
+  {name:'Formaggio Linea Osella',qty:Q(40,40),   uom:'g',  limitKey:'fresh_cheese'},
+];
 FOOD_DB.speciali_farine = [
   {name:'Farina 0',           qty:Q(20,20), uom:'g', limitKey:'flour_special'},
   {name:'Farina 00',          qty:Q(20,20), uom:'g', limitKey:'flour_special'},
@@ -298,7 +308,7 @@ const TEMPLATES = {
   Riposo:{
     Colazione:[{context:'oats_breakfast',def:'Avena'},{context:'milk_portion',def:'Latte'},{context:'fruit_portion',def:'Mela'}],
     Spuntino:[{context:'fruit_portion',def:'Mela'}],
-    'Spuntino pom.':[{context:'yogurt_portion',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[{context:'lunch_carb_pasta',def:'Pasta integrale'},{context:'protein_equiv_chicken',def:'Petto di pollo'},{context:'vegetable_side',def:'Zucchine'},{context:'oil_portion',def:'Olio EVO'}],
     'Pre-workout':[],
     Cena:[{context:'dinner_carb_bread',def:'Pane integrale'},{context:'protein_equiv_chicken',def:'Merluzzo'},{context:'vegetable_side',def:'Broccoli'},{context:'oil_portion',def:'Olio EVO'}],
@@ -307,7 +317,7 @@ const TEMPLATES = {
   Corsa:{
     Colazione:[{context:'oats_breakfast',def:'Avena'},{context:'milk_portion',def:'Latte'},{context:'fruit_portion',def:'Banana'}],
     Spuntino:[{context:'fruit_portion',def:'Mela'}],
-    'Spuntino pom.':[{context:'yogurt_portion',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[{context:'lunch_carb_pasta',def:'Riso basmati'},{context:'protein_equiv_chicken',def:'Petto di pollo'},{context:'vegetable_side',def:'Zucchine'},{context:'oil_portion',def:'Olio EVO'}],
     'Pre-workout':[{context:'pre_run_banana',def:'Banana pre-corsa'},{context:'pre_run_bread',def:'Pane bianco pre-corsa'}],
     Cena:[{context:'dinner_carb_bread',def:'Patate'},{context:'protein_equiv_chicken',def:'Merluzzo'},{context:'vegetable_side',def:'Broccoli'},{context:'oil_portion',def:'Olio EVO'}],
@@ -316,7 +326,7 @@ const TEMPLATES = {
   Calcio:{
     Colazione:[{context:'oats_breakfast',def:'Avena'},{context:'milk_portion',def:'Latte'},{context:'fruit_portion',def:'Banana'}],
     Spuntino:[{context:'fruit_portion',def:'Mela'}],
-    'Spuntino pom.':[{context:'yogurt_portion',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[{context:'lunch_carb_pasta',def:'Riso basmati'},{context:'protein_equiv_chicken',def:'Petto di pollo'},{context:'vegetable_side',def:'Zucchine'},{context:'oil_portion',def:'Olio EVO'}],
     'Pre-workout':[{context:'pre_soccer_bread',def:'Pane pre-calcio'},{context:'pre_soccer_jam',def:'Marmellata pre-calcio'}],
     Cena:[{context:'dinner_carb_bread',def:'Patate'},{context:'protein_equiv_chicken',def:'Merluzzo'},{context:'vegetable_side',def:'Broccoli'},{context:'oil_portion',def:'Olio EVO'}],
@@ -330,7 +340,7 @@ const DAY_TEMPLATES = {
   // ── LUNEDÌ (dayIndex 0) — Corsa ───────────────────────────────
   0:{
     Colazione:[
-      {context:'yogurt_portion',   def:'Yogurt greco'},
+      {context:'breakfast_dairy',   def:'Yogurt greco'},
       {context:'fruit_portion',    def:'Banana'},
       {context:'oats_breakfast',   def:'Avena'},
       {context:'oil_portion',      def:'Olio EVO', qtyOverride:0}, // placeholder — farina di cocco (qty fissa)
@@ -338,10 +348,10 @@ const DAY_TEMPLATES = {
       // farina di cocco 10g e cacao 10g: item fissi
     ],
     Spuntino:[{context:'fruit_portion', def:'Pera'}],
-    'Spuntino pom.':[{context:'yogurt_portion',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[
       {context:'lunch_carb_pasta',       def:'Farro'},
-      {context:'feta_portion',           def:'Feta'},
+      {context:'protein_equiv_chicken',   def:'Feta'},
       {context:'vegetable_side',         def:'Pomodorini'},
       {context:'oil_portion',            def:'Olio EVO'},
     ],
@@ -361,7 +371,7 @@ const DAY_TEMPLATES = {
       {context:'fruit_portion',          def:'Mirtilli'},
       {context:'nuts_snack',             def:'Burro di arachidi', qtyOverride:0}, // miele al posto di PB — sotto
     ],
-    Spuntino:[{context:'yogurt_portion', def:'Yogurt greco'}],
+    Spuntino:[{context:'breakfast_dairy', def:'Yogurt greco'}],
     'Spuntino pom.':[{context:'fruit_portion',def:'Mela'},{context:'nuts_snack',def:'Noci'}],
     Pranzo:[
       {context:'lunch_carb_pasta',       def:'Riso'},
@@ -387,7 +397,7 @@ const DAY_TEMPLATES = {
       {context:'ciocco_snack',          def:'Cioccolato fondente'},
     ],
     Spuntino:[{context:'fruit_portion', def:'Mela'}],
-    'Spuntino pom.':[{context:'yogurt_portion',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[
       {context:'lunch_carb_pasta',      def:'Riso basmati'},
       {context:'protein_equiv_chicken', def:'Lenticchie cotte'},
@@ -397,7 +407,7 @@ const DAY_TEMPLATES = {
     'Pre-workout':[],
     Cena:[
       {context:'dinner_carb_bread',     def:'Pane integrale'},
-      {context:'ricotta_protein',       def:'Ricotta'},
+      {context:'protein_equiv_chicken',  def:'Ricotta'},
       {context:'vegetable_side',        def:'Spinaci'},
       {context:'oil_portion',           def:'Olio EVO'},
     ],
@@ -410,7 +420,7 @@ const DAY_TEMPLATES = {
       {context:'oats_breakfast',        def:'Avena'},
     ],
     Spuntino:[{context:'fruit_portion', def:'Kiwi'}],
-    'Spuntino pom.':[{context:'yogurt_portion',def:'Skyr'},{context:'nuts_snack',def:'Noci'}],
+    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Noci'}],
     Pranzo:[
       {context:'lunch_carb_pasta',      def:'Pasta integrale'},
       {context:'protein_equiv_chicken', def:'Petto di pollo'},
@@ -429,7 +439,7 @@ const DAY_TEMPLATES = {
   4:{
     Colazione:[
       {context:'dinner_carb_bread',     def:'Pane integrale'},
-      {context:'ricotta_protein',       def:'Ricotta'},
+      {context:'breakfast_dairy',        def:'Ricotta'},
     ],
     Spuntino:[{context:'fruit_portion', def:'Arancia'}],
     'Spuntino pom.':[{context:'nuts_snack',def:'Mandorle'},{context:'fruit_portion',def:'Mela'}],
@@ -452,7 +462,7 @@ const DAY_TEMPLATES = {
   5:{
     Colazione:[
       {context:'sat_bread',       def:'Pane di segale'},
-      {context:'philly_portion',  def:'Philadelphia light'},
+      {context:'breakfast_dairy', def:'Philadelphia light'},
       {context:'fruit_portion',   def:'Mirtilli'},
     ],
     Spuntino:[
@@ -483,7 +493,7 @@ const DAY_TEMPLATES = {
     Pranzo:[{context:'free_meal_lunch',def:'Pasto libero a scelta'}],
     'Pre-workout':[],
     Cena:[
-      {context:'sun_dinner_protein', def:'Uova'},
+      {context:'protein_equiv_chicken', def:'Uova'},
       {context:'vegetable_side',     def:'Insalata mista'},
       {context:'oil_portion',        def:'Olio EVO'},
     ],
