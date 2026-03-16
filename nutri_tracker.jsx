@@ -43,7 +43,7 @@ const Q = (r,c) => ({Riposo:r, Corsa:c, Calcio:c});
 const FOOD_DB = {
   protein_equiv_chicken:[
     {name:'Petto di pollo',        qty:Q(160,180), uom:'g', limitKey:'white_meat_fresh'},
-    {name:'Merluzzo',              qty:Q(180,200), uom:'g', limitKey:'fish_fresh'},
+    {name:'Merluzzo',              qty:Q(150,180), uom:'g', limitKey:'fish_fresh'},
     {name:'Salmone',               qty:Q(160,180), uom:'g', limitKey:'fish_fresh'},
     {name:'Orata',                 qty:Q(160,180), uom:'g', limitKey:'fish_fresh'},
     {name:'Spigola',               qty:Q(160,180), uom:'g', limitKey:'fish_fresh'},
@@ -69,6 +69,9 @@ const FOOD_DB = {
     {name:'Fagioli cotti',         qty:Q(150,160), uom:'g', limitKey:'legumes_cooked'},
     {name:'Lenticchie cotte',      qty:Q(150,160), uom:'g', limitKey:'legumes_cooked'},
     {name:'Lenticchie secche',     qty:Q(75,80),   uom:'g', limitKey:'legumes_dry'},
+    {name:'Fagioli secchi',        qty:Q(75,80),   uom:'g', limitKey:'legumes_dry'},
+    {name:'Fagioli cannellini secchi',qty:Q(75,80),uom:'g', limitKey:'legumes_dry'},
+    {name:'Piselli secchi',        qty:Q(75,80),   uom:'g', limitKey:'legumes_dry'},
     {name:'Piselli cotti',         qty:Q(150,160), uom:'g', limitKey:'legumes_cooked'},
     {name:'Fiocchi di latte',      qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
     {name:'Mozzarella',            qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
@@ -105,13 +108,13 @@ const FOOD_DB = {
     {name:'Pure di patate',    qty:Q(220,250),uom:'g', limitKey:'pure_family'},
     {name:'Crackers integrali',qty:Q(40,50),  uom:'g', limitKey:'crackers_family'},
     {name:'Grissini integrali',qty:Q(40,50),  uom:'g', limitKey:'grissini_family'},
-    {name:'Gallette di mais',  qty:Q(7,9),    uom:'pz',limitKey:'gallette_family'},
+    {name:'Gallette di mais',  qty:Q(8.75,8.75),uom:'pz',limitKey:'gallette_family'},
   ],
   oats_breakfast:[
     {name:'Avena',                     qty:Q(60,60), uom:'g',  limitKey:'oats_family'},
     {name:'Muesli',                    qty:Q(60,60), uom:'g',  limitKey:'oats_family'},
     {name:'Fette biscottate integrali',qty:Q(4,4),   uom:'pz', limitKey:'fette_family'},
-    {name:'Gallette di mais',          qty:Q(7,9),   uom:'pz', limitKey:'gallette_family'},
+    {name:'Gallette di mais',          qty:Q(8.75,8.75), uom:'pz', limitKey:'gallette_family'},
   ],
   milk_portion:[
     {name:'Latte',      qty:Q(250,250),uom:'ml',limitKey:'milk_default'},
@@ -153,6 +156,7 @@ const FOOD_DB = {
     {name:'Grana snack',       qty:Q(10,10),uom:'g',limitKey:'hard_cheese'},
     {name:'Formaggio fresco snack',qty:Q(40,40),uom:'g',limitKey:'fresh_cheese'},
     {name:'Burro di arachidi', qty:Q(20,20),uom:'g',limitKey:'pb'},
+    {name:'Marmellata zero zucc',qty:Q(20,20),uom:'g',limitKey:'jam_default'},
   ],
   oil_portion:[
     {name:'Olio EVO',qty:Q(10,10),uom:'g',limitKey:'oil_evo'},
@@ -206,7 +210,7 @@ FOOD_DB.sat_bread = [
 FOOD_DB.sat_protein_lunch = [
   {name:'Uova',              qty:Q(120,120), uom:'g', limitKey:'eggs'},
   {name:'Petto di pollo',    qty:Q(160,180), uom:'g', limitKey:'white_meat_fresh'},
-  {name:'Merluzzo',          qty:Q(180,200), uom:'g', limitKey:'fish_fresh'},
+  {name:'Merluzzo',          qty:Q(150,180), uom:'g', limitKey:'fish_fresh'},
   {name:'Tonno al naturale', qty:Q(100,120), uom:'g', limitKey:'tuna_canned'},
   {name:'Bresaola',          qty:Q(80,100),  uom:'g', limitKey:'cured_lean'},
   {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
@@ -239,7 +243,7 @@ FOOD_DB.sun_breakfast_sweet = [
 FOOD_DB.sun_biscuits = [
   {name:'Biscotti',                   qty:Q(40,40), uom:'g',  limitKey:'bread_family'},
   {name:'Fette biscottate integrali', qty:Q(4,4),   uom:'pz', limitKey:'fette_family'},
-  {name:'Gallette di mais',           qty:Q(7,9),   uom:'pz', limitKey:'gallette_family'},
+  {name:'Gallette di mais',           qty:Q(8.75,8.75), uom:'pz', limitKey:'gallette_family'},
 ];
 FOOD_DB.free_meal_lunch = [
   {name:'Lasagna (pasto libero)',          qty:Q(1,1), uom:'porz', limitKey:null},
@@ -251,10 +255,20 @@ FOOD_DB.free_meal_lunch = [
 FOOD_DB.sun_dinner_protein = [
   {name:'Uova',              qty:Q(120,120), uom:'g', limitKey:'eggs'},
   {name:'Petto di pollo',    qty:Q(160,180), uom:'g', limitKey:'white_meat_fresh'},
-  {name:'Merluzzo',          qty:Q(180,200), uom:'g', limitKey:'fish_fresh'},
+  {name:'Merluzzo',          qty:Q(150,180), uom:'g', limitKey:'fish_fresh'},
   {name:'Tonno al naturale', qty:Q(100,120), uom:'g', limitKey:'tuna_canned'},
   {name:'Bresaola',          qty:Q(80,100),  uom:'g', limitKey:'cured_lean'},
   {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', limitKey:'fresh_cheese'},
+];
+FOOD_DB.speciali_farine = [
+  {name:'Farina 0',           qty:Q(20,20), uom:'g', limitKey:'flour_special'},
+  {name:'Farina 00',          qty:Q(20,20), uom:'g', limitKey:'flour_special'},
+  {name:'Farina integrale',   qty:Q(20,20), uom:'g', limitKey:'flour_special'},
+  {name:'Farina di ceci',     qty:Q(30,30), uom:'g', limitKey:'flour_special'},
+  {name:'Farina di mais',     qty:Q(20,20), uom:'g', limitKey:'flour_special'},
+  {name:'Farina di cocco',    qty:Q(15,15), uom:'g', limitKey:'flour_special'},
+  {name:'Farina di mandorla', qty:Q(20,20), uom:'g', limitKey:'flour_special'},
+  {name:"Sciroppo d'amaro",   qty:Q(5,5),   uom:'g', limitKey:'syrup_special'},
 ];
 // Nuovi gruppi per i template feriali personalizzati
 FOOD_DB.feta_portion = [
