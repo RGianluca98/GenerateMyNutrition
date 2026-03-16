@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nutri Tracker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+      html, body, #root {
+        margin: 0;
+        width: 100%;
+        min-height: 100%;
+        background: #0f0e0c;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      const SUPABASE_URL = 'https://tjfcewmrwcmddppagzpc.supabase.co';
+      const SUPABASE_KEY = 'sb_publishable_9enQhwL4cw--42033zgwTA_5W6CWdXu';
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      window.storage = {
+        async get(key) {
+          const { data, error } = await sb
+            .from('user_data')
+            .select('value')
+            .eq('key', key)
+            .single();
+          if (error || !data) return null;
+          return { value: data.value };
+        },
+        async set(key, value) {
+          const { error } = await sb
+            .from('user_data')
+            .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+          return !error;
+        },
+      };
+
+      async function boot() {
+        const source = await fetch("./nutri_tracker.jsx").then((r) => r.text());
+        const transformedSource = source
+          .replace('import { useState, useEffect, useRef } from "react";', "const { useState, useEffect, useRef } = React;")
+          .replace("export default function App()", "function App()");
+
+        const wrapped = `
+          (function () {
+            ${transformedSource}
+            const root = ReactDOM.createRoot(document.getElementById("root"));
+            root.render(React.createElement(App));
+          })();
+        `;
+
+        const compiled = Babel.transform(wrapped, { presets: ["react"] }).code;
+        // eslint-disable-next-line no-new-func
+        new Function(compiled)();
+      }
+
+      boot().catch((err) => {
+        console.error(err);
+        document.body.innerHTML =
+          "<pre style='color:#f0ebe0;padding:16px'>Errore avvio app:\\n" +
+          String(err) +
+          "</pre>";
+      });
+    </script>
+  </body>
+</html>
