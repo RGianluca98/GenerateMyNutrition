@@ -781,7 +781,7 @@ function OggiView({
         <div style={{height:'4px',borderRadius:'2px',background:'var(--border)',overflow:'hidden'}}>
           <div style={{height:'100%',width:`${pct}%`,background:'var(--accent)',borderRadius:'2px',transition:'width 0.4s'}}/>
         </div>
-        {(()=>{const kcal=getDailyCalories(selectedISO,di);return kcal>0?<div style={{fontSize:'13px',color:'var(--accent)',fontWeight:600,marginTop:'8px',display:'flex',alignItems:'center',gap:'6px'}}><span>🔥</span><span>{kcal.toLocaleString('it-IT')} kcal consumate</span></div>:null;})()}
+        {(()=>{const kcal=getDailyCalories(selectedISO,di);return kcal>0?<div style={{fontSize:'13px',color:'var(--accent)',fontWeight:600,marginTop:'8px',display:'flex',alignItems:'center',gap:'6px'}}><span>🔥</span><span>{kcal.toLocaleString('it-IT')} kcal giornaliere</span></div>:null;})()}
       </div>
 
       {/* Meals */}
@@ -1200,20 +1200,20 @@ export default function App(){
     let total=0;
     const extraItems=weekPlan.extraMeals?.[di]||[];
     MEAL_ORDER.forEach(m=>(items[m]||[]).forEach(item=>{
+      if(item.kcal==null)return;
       const le=dayLog[item.key];
-      if(le?.checked&&item.kcal!=null){
-        const qty=le.qtyOverride??item.qty?.[type]??item.qty?.Riposo??0;
-        const kcal=['g','ml'].includes(item.uom)?(item.kcal*qty/100):(item.kcal*qty);
-        total+=kcal;
-      }
+      const qty=le?.qtyOverride??item.qty?.[type]??item.qty?.Riposo??0;
+      if(qty===0)return;
+      const kcal=['g','ml'].includes(item.uom)?(item.kcal*qty/100):(item.kcal*qty);
+      total+=kcal;
     }));
     // also count extra meal items
     extraItems.forEach((ei,i)=>{
       const food=(FOOD_DB[ei.context]||[]).find(f=>f.name===ei.name);
       if(!food||food.kcal==null)return;
       const le=dayLog[`extra_${di}_${i}`];
-      if(!le?.checked)return;
-      const qty=le.qtyOverride??food.qty?.[type]??food.qty?.Riposo??0;
+      const qty=le?.qtyOverride??food.qty?.[type]??food.qty?.Riposo??0;
+      if(qty===0)return;
       const kcal=['g','ml'].includes(food.uom)?(food.kcal*qty/100):(food.kcal*qty);
       total+=kcal;
     });
