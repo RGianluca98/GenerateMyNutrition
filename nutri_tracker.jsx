@@ -271,6 +271,29 @@ FOOD_DB.breakfast_dairy = [
   {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'fresh_cheese'},
   {name:'Formaggio Linea Osella',qty:Q(40,40),   uom:'g',  kcal:100, limitKey:'fresh_cheese'},
 ];
+FOOD_DB.breakfast_protein = [
+  {name:'Latte',                 qty:Q(250,250), uom:'ml', kcal:49,  limitKey:'milk_default'},
+  {name:'Latte di cocco',        qty:Q(200,200), uom:'ml', kcal:230, limitKey:'milk_default'},
+  {name:'Latte di riso',         qty:Q(200,200), uom:'ml', kcal:47,  limitKey:'milk_default'},
+  {name:'Latte di mandorla',     qty:Q(200,200), uom:'ml', kcal:24,  limitKey:'milk_default'},
+  {name:'Yogurt greco',          qty:Q(170,170), uom:'g',  kcal:59,  limitKey:'yogurt_skyr'},
+  {name:'Skyr',                  qty:Q(170,170), uom:'g',  kcal:63,  limitKey:'yogurt_skyr'},
+  {name:'Kefir',                 qty:Q(200,200), uom:'ml', kcal:52,  limitKey:'yogurt_skyr'},
+  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  kcal:174, limitKey:'fresh_cheese'},
+  {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  kcal:103, limitKey:'fresh_cheese'},
+  {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'fresh_cheese'},
+  {name:'Uova',                  qty:Q(2,2),     uom:'pz', kcal:70,  limitKey:'eggs'},
+];
+FOOD_DB.breakfast_toppings = [
+  {name:'Burro di arachidi',  qty:Q(20,20), uom:'g', kcal:588, limitKey:'pb'},
+  {name:'Nocciole',           qty:Q(15,15), uom:'g', kcal:628, limitKey:'nuts'},
+  {name:'Noci',               qty:Q(15,15), uom:'g', kcal:654, limitKey:'nuts'},
+  {name:'Mandorle',           qty:Q(15,15), uom:'g', kcal:579, limitKey:'nuts'},
+  {name:'Cacao amaro',        qty:Q(10,10), uom:'g', kcal:228, limitKey:null},
+  {name:'Miele',              qty:Q(10,10), uom:'g', kcal:304, limitKey:'honey_default'},
+  {name:'Farina di cocco',    qty:Q(10,10), uom:'g', kcal:604, limitKey:'flour_special'},
+  {name:"Sciroppo d'acero",   qty:Q(10,10), uom:'g', kcal:260, limitKey:null},
+];
 FOOD_DB.speciali_farine = [
   {name:'Farina 0',           qty:Q(20,20), uom:'g', kcal:364, limitKey:'flour_special'},
   {name:'Farina 00',          qty:Q(20,20), uom:'g', kcal:364, limitKey:'flour_special'},
@@ -341,12 +364,11 @@ const DAY_TEMPLATES = {
   // ── LUNEDÌ (dayIndex 0) — Corsa ───────────────────────────────
   0:{
     Colazione:[
-      {context:'breakfast_dairy',   def:'Yogurt greco'},
-      {context:'fruit_portion',    def:'Banana'},
-      {context:'oats_breakfast',   def:'Avena'},
-      {context:'oil_portion',      def:'Olio EVO', qtyOverride:0}, // placeholder — farina di cocco (qty fissa)
-      {context:'nuts_snack',       def:'Burro di arachidi'},
-      // farina di cocco 10g e cacao 10g: item fissi
+      {context:'breakfast_dairy',    def:'Yogurt greco'},
+      {context:'fruit_portion',      def:'Banana'},
+      {context:'oats_breakfast',     def:'Avena'},
+      {context:'breakfast_toppings', def:'Burro di arachidi'},
+      {context:'breakfast_toppings', def:'Cacao amaro'},
     ],
     Spuntino:[{context:'fruit_portion', def:'Pera'}],
     'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
@@ -367,10 +389,10 @@ const DAY_TEMPLATES = {
   // ── MARTEDÌ (dayIndex 1) — Riposo ─────────────────────────────
   1:{
     Colazione:[
-      {context:'protein_equiv_chicken',  def:'Uova'},
+      {context:'breakfast_protein',      def:'Uova'},
       {context:'fruit_portion',          def:'Banana'},
       {context:'fruit_portion',          def:'Mirtilli'},
-      {context:'nuts_snack',             def:'Burro di arachidi', qtyOverride:0}, // miele al posto di PB — sotto
+      {context:'breakfast_toppings',     def:'Miele'},
     ],
     Spuntino:[{context:'breakfast_dairy', def:'Yogurt greco'}],
     'Spuntino pom.':[{context:'fruit_portion',def:'Mela'},{context:'nuts_snack',def:'Noci'}],
@@ -392,9 +414,9 @@ const DAY_TEMPLATES = {
   // ── MERCOLEDÌ (dayIndex 2) — Riposo ───────────────────────────
   2:{
     Colazione:[
-      {context:'latte_riso_portion',    def:'Latte di riso'},
+      {context:'breakfast_protein',     def:'Latte di riso'},
       {context:'oats_breakfast',        def:'Fette biscottate integrali'},
-      {context:'nuts_snack',            def:'Nocciole',   qtyOverride:10},
+      {context:'breakfast_toppings',    def:'Nocciole'},
       {context:'ciocco_snack',          def:'Cioccolato fondente'},
     ],
     Spuntino:[{context:'fruit_portion', def:'Mela'}],
@@ -417,8 +439,10 @@ const DAY_TEMPLATES = {
   // ── GIOVEDÌ (dayIndex 3) — Corsa ──────────────────────────────
   3:{
     Colazione:[
+      {context:'breakfast_protein',     def:'Yogurt greco'},
       {context:'fruit_portion',         def:'Banana'},
       {context:'oats_breakfast',        def:'Avena'},
+      {context:'breakfast_toppings',    def:'Burro di arachidi'},
     ],
     Spuntino:[{context:'fruit_portion', def:'Kiwi'}],
     'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Noci'}],
@@ -440,7 +464,8 @@ const DAY_TEMPLATES = {
   4:{
     Colazione:[
       {context:'dinner_carb_bread',     def:'Pane integrale'},
-      {context:'breakfast_dairy',        def:'Ricotta'},
+      {context:'breakfast_dairy',       def:'Ricotta'},
+      {context:'breakfast_toppings',    def:'Miele'},
     ],
     Spuntino:[{context:'fruit_portion', def:'Arancia'}],
     'Spuntino pom.':[{context:'nuts_snack',def:'Mandorle'},{context:'fruit_portion',def:'Mela'}],
@@ -793,7 +818,7 @@ function OggiView({
             </div>
             <button
               onClick={()=>{
-                const mealContexts=[...new Set([...(dayItems[meal]||[]).map(i=>i.context).filter(Boolean),'vegetable_side'])];
+                const mealContexts=[...new Set([...(dayItems[meal]||[]).map(i=>i.context).filter(Boolean),'vegetable_side','breakfast_protein','breakfast_toppings'])];
                 setAddModal({dayIndex:di,meal,type,contexts:mealContexts});
               }}
               style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',fontSize:'12px',padding:'2px 8px'}}>
@@ -1053,7 +1078,8 @@ function ExtraFoodModal({modal,onAdd,onClose}){
     dinner_carb_bread:'Carboidrati cena/colazione',oats_breakfast:'Cereali colazione',
     milk_portion:'Latte e bevande',fruit_portion:'Frutta',yogurt_portion:'Yogurt',
     nuts_snack:'Frutta secca e snack',oil_portion:'Olio',vegetable_side:'Verdure',
-    breakfast_dairy:'Latticini colazione',speciali_farine:'Farine speciali',
+    breakfast_dairy:'Latticini colazione',breakfast_protein:'Proteine colazione',
+    breakfast_toppings:'Topping colazione',speciali_farine:'Farine speciali',
     latte_riso_portion:'Latte e alternative',ciocco_snack:'Cioccolato',
     sat_bread:'Pane',sat_protein_lunch:'Proteine',sat_veg_lunch:'Verdure',
     parmigiano_snack:'Formaggi snack',philly_portion:'Formaggi spalmabili',
