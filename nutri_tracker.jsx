@@ -1176,6 +1176,17 @@ export default function App(){
   const [expandedDay,setExpandedDay]=useState(null);
   const [selectedDayIndex,setSelectedDayIndex]=useState(()=>{const g=new Date().getDay();return g===0?6:g-1;});
 
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const wp=await window.storage.get('nt_weekPlan');
+        if(wp?.value)setWeekPlan(JSON.parse(wp.value));
+        const dl=await window.storage.get('nt_dailyLog');
+        if(dl?.value)setDailyLog(JSON.parse(dl.value));
+      }catch(e){}
+    })();
+  },[]);
+
   if(!unlocked){
     return(
       <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'32px',padding:'24px'}}>
@@ -1220,17 +1231,6 @@ export default function App(){
 
   const weekDates=getWeekDates(weekStart);
   const todayISO=toISO(new Date());
-
-  useEffect(()=>{
-    (async()=>{
-      try{
-        const wp=await window.storage.get('nt_weekPlan');
-        if(wp?.value)setWeekPlan(JSON.parse(wp.value));
-        const dl=await window.storage.get('nt_dailyLog');
-        if(dl?.value)setDailyLog(JSON.parse(dl.value));
-      }catch(e){}
-    })();
-  },[]);
 
   const saveWP=async p=>{setWeekPlan(p);try{await window.storage.set('nt_weekPlan',JSON.stringify(p));}catch(e){}};
   const saveDL=async l=>{setDailyLog(l);try{await window.storage.set('nt_dailyLog',JSON.stringify(l));}catch(e){}};
