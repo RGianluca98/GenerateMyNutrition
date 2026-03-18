@@ -665,7 +665,7 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan}){
 }
 
 // ── PLANNER VIEW ──────────────────────────────────────────────
-function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,expandedDay,setExpandedDay,getDayCompliance,todayISO}){
+function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,expandedDay,setExpandedDay,getDayCompliance,todayISO,resetMeal}){
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
       {weekDates.map((date,di)=>{
@@ -720,8 +720,17 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
               <div style={{padding:'0 14px 14px',borderTop:'1px solid var(--border)'}}>
                 {MEAL_ORDER.filter(m=>dayItems[m]).map(meal=>(
                   <div key={meal} style={{marginTop:'12px'}}>
-                    <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px',marginBottom:'6px'}}>
-                      {MEAL_LABEL[meal]} {meal.toUpperCase()}
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}}>
+                      <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>
+                        {MEAL_LABEL[meal]} {meal.toUpperCase()}
+                      </div>
+                      {weekPlan.overrides?.[di]?.[meal]&&(
+                        <button onClick={()=>resetMeal(di,meal)}
+                          title="Ripristina template"
+                          style={{background:'none',border:'1px solid var(--border)',borderRadius:'5px',color:'var(--text3)',fontSize:'11px',padding:'1px 6px',cursor:'pointer'}}>
+                          ↺ reset
+                        </button>
+                      )}
                     </div>
                     {dayItems[meal].map((item,ii)=>(
                       <div key={item.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
@@ -1139,7 +1148,23 @@ function ExtraFoodModal({modal,onAdd,onClose}){
 }
 
 // ── APP ROOT ──────────────────────────────────────────────────
+const APP_PIN='141098';
 export default function App(){
+  const [unlocked,setUnlocked]=useState(false);
+  const [pinInput,setPinInput]=useState('');
+  const [pinError,setPinError]=useState(false);
+
+  const handlePin=(digit)=>{
+    if(pinError)return;
+    const next=pinInput+digit;
+    setPinInput(next);
+    if(next.length===APP_PIN.length){
+      if(next===APP_PIN){setUnlocked(true);}
+      else{setPinError(true);setTimeout(()=>{setPinInput('');setPinError(false);},700);}
+    }
+  };
+  const handleDel=()=>{if(!pinError)setPinInput(p=>p.slice(0,-1));};
+
   const [tab,setTab]=useState('home');
   const [weekStart,setWeekStart]=useState(()=>getWeekStart());
   const [weekPlan,setWeekPlan]=useState({types:['Riposo','Corsa','Riposo','Corsa','Calcio','Corsa','Riposo'],overrides:{}});
@@ -1150,6 +1175,48 @@ export default function App(){
   const [editQty,setEditQty]=useState(null);
   const [expandedDay,setExpandedDay]=useState(null);
   const [selectedDayIndex,setSelectedDayIndex]=useState(()=>{const g=new Date().getDay();return g===0?6:g-1;});
+
+  if(!unlocked){
+    return(
+      <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'32px',padding:'24px'}}>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontSize:'36px',marginBottom:'8px'}}>🥗</div>
+          <div style={{fontFamily:'var(--display)',fontSize:'26px',color:'var(--text)'}}>NutriTracker</div>
+          <div style={{fontSize:'13px',color:'var(--text2)',marginTop:'6px'}}>Inserisci il codice di accesso</div>
+        </div>
+        {/* Dots */}
+        <div style={{display:'flex',gap:'14px'}}>
+          {Array.from({length:APP_PIN.length}).map((_,i)=>(
+            <div key={i} style={{width:'14px',height:'14px',borderRadius:'50%',
+              background:i<pinInput.length?(pinError?'#e05c5c':'var(--accent)'):'var(--border)',
+              transition:'background 0.15s',
+              boxShadow:i<pinInput.length&&!pinError?'0 0 8px var(--accent)':undefined}}/>
+          ))}
+        </div>
+        {/* Keypad */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',width:'220px'}}>
+          {[1,2,3,4,5,6,7,8,9].map(n=>(
+            <button key={n} onClick={()=>handlePin(String(n))}
+              style={{height:'60px',borderRadius:'14px',border:'1px solid var(--border)',background:'var(--card)',
+                color:'var(--text)',fontSize:'22px',fontWeight:600,cursor:'pointer',transition:'background 0.1s'}}>
+              {n}
+            </button>
+          ))}
+          <div/>
+          <button onClick={()=>handlePin('0')}
+            style={{height:'60px',borderRadius:'14px',border:'1px solid var(--border)',background:'var(--card)',
+              color:'var(--text)',fontSize:'22px',fontWeight:600,cursor:'pointer'}}>
+            0
+          </button>
+          <button onClick={handleDel}
+            style={{height:'60px',borderRadius:'14px',border:'1px solid var(--border)',background:'var(--card)',
+              color:'var(--text2)',fontSize:'20px',cursor:'pointer'}}>
+            ⌫
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const weekDates=getWeekDates(weekStart);
   const todayISO=toISO(new Date());
@@ -1172,6 +1239,11 @@ export default function App(){
 
   const setMealOverrides=(di,meal,items)=>{
     saveWP({...weekPlan,overrides:{...weekPlan.overrides,[di]:{...(weekPlan.overrides?.[di]||{}),[meal]:items}}});
+  };
+  const resetMeal=(di,meal)=>{
+    const newOverrides={...weekPlan.overrides};
+    if(newOverrides[di]){const d={...newOverrides[di]};delete d[meal];newOverrides[di]=d;}
+    saveWP({...weekPlan,overrides:newOverrides});
   };
 
   const addExtraFood=(di,context,name)=>{
@@ -1295,7 +1367,7 @@ export default function App(){
         {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan}/>}
         {tab==='planner'&&<PlannerView weekDates={weekDates} weekPlan={weekPlan} dailyLog={dailyLog}
           changeDayType={changeDayType} setSwapModal={setSwapModal} expandedDay={expandedDay}
-          setExpandedDay={setExpandedDay} getDayCompliance={getDayCompliance} todayISO={todayISO}/>}
+          setExpandedDay={setExpandedDay} getDayCompliance={getDayCompliance} todayISO={todayISO} resetMeal={resetMeal}/>}
         {tab==='oggi'&&<OggiView weekPlan={weekPlan} weekDates={weekDates} todayISO={todayISO}
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
           dailyLog={dailyLog} toggleLogItem={toggleLog} updateLogQty={updateQty}
