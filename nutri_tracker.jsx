@@ -588,6 +588,11 @@ function getDayItems(weekPlan, dayIndex, dateISO, dayTypes){
   return result;
 }
 
+function calcKcal(item){
+  if(item.kcal==null||item.qty==null||item.qty===0)return null;
+  return Math.round(['g','ml'].includes(item.uom)?(item.kcal*item.qty/100):(item.kcal*item.qty));
+}
+
 // ── STYLES HELPERS ────────────────────────────────────────────
 const S={
   card:(extra={})=>({background:'var(--card)',borderRadius:'14px',boxShadow:'var(--shadow)',...extra}),
@@ -781,6 +786,7 @@ function OggiView({
   const allItems=MEAL_ORDER.flatMap(m=>dayItems[m]||[]);
   const checked=allItems.filter(it=>dayLog[it.key]?.checked).length;
   const pct=allItems.length?Math.round(checked/allItems.length*100):0;
+  const totalKcal=allItems.reduce((sum,item)=>sum+(calcKcal(item)||0),0);
 
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
@@ -842,14 +848,26 @@ function OggiView({
             );
           })}
         </div>
+        {totalKcal>0&&(
+          <div style={{marginTop:'10px',fontSize:'13px',color:'var(--accent)',fontWeight:600,
+            display:'flex',alignItems:'center',gap:'6px'}}>
+            <span>🔥</span>
+            <span>{totalKcal.toLocaleString('it-IT')} kcal nel piano di oggi</span>
+          </div>
+        )}
       </div>
 
       {/* Meals */}
-      {MEAL_ORDER.filter(m=>dayItems[m]).map(meal=>(
+      {MEAL_ORDER.filter(m=>dayItems[m]).map(meal=>{
+        const mealKcal=(dayItems[meal]||[]).reduce((sum,item)=>sum+(calcKcal(item)||0),0);
+        return(
         <div key={meal} style={S.card({padding:'12px 14px'})}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-            <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>
-              {MEAL_LABEL[meal]} {meal.toUpperCase()}
+            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+              <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>
+                {MEAL_LABEL[meal]} {meal.toUpperCase()}
+              </div>
+              {mealKcal>0&&<span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600}}>{mealKcal} kcal</span>}
             </div>
             <button
               onClick={()=>{
@@ -865,6 +883,7 @@ function OggiView({
             const isChecked=!!logEntry.checked;
             const displayQty=logEntry.qtyOverride??item.qty;
             const isEditing=editQty?.key===item.key;
+            const itemKcal=calcKcal({...item,qty:displayQty});
             return(
               <div key={item.key} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:'1px solid var(--border)',opacity:isChecked?0.6:1,transition:'opacity 0.2s'}}>
                 {/* Checkbox */}
@@ -894,17 +913,21 @@ function OggiView({
                     onSave={v=>{updateLogQty(selectedISO,item.key,v);setEditQty(null);}}
                     onCancel={()=>setEditQty(null)}/>
                 ):(
-                  <button onClick={()=>setEditQty({key:item.key})}
-                    style={{fontSize:'12px',color:'var(--text2)',fontWeight:500,background:'var(--chip)',
-                      padding:'3px 10px',borderRadius:'999px',border:'none',minWidth:'56px',textAlign:'center'}}>
-                    {displayQty} {item.uom}
-                  </button>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
+                    <button onClick={()=>setEditQty({key:item.key})}
+                      style={{fontSize:'12px',color:'var(--text2)',fontWeight:500,background:'var(--chip)',
+                        padding:'3px 10px',borderRadius:'999px',border:'none',minWidth:'56px',textAlign:'center'}}>
+                      {displayQty} {item.uom}
+                    </button>
+                    {itemKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{itemKcal} kcal</span>}
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
-      ))}
+        );
+      })}
       {(weekPlan.extraMeals?.[selectedISO]||[]).length>0&&(
         <div style={S.card({padding:'12px 14px'})}>
           <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px',marginBottom:'10px'}}>EXTRA</div>
