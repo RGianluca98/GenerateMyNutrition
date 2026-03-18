@@ -558,23 +558,26 @@ function getWeekStart(d=new Date()){
 }
 function getWeekDates(ws){return Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d;});}
 function toISO(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
+function getDayType(dayTypes,weekPlan,dateISO,dayIndex){
+  return dayTypes?.[dateISO]??weekPlan.types[dayIndex];
+}
 function getFD(context,name){return FOOD_DB[context]?.find(f=>f.name===name);}
 function getTemplateForDay(weekPlan, dayIndex){
   const type=weekPlan.types[dayIndex];
   return DAY_TEMPLATES[dayIndex] ?? TEMPLATES[type] ?? {};
 }
-function getMealSourceItems(weekPlan, dayIndex, meal){
+function getMealSourceItems(weekPlan, dayIndex, meal, dateISO){
   const tmpl=getTemplateForDay(weekPlan,dayIndex);
   const tmplItems=tmpl[meal]||[];
   const base=tmplItems.map(t=>({context:t.context,name:t.def,qtyOverride:t.qtyOverride}));
-  return weekPlan.overrides?.[dayIndex]?.[meal]||base;
+  return weekPlan.overrides?.[dateISO]?.[meal]||base;
 }
 
-function getDayItems(weekPlan, dayIndex){
-  const type=weekPlan.types[dayIndex];
+function getDayItems(weekPlan, dayIndex, dateISO, dayTypes){
+  const type=getDayType(dayTypes,weekPlan,dateISO,dayIndex);
   const result={};
   for(const meal of MEAL_ORDER){
-    const src=getMealSourceItems(weekPlan,dayIndex,meal);
+    const src=getMealSourceItems(weekPlan,dayIndex,meal,dateISO);
     const items=src.map((item,i)=>{
       const fd=getFD(item.context,item.name);
       const qty=item.qtyOverride!==undefined?item.qtyOverride:(fd?.qty?.[type]??fd?.qty?.Riposo??0);
@@ -625,9 +628,9 @@ function NavGlyph({id,active}){
   );
 }
 
-function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan}){
+function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
   const todayISO=toISO(weekDates[selectedDayIndex]);
-  const dayItems=getDayItems(weekPlan,selectedDayIndex);
+  const dayItems=getDayItems(weekPlan,selectedDayIndex,toISO(weekDates[selectedDayIndex]),dayTypes);
   const dayLog=dailyLog[todayISO]||{};
   const allItems=MEAL_ORDER.flatMap(m=>dayItems[m]||[]);
   const checked=allItems.filter(it=>dayLog[it.key]?.checked).length;
@@ -665,14 +668,14 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan}){
 }
 
 // ── PLANNER VIEW ──────────────────────────────────────────────
-function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,expandedDay,setExpandedDay,getDayCompliance,todayISO,resetMeal}){
+function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,expandedDay,setExpandedDay,getDayCompliance,todayISO,resetMeal,dayTypes}){
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
       {weekDates.map((date,di)=>{
         const iso=toISO(date);const isToday=iso===todayISO;
-        const type=weekPlan.types[di];const tc=TYPE_CFG[type];
+        const type=getDayType(dayTypes,weekPlan,iso,di);const tc=TYPE_CFG[type];
         const comp=getDayCompliance(iso,di);const expanded=expandedDay===di;
-        const dayItems=getDayItems(weekPlan,di);
+        const dayItems=getDayItems(weekPlan,di,iso,dayTypes);
         return(
           <div key={di} style={{...S.card(),borderLeft:`2px solid ${expanded?'var(--accent)':'transparent'}`,transition:'all 0.2s',overflow:'hidden'}}>
             {/* Day Header */}
@@ -692,7 +695,7 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
               {!WEEKEND_TEMPLATES[di] && (
               <div style={{display:'flex',gap:'4px'}}>
                 {['Riposo','Corsa','Calcio'].map(t=>(
-                  <button key={t} onClick={e=>{e.stopPropagation();changeDayType(di,t);}}
+                  <button key={t} onClick={e=>{e.stopPropagation();changeDayType(iso,t);}}
                     style={{padding:'4px 7px',borderRadius:'6px',border:'1px solid var(--border)',fontSize:'10px',fontWeight:600,
                       background:type===t?'var(--accent-soft)':'transparent',
                       color:type===t?'var(--accent)':'var(--text3)',transition:'all 0.15s',display:'flex',alignItems:'center',gap:'4px'}}>
@@ -724,8 +727,8 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
                       <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>
                         {MEAL_LABEL[meal]} {meal.toUpperCase()}
                       </div>
-                      {weekPlan.overrides?.[di]?.[meal]&&(
-                        <button onClick={()=>resetMeal(di,meal)}
+                      {weekPlan.overrides?.[iso]?.[meal]&&(
+                        <button onClick={()=>resetMeal(iso,meal)}
                           title="Ripristina template"
                           style={{background:'none',border:'1px solid var(--border)',borderRadius:'5px',color:'var(--text3)',fontSize:'11px',padding:'1px 6px',cursor:'pointer'}}>
                           ↺ reset
@@ -734,7 +737,7 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
                     </div>
                     {dayItems[meal].map((item,ii)=>(
                       <div key={item.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
-                        <button onClick={()=>{if(FOOD_DB[item.context]?.length>1)setSwapModal({dayIndex:di,meal,itemIndex:ii,context:item.context,currentName:item.name,type});}}
+                        <button onClick={()=>{if(FOOD_DB[item.context]?.length>1)setSwapModal({dateISO:iso,dayIndex:di,meal,itemIndex:ii,context:item.context,currentName:item.name,type});}}
                           style={{background:'none',border:'none',color:FOOD_DB[item.context]?.length>1?'var(--text)':'var(--text2)',
                             textAlign:'left',fontSize:'13px',cursor:FOOD_DB[item.context]?.length>1?'pointer':'default',display:'flex',alignItems:'center',gap:'4px'}}>
                           {item.name}
@@ -760,14 +763,14 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
 function OggiView({
   weekPlan,weekDates,todayISO,selectedDayIndex,setSelectedDayIndex,dailyLog,
   toggleLogItem,updateLogQty,editQty,setEditQty,setSwapModal,setAddModal,
-  getDailyCalories,setExtraModal
+  setExtraModal,dayTypes
 }){
   const di=selectedDayIndex>=0&&selectedDayIndex<7?selectedDayIndex:0;
   const selectedISO=toISO(weekDates[di]);
   const isToday=selectedISO===todayISO;
-  const type=weekPlan.types[di];
+  const type=getDayType(dayTypes,weekPlan,selectedISO,di);
   const tc=TYPE_CFG[type];
-  const dayItems=getDayItems(weekPlan,di);
+  const dayItems=getDayItems(weekPlan,di,selectedISO,dayTypes);
   const dayLog=dailyLog[selectedISO]||{};
   const allItems=MEAL_ORDER.flatMap(m=>dayItems[m]||[]);
   const checked=allItems.filter(it=>dayLog[it.key]?.checked).length;
@@ -815,7 +818,6 @@ function OggiView({
         <div style={{height:'4px',borderRadius:'2px',background:'var(--border)',overflow:'hidden'}}>
           <div style={{height:'100%',width:`${pct}%`,background:'var(--accent)',borderRadius:'2px',transition:'width 0.4s'}}/>
         </div>
-        {(()=>{const kcal=getDailyCalories(selectedISO,di);return kcal>0?<div style={{fontSize:'13px',color:'var(--accent)',fontWeight:600,marginTop:'8px',display:'flex',alignItems:'center',gap:'6px'}}><span>🔥</span><span>{kcal.toLocaleString('it-IT')} kcal giornaliere</span></div>:null;})()}
       </div>
 
       {/* Meals */}
@@ -828,7 +830,7 @@ function OggiView({
             <button
               onClick={()=>{
                 const mealContexts=[...new Set([...(dayItems[meal]||[]).map(i=>i.context).filter(Boolean),'vegetable_side','breakfast_protein','breakfast_toppings'])];
-                setAddModal({dayIndex:di,meal,type,contexts:mealContexts});
+                setAddModal({dateISO:selectedISO,dayIndex:di,meal,type,contexts:mealContexts});
               }}
               style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',fontSize:'12px',padding:'2px 8px'}}>
               + aggiungi
@@ -851,7 +853,7 @@ function OggiView({
                 <button
                   onClick={()=>{
                     if(FOOD_DB[item.context]?.length>1){
-                      setSwapModal({dayIndex:di,meal,itemIndex:Number(item.key.split('_').pop()),context:item.context,currentName:item.name,type});
+                      setSwapModal({dateISO:selectedISO,dayIndex:di,meal,itemIndex:Number(item.key.split('_').pop()),context:item.context,currentName:item.name,type});
                     }
                   }}
                   style={{flex:1,background:'none',border:'none',textAlign:'left',padding:0,fontSize:'13px',
@@ -879,13 +881,13 @@ function OggiView({
           })}
         </div>
       ))}
-      {(weekPlan.extraMeals?.[di]||[]).length>0&&(
+      {(weekPlan.extraMeals?.[selectedISO]||[]).length>0&&(
         <div style={S.card({padding:'12px 14px'})}>
           <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px',marginBottom:'10px'}}>EXTRA</div>
-          {(weekPlan.extraMeals[di]||[]).map((ei,i)=>{
+          {(weekPlan.extraMeals[selectedISO]||[]).map((ei,i)=>{
             const food=(FOOD_DB[ei.context]||[]).find(f=>f.name===ei.name);
             if(!food)return null;
-            const key=`extra_${di}_${i}`;
+            const key=`extra_${selectedISO}_${i}`;
             const le=(dailyLog[selectedISO]||{})[key]||{};
             const qty=le.qtyOverride??food.qty?.[type]??food.qty?.Riposo??0;
             return(
@@ -902,7 +904,7 @@ function OggiView({
         </div>
       )}
       <div style={{padding:'8px 0'}}>
-        <button onClick={()=>setExtraModal({dayIndex:di,type})}
+        <button onClick={()=>setExtraModal({dateISO:selectedISO,dayIndex:di,type})}
           style={{width:'100%',padding:'12px',background:'var(--surface)',border:'1px dashed var(--border)',borderRadius:'12px',color:'var(--text2)',fontSize:'13px',fontWeight:500,cursor:'pointer'}}>
           ＋ Pasto extra
         </button>
@@ -928,7 +930,7 @@ function QtyEditor({value,uom,onSave,onCancel}){
 }
 
 // ── DASHBOARD VIEW ─────────────────────────────────────────────
-function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayCompliance}){
+function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayCompliance,dayTypes}){
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
       {/* Daily compliance grid */}
@@ -937,7 +939,7 @@ function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayComplianc
         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'6px'}}>
           {weekDates.map((date,di)=>{
             const iso=toISO(date);const isToday=iso===toISO(new Date());
-            const comp=getDayCompliance(iso,di);const type=weekPlan.types[di];
+            const comp=getDayCompliance(iso,di);const type=getDayType(dayTypes,weekPlan,iso,di);
             const tc=TYPE_CFG[type];
             return(
               <div key={di} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px'}}>
@@ -996,7 +998,7 @@ function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayComplianc
 
 // ── SWAP MODAL ────────────────────────────────────────────────
 function SwapModal({modal,weekPlan,onSwap,onClose}){
-  const {dayIndex,meal,itemIndex,context,currentName,type}=modal;
+  const {dateISO,dayIndex,meal,itemIndex,context,currentName,type}=modal;
   const alternatives=FOOD_DB[context]||[];
   return(
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'flex-end'}}
@@ -1015,7 +1017,7 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
             const qty=alt.qty[type];
             if(qty===0)return null;
             return(
-              <button key={i} onClick={()=>onSwap(dayIndex,meal,itemIndex,alt.name)}
+              <button key={i} onClick={()=>onSwap(dateISO,dayIndex,meal,itemIndex,alt.name)}
                 style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
                   borderRadius:'10px',border:`1px solid ${isCurrent?'var(--accent)':'var(--border)'}`,
                   background:isCurrent?'var(--accent-soft)':'var(--card)',cursor:'pointer'}}>
@@ -1036,7 +1038,7 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
 }
 
 function AddFoodModal({modal,onAdd,onClose}){
-  const {dayIndex,meal,type,contexts}=modal;
+  const {dateISO,dayIndex,meal,type,contexts}=modal;
   const [context,setContext]=useState(contexts[0]||'');
   const options=(FOOD_DB[context]||[]).filter(f=>(f.qty?.[type]??f.qty?.Riposo??0)>0);
   return(
@@ -1064,7 +1066,7 @@ function AddFoodModal({modal,onAdd,onClose}){
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
           {options.map((food,i)=>(
-            <button key={i} onClick={()=>onAdd(dayIndex,meal,context,food.name)}
+            <button key={i} onClick={()=>onAdd(dateISO,dayIndex,meal,context,food.name)}
               style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
                 borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer'}}>
               <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
@@ -1080,7 +1082,7 @@ function AddFoodModal({modal,onAdd,onClose}){
 }
 
 function ExtraFoodModal({modal,onAdd,onClose}){
-  const {type}=modal;
+  const {type,dateISO}=modal;
   const allContexts=Object.keys(FOOD_DB);
   const CONTEXT_LABELS={
     protein_equiv_chicken:'Proteine',lunch_carb_pasta:'Carboidrati pranzo',
@@ -1132,7 +1134,7 @@ function ExtraFoodModal({modal,onAdd,onClose}){
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
           {options.map((food,i)=>(
-            <button key={i} onClick={()=>onAdd(modal.dayIndex,context,food.name)}
+            <button key={i} onClick={()=>onAdd(dateISO,context,food.name)}
               style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
                 borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer'}}>
               <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
@@ -1175,6 +1177,7 @@ export default function App(){
   const [editQty,setEditQty]=useState(null);
   const [expandedDay,setExpandedDay]=useState(null);
   const [selectedDayIndex,setSelectedDayIndex]=useState(()=>{const g=new Date().getDay();return g===0?6:g-1;});
+  const [dayTypes,setDayTypes]=useState({});
 
   useEffect(()=>{
     (async()=>{
@@ -1183,6 +1186,8 @@ export default function App(){
         if(wp?.value)setWeekPlan(JSON.parse(wp.value));
         const dl=await window.storage.get('nt_dailyLog');
         if(dl?.value)setDailyLog(JSON.parse(dl.value));
+        const dt=await window.storage.get('nt_dayTypes');
+        if(dt?.value)setDayTypes(JSON.parse(dt.value));
       }catch(e){}
     })();
   },[]);
@@ -1235,34 +1240,38 @@ export default function App(){
   const saveWP=async p=>{setWeekPlan(p);try{await window.storage.set('nt_weekPlan',JSON.stringify(p));}catch(e){}};
   const saveDL=async l=>{setDailyLog(l);try{await window.storage.set('nt_dailyLog',JSON.stringify(l));}catch(e){}};
 
-  const changeDayType=(di,t)=>saveWP({...weekPlan,types:weekPlan.types.map((x,i)=>i===di?t:x)});
-
-  const setMealOverrides=(di,meal,items)=>{
-    saveWP({...weekPlan,overrides:{...weekPlan.overrides,[di]:{...(weekPlan.overrides?.[di]||{}),[meal]:items}}});
+  const changeDayType=(dateISO,t)=>{
+    const newDayTypes={...dayTypes,[dateISO]:t};
+    setDayTypes(newDayTypes);
+    try{window.storage.set('nt_dayTypes',JSON.stringify(newDayTypes));}catch(e){}
   };
-  const resetMeal=(di,meal)=>{
+
+  const setMealOverrides=(dateISO,meal,items)=>{
+    saveWP({...weekPlan,overrides:{...weekPlan.overrides,[dateISO]:{...(weekPlan.overrides?.[dateISO]||{}),[meal]:items}}});
+  };
+  const resetMeal=(dateISO,meal)=>{
     const newOverrides={...weekPlan.overrides};
-    if(newOverrides[di]){const d={...newOverrides[di]};delete d[meal];newOverrides[di]=d;}
+    if(newOverrides[dateISO]){const d={...newOverrides[dateISO]};delete d[meal];newOverrides[dateISO]=d;}
     saveWP({...weekPlan,overrides:newOverrides});
   };
 
-  const addExtraFood=(di,context,name)=>{
-    const cur=weekPlan.extraMeals?.[di]||[];
-    saveWP({...weekPlan,extraMeals:{...(weekPlan.extraMeals||{}),[di]:[...cur,{context,name}]}});
+  const addExtraFood=(dateISO,context,name)=>{
+    const cur=weekPlan.extraMeals?.[dateISO]||[];
+    saveWP({...weekPlan,extraMeals:{...(weekPlan.extraMeals||{}),[dateISO]:[...cur,{context,name}]}});
     setExtraModal(null);
   };
 
-  const swapFood=(di,meal,ii,newFood)=>{
-    const cur=getMealSourceItems(weekPlan,di,meal);
+  const swapFood=(dateISO,dayIndex,meal,ii,newFood)=>{
+    const cur=getMealSourceItems(weekPlan,dayIndex,meal,dateISO);
     const upd=cur.map((item,i)=>i===ii?{...item,name:newFood}:item);
-    setMealOverrides(di,meal,upd);
+    setMealOverrides(dateISO,meal,upd);
     setSwapModal(null);
   };
 
-  const addFood=(di,meal,context,name)=>{
-    const cur=getMealSourceItems(weekPlan,di,meal);
+  const addFood=(dateISO,dayIndex,meal,context,name)=>{
+    const cur=getMealSourceItems(weekPlan,dayIndex,meal,dateISO);
     const upd=[...cur,{context,name}];
-    setMealOverrides(di,meal,upd);
+    setMealOverrides(dateISO,meal,upd);
     setAddModal(null);
   };
 
@@ -1280,7 +1289,7 @@ export default function App(){
     const totals={};
     weekDates.forEach((date,di)=>{
       const iso=toISO(date);const dayLog=dailyLog[iso]||{};
-      const items=getDayItems(weekPlan,di);
+      const items=getDayItems(weekPlan,di,iso,dayTypes);
       MEAL_ORDER.forEach(m=>(items[m]||[]).forEach(item=>{
         const le=dayLog[item.key];
         if(le?.checked&&item.limitKey){
@@ -1291,35 +1300,8 @@ export default function App(){
     return totals;
   };
 
-  const getDailyCalories=(dayISO,di)=>{
-    const dayLog=dailyLog[dayISO]||{};
-    const items=getDayItems(weekPlan,di);
-    const type=weekPlan.types[di];
-    let total=0;
-    const extraItems=weekPlan.extraMeals?.[di]||[];
-    MEAL_ORDER.forEach(m=>(items[m]||[]).forEach(item=>{
-      if(item.kcal==null)return;
-      const le=dayLog[item.key];
-      const qty=le?.qtyOverride??item.qty??0;
-      if(qty===0)return;
-      const kcal=['g','ml'].includes(item.uom)?(item.kcal*qty/100):(item.kcal*qty);
-      total+=kcal;
-    }));
-    // also count extra meal items
-    extraItems.forEach((ei,i)=>{
-      const food=(FOOD_DB[ei.context]||[]).find(f=>f.name===ei.name);
-      if(!food||food.kcal==null)return;
-      const le=dayLog[`extra_${di}_${i}`];
-      const qty=le?.qtyOverride??food.qty?.[type]??food.qty?.Riposo??0;
-      if(qty===0)return;
-      const kcal=['g','ml'].includes(food.uom)?(food.kcal*qty/100):(food.kcal*qty);
-      total+=kcal;
-    });
-    return Math.round(total);
-  };
-
   const getDayCompliance=(iso,di)=>{
-    const items=getDayItems(weekPlan,di);const dl=dailyLog[iso]||{};
+    const items=getDayItems(weekPlan,di,iso,dayTypes);const dl=dailyLog[iso]||{};
     const all=MEAL_ORDER.flatMap(m=>items[m]||[]);
     if(!all.length)return null;
     return Math.round(all.filter(it=>dl[it.key]?.checked).length/all.length*100);
@@ -1364,18 +1346,18 @@ export default function App(){
 
       {/* Content */}
       <div style={{paddingTop:'12px'}}>
-        {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan}/>}
+        {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}/>}
         {tab==='planner'&&<PlannerView weekDates={weekDates} weekPlan={weekPlan} dailyLog={dailyLog}
           changeDayType={changeDayType} setSwapModal={setSwapModal} expandedDay={expandedDay}
-          setExpandedDay={setExpandedDay} getDayCompliance={getDayCompliance} todayISO={todayISO} resetMeal={resetMeal}/>}
+          setExpandedDay={setExpandedDay} getDayCompliance={getDayCompliance} todayISO={todayISO} resetMeal={resetMeal}
+          dayTypes={dayTypes}/>}
         {tab==='oggi'&&<OggiView weekPlan={weekPlan} weekDates={weekDates} todayISO={todayISO}
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
           dailyLog={dailyLog} toggleLogItem={toggleLog} updateLogQty={updateQty}
           editQty={editQty} setEditQty={setEditQty} setSwapModal={setSwapModal}
-          setAddModal={setAddModal} getDailyCalories={getDailyCalories}
-          setExtraModal={setExtraModal}/>}
+          setAddModal={setAddModal} setExtraModal={setExtraModal} dayTypes={dayTypes}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
-          weekPlan={weekPlan} dailyLog={dailyLog} getDayCompliance={getDayCompliance}/>}
+          weekPlan={weekPlan} dailyLog={dailyLog} getDayCompliance={getDayCompliance} dayTypes={dayTypes}/>}
       </div>
 
       {/* Bottom nav */}
