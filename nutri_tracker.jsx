@@ -620,6 +620,18 @@ function NavGlyph({id,active}){
       </svg>
     );
   }
+  if(id==='calendario'){
+    return(
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2" y="3" width="12" height="11" rx="2" stroke={stroke} strokeWidth="1.5"/>
+        <line x1="2" y1="6.5" x2="14" y2="6.5" stroke={stroke} strokeWidth="1.5"/>
+        <line x1="5.5" y1="1.5" x2="5.5" y2="4.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="10.5" y1="1.5" x2="10.5" y2="4.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+        <rect x="4.5" y="9" width="2" height="2" rx="0.5" fill={stroke}/>
+        <rect x="9" y="9" width="2" height="2" rx="0.5" fill={stroke}/>
+      </svg>
+    );
+  }
   return(
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3" stroke={stroke} strokeWidth="1.5"/>
@@ -691,18 +703,12 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
                 </div>
                 <div style={{fontSize:'12px',color:'var(--text2)',marginTop:'1px'}}>{date.toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</div>
               </div>
-              {/* Type Selector — solo giorni feriali */}
+              {/* Tipo giorno badge */}
               {!WEEKEND_TEMPLATES[di] && (
-              <div style={{display:'flex',gap:'4px'}}>
-                {['Riposo','Corsa','Calcio'].map(t=>(
-                  <button key={t} onClick={e=>{e.stopPropagation();changeDayType(iso,t);}}
-                    style={{padding:'4px 7px',borderRadius:'6px',border:'1px solid var(--border)',fontSize:'10px',fontWeight:600,
-                      background:type===t?'var(--accent-soft)':'transparent',
-                      color:type===t?'var(--accent)':'var(--text3)',transition:'all 0.15s',display:'flex',alignItems:'center',gap:'4px'}}>
-                    <span>{TYPE_CFG[t].icon}</span><span>{TYPE_CFG[t].short}</span>
-                  </button>
-                ))}
-              </div>
+                <div style={{fontSize:'11px',color:'var(--text3)',background:'var(--muted)',
+                  borderRadius:'6px',padding:'3px 8px',fontWeight:600,display:'flex',alignItems:'center',gap:'3px'}}>
+                  <span>{tc.icon}</span><span>{TYPE_CFG[type].short}</span>
+                </div>
               )}
               {WEEKEND_TEMPLATES[di] && (
                 <div style={{fontSize:'10px',color:'var(--text2)',background:'var(--muted)',
@@ -763,7 +769,7 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
 function OggiView({
   weekPlan,weekDates,todayISO,selectedDayIndex,setSelectedDayIndex,dailyLog,
   toggleLogItem,updateLogQty,editQty,setEditQty,setSwapModal,setAddModal,
-  setExtraModal,dayTypes
+  setExtraModal,dayTypes,changeDayType
 }){
   const di=selectedDayIndex>=0&&selectedDayIndex<7?selectedDayIndex:0;
   const selectedISO=toISO(weekDates[di]);
@@ -817,6 +823,24 @@ function OggiView({
         {/* Progress bar */}
         <div style={{height:'4px',borderRadius:'2px',background:'var(--border)',overflow:'hidden'}}>
           <div style={{height:'100%',width:`${pct}%`,background:'var(--accent)',borderRadius:'2px',transition:'width 0.4s'}}/>
+        </div>
+        {/* Bottoni tipo giorno */}
+        <div style={{display:'flex',gap:'8px',marginTop:'12px'}}>
+          {['Riposo','Corsa','Calcio'].map(t=>{
+            const active=type===t;
+            const cfg=TYPE_CFG[t];
+            return(
+              <button key={t} onClick={()=>changeDayType(selectedISO,t)}
+                style={{flex:1,padding:'9px 4px',borderRadius:'10px',
+                  border:`1.5px solid ${active?'var(--accent)':'var(--border)'}`,
+                  background:active?'var(--accent-soft)':'var(--card)',
+                  color:active?'var(--accent)':'var(--text2)',
+                  fontSize:'12px',fontWeight:600,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',gap:'5px'}}>
+                <span>{cfg.icon}</span><span>{cfg.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1149,6 +1173,97 @@ function ExtraFoodModal({modal,onAdd,onClose}){
   );
 }
 
+// ── CALENDAR VIEW ─────────────────────────────────────────────
+const MONTH_NAMES=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,setWeekStart}){
+  const todayISO=toISO(new Date());
+  const [cur,setCur]=useState(()=>{const d=new Date();return{year:d.getFullYear(),month:d.getMonth()};});
+  const {year,month}=cur;
+  const prevMonth=()=>setCur(c=>c.month===0?{year:c.year-1,month:11}:{year:c.year,month:c.month-1});
+  const nextMonth=()=>setCur(c=>c.month===11?{year:c.year+1,month:0}:{year:c.year,month:c.month+1});
+  const firstDow=(new Date(year,month,1).getDay()+6)%7; // 0=Lun
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const cells=[];
+  for(let i=0;i<firstDow;i++)cells.push(null);
+  for(let d=1;d<=daysInMonth;d++)cells.push(d);
+  const getISO=(d)=>`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const getCompliance=(dateISO)=>{
+    const d=new Date(dateISO);const di=(d.getDay()+6)%7;
+    const items=getDayItems(weekPlan,di,dateISO,dayTypes);
+    const dl=dailyLog[dateISO]||{};
+    const all=MEAL_ORDER.flatMap(m=>items[m]||[]);
+    if(!all.length)return null;
+    const c=all.filter(it=>dl[it.key]?.checked).length;
+    return Math.round(c/all.length*100);
+  };
+  return(
+    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+      {/* Header mese */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 0'}}>
+        <button onClick={prevMonth} style={{...S.btn('var(--text3)',{padding:'6px 14px',fontSize:'16px'})}}>‹</button>
+        <div style={{fontFamily:'var(--display)',fontSize:'18px',color:'var(--text)',fontWeight:700}}>
+          {MONTH_NAMES[month]} {year}
+        </div>
+        <button onClick={nextMonth} style={{...S.btn('var(--text3)',{padding:'6px 14px',fontSize:'16px'})}}>›</button>
+      </div>
+      {/* Intestazioni giorni */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}}>
+        {['L','M','M','G','V','S','D'].map((d,i)=>(
+          <div key={i} style={{textAlign:'center',fontSize:'10px',color:'var(--text3)',fontWeight:600,padding:'4px 0'}}>{d}</div>
+        ))}
+      </div>
+      {/* Griglia giorni */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}}>
+        {cells.map((d,i)=>{
+          if(!d)return<div key={i}/>;
+          const dateISO=getISO(d);
+          const isFuture=dateISO>todayISO;
+          const isToday=dateISO===todayISO;
+          const type=dayTypes?.[dateISO];
+          const comp=!isFuture?getCompliance(dateISO):null;
+          const hasLog=!!(dailyLog[dateISO]&&Object.keys(dailyLog[dateISO]).length>0);
+          return(
+            <div key={i} onClick={()=>{
+                if(isFuture)return;
+                const dd=new Date(dateISO);
+                setWeekStart(getWeekStart(dd));
+                setSelectedDayIndex((dd.getDay()+6)%7);
+                setTab('oggi');
+              }}
+              style={{
+                borderRadius:'10px',
+                border:`${isToday?'2px':'1px'} solid ${isToday?'var(--accent)':'var(--border)'}`,
+                background:hasLog?'var(--card)':'var(--surface)',
+                opacity:isFuture?0.3:1,
+                padding:'6px 2px',
+                textAlign:'center',
+                cursor:isFuture?'default':'pointer',
+                minHeight:'52px',
+                display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'1px'
+              }}>
+              <span style={{fontSize:'11px',color:isToday?'var(--accent)':'var(--text2)',fontWeight:isToday?700:400}}>{d}</span>
+              {type&&<span style={{fontSize:'11px'}}>{TYPE_CFG[type].icon}</span>}
+              {comp!==null&&<span style={{fontSize:'9px',color:comp>=80?'var(--accent)':'var(--text3)',fontWeight:600}}>{comp}%</span>}
+            </div>
+          );
+        })}
+      </div>
+      {/* Legenda */}
+      <div style={{display:'flex',gap:'16px',justifyContent:'center',padding:'4px 0'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',color:'var(--text3)'}}>
+          <span>💤</span><span>Riposo</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',color:'var(--text3)'}}>
+          <span>🏃</span><span>Corsa</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',color:'var(--text3)'}}>
+          <span>⚽</span><span>Calcio</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── APP ROOT ──────────────────────────────────────────────────
 const APP_PIN='141098';
 export default function App(){
@@ -1355,14 +1470,17 @@ export default function App(){
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
           dailyLog={dailyLog} toggleLogItem={toggleLog} updateLogQty={updateQty}
           editQty={editQty} setEditQty={setEditQty} setSwapModal={setSwapModal}
-          setAddModal={setAddModal} setExtraModal={setExtraModal} dayTypes={dayTypes}/>}
+          setAddModal={setAddModal} setExtraModal={setExtraModal} dayTypes={dayTypes}
+          changeDayType={changeDayType}/>}
+        {tab==='calendario'&&<CalendarView dailyLog={dailyLog} dayTypes={dayTypes} weekPlan={weekPlan}
+          setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
           weekPlan={weekPlan} dailyLog={dailyLog} getDayCompliance={getDayCompliance} dayTypes={dayTypes}/>}
       </div>
 
       {/* Bottom nav */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'var(--surface)',borderTop:'1px solid var(--border)',display:'flex',zIndex:100,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'home',label:'Home'},{id:'oggi',label:'Oggi'},{id:'planner',label:'Planner'},{id:'dashboard',label:'Limiti'}].map(t=>(
+        {[{id:'home',label:'Home'},{id:'oggi',label:'Oggi'},{id:'planner',label:'Planner'},{id:'calendario',label:'Calendario'},{id:'dashboard',label:'Limiti'}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{flex:1,padding:'10px 0 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'}}>
             <NavGlyph id={t.id} active={tab===t.id}/>
