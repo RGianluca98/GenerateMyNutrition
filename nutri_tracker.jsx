@@ -787,6 +787,10 @@ function OggiView({
   const checked=allItems.filter(it=>dayLog[it.key]?.checked).length;
   const pct=allItems.length?Math.round(checked/allItems.length*100):0;
   const totalKcal=allItems.reduce((sum,item)=>sum+(calcKcal(item)||0),0);
+  const consumedKcal=allItems.filter(item=>dayLog[item.key]?.checked).reduce((sum,item)=>{
+    const qty=dayLog[item.key]?.qtyOverride??item.qty;
+    return sum+(calcKcal({...item,qty})||0);
+  },0);
 
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
@@ -852,7 +856,7 @@ function OggiView({
           <div style={{marginTop:'10px',fontSize:'13px',color:'var(--accent)',fontWeight:600,
             display:'flex',alignItems:'center',gap:'6px'}}>
             <span>🔥</span>
-            <span>{totalKcal.toLocaleString('it-IT')} kcal nel piano di oggi</span>
+            <span>{consumedKcal.toLocaleString('it-IT')} / {totalKcal.toLocaleString('it-IT')} kcal</span>
           </div>
         )}
       </div>
