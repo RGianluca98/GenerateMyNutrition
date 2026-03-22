@@ -784,8 +784,6 @@ function OggiView({
   const dayItems=getDayItems(weekPlan,di,selectedISO,dayTypes);
   const dayLog=dailyLog[selectedISO]||{};
   const allItems=MEAL_ORDER.flatMap(m=>dayItems[m]||[]);
-  const checked=allItems.filter(it=>dayLog[it.key]?.checked).length;
-  const pct=allItems.length?Math.round(checked/allItems.length*100):0;
   const totalKcal=allItems.reduce((sum,item)=>sum+(calcKcal(item)||0),0);
   const consumedKcal=allItems.filter(item=>dayLog[item.key]?.checked).reduce((sum,item)=>{
     const qty=dayLog[item.key]?.qtyOverride??item.qty;
@@ -814,25 +812,15 @@ function OggiView({
             );
           })}
         </div>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
-          <div>
-            <div style={{fontFamily:'var(--display)',fontSize:'20px',color:'var(--text)',textTransform:'capitalize'}}>
-              {weekDates[di].toLocaleDateString('it-IT',{weekday:'long'})}
-              {isToday&&<span style={{display:'inline-block',marginLeft:'8px',width:'6px',height:'6px',borderRadius:'50%',background:'var(--accent)'}}/>}
-            </div>
-            <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'1px'}}>
-              {weekDates[di].toLocaleDateString('it-IT',{day:'numeric',month:'long'})}
-            </div>
-            <div style={{fontSize:'12px',color:'var(--text2)',fontWeight:600,marginTop:'2px'}}>{tc.icon} {type}</div>
+        <div style={{marginBottom:'12px'}}>
+          <div style={{fontFamily:'var(--display)',fontSize:'20px',color:'var(--text)',textTransform:'capitalize'}}>
+            {weekDates[di].toLocaleDateString('it-IT',{weekday:'long'})}
+            {isToday&&<span style={{display:'inline-block',marginLeft:'8px',width:'6px',height:'6px',borderRadius:'50%',background:'var(--accent)'}}/>}
           </div>
-          <div style={{textAlign:'right'}}>
-            <div style={{fontFamily:'var(--display)',fontSize:'28px',color:pct>=80?'var(--accent)':'var(--text2)'}}>{pct}%</div>
-            <div style={{fontSize:'11px',color:'var(--text2)'}}>{checked}/{allItems.length} voci</div>
+          <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'1px'}}>
+            {weekDates[di].toLocaleDateString('it-IT',{day:'numeric',month:'long'})}
           </div>
-        </div>
-        {/* Progress bar */}
-        <div style={{height:'4px',borderRadius:'2px',background:'var(--border)',overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${pct}%`,background:'var(--accent)',borderRadius:'2px',transition:'width 0.4s'}}/>
+          <div style={{fontSize:'12px',color:'var(--text2)',fontWeight:600,marginTop:'2px'}}>{tc.icon} {type}</div>
         </div>
         {/* Bottoni tipo giorno */}
         <div style={{display:'flex',gap:'8px',marginTop:'12px'}}>
@@ -852,11 +840,30 @@ function OggiView({
             );
           })}
         </div>
+        {(type==='Corsa'||type==='Calcio')&&(
+          <div style={{display:'flex',alignItems:'center',gap:'8px',marginTop:'10px'}}>
+            <span style={{fontSize:'13px',color:'var(--text2)',fontWeight:600}}>⚡ Kcal bruciate:</span>
+            <input type='number'
+              value={weekPlan.kcalBruciateAttivita?.[selectedISO]||''}
+              onChange={e=>saveWP({...weekPlan,kcalBruciateAttivita:{...(weekPlan.kcalBruciateAttivita||{}),[selectedISO]:Number(e.target.value)||0}})}
+              placeholder='0'
+              style={{width:'80px',padding:'4px 8px',borderRadius:'8px',
+                border:'1.5px solid var(--border)',background:'var(--surface)',
+                color:'var(--text)',fontSize:'13px',fontWeight:600}}/>
+          </div>
+        )}
         {totalKcal>0&&(
-          <div style={{marginTop:'10px',fontSize:'13px',color:'var(--accent)',fontWeight:600,
-            display:'flex',alignItems:'center',gap:'6px'}}>
-            <span>🔥</span>
-            <span>{consumedKcal.toLocaleString('it-IT')} / {totalKcal.toLocaleString('it-IT')} kcal</span>
+          <div style={{marginTop:'10px',display:'flex',flexDirection:'column',gap:'4px'}}>
+            <div style={{fontSize:'13px',color:'var(--accent)',fontWeight:600,display:'flex',alignItems:'center',gap:'6px'}}>
+              <span>🍽️</span>
+              <span>{consumedKcal.toLocaleString('it-IT')} / {totalKcal.toLocaleString('it-IT')} kcal</span>
+            </div>
+            {(weekPlan.kcalBruciateAttivita?.[selectedISO]>0)&&(
+              <div style={{fontSize:'13px',color:'var(--text2)',fontWeight:600,display:'flex',alignItems:'center',gap:'6px'}}>
+                <span>⚡</span>
+                <span>Nette: {(consumedKcal-(weekPlan.kcalBruciateAttivita[selectedISO]||0)).toLocaleString('it-IT')} kcal</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1214,14 +1221,15 @@ function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,set
   for(let i=0;i<firstDow;i++)cells.push(null);
   for(let d=1;d<=daysInMonth;d++)cells.push(d);
   const getISO=(d)=>`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  const getCompliance=(dateISO)=>{
+  const getDayConsumedKcal=(dateISO)=>{
     const d=new Date(dateISO);const di=(d.getDay()+6)%7;
     const items=getDayItems(weekPlan,di,dateISO,dayTypes);
     const dl=dailyLog[dateISO]||{};
     const all=MEAL_ORDER.flatMap(m=>items[m]||[]);
-    if(!all.length)return null;
-    const c=all.filter(it=>dl[it.key]?.checked).length;
-    return Math.round(c/all.length*100);
+    return all.filter(it=>dl[it.key]?.checked).reduce((sum,it)=>{
+      const qty=dl[it.key]?.qtyOverride??it.qty;
+      return sum+(calcKcal({...it,qty})||0);
+    },0);
   };
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
@@ -1247,7 +1255,6 @@ function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,set
           const isFuture=dateISO>todayISO;
           const isToday=dateISO===todayISO;
           const type=dayTypes?.[dateISO];
-          const comp=!isFuture?getCompliance(dateISO):null;
           const hasLog=!!(dailyLog[dateISO]&&Object.keys(dailyLog[dateISO]).length>0);
           return(
             <div key={i} onClick={()=>{
@@ -1270,7 +1277,7 @@ function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,set
               }}>
               <span style={{fontSize:'11px',color:isToday?'var(--accent)':'var(--text2)',fontWeight:isToday?700:400}}>{d}</span>
               {type&&<span style={{fontSize:'11px'}}>{TYPE_CFG[type].icon}</span>}
-              {comp!==null&&<span style={{fontSize:'9px',color:comp>=80?'var(--accent)':'var(--text3)',fontWeight:600}}>{comp}%</span>}
+              {!isFuture&&(()=>{const k=getDayConsumedKcal(dateISO);return k>0?<span style={{fontSize:'9px',color:'var(--accent)',fontWeight:600}}>{k}</span>:null;})()}
             </div>
           );
         })}
