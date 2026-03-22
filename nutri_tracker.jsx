@@ -78,7 +78,7 @@ const FOOD_DB = {
     {name:'Ricotta',               qty:Q(150,170), uom:'g', kcal:174, limitKey:'fresh_cheese'},
     {name:'Formaggio Linea Osella',qty:Q(150,170), uom:'g', kcal:100, limitKey:'fresh_cheese'},
     {name:'Formaggio stagionato',  qty:Q(120,150), uom:'g', kcal:402, limitKey:'hard_cheese'},
-    {name:'Feta',                  qty:Q(80,100),  uom:'g', kcal:264, limitKey:'hard_cheese'},
+    {name:'Feta',                  qty:Q(150,170), uom:'g', kcal:264, limitKey:'hard_cheese'},
     {name:'Stracchino light',      qty:Q(120,150), uom:'g', kcal:134, limitKey:'fresh_cheese'},
     {name:'Formaggio fresco snack',qty:Q(40,40),   uom:'g', kcal:134, limitKey:'fresh_cheese'},
     {name:'Yogurt greco',          qty:Q(170,200), uom:'g', kcal:59,  limitKey:'yogurt_skyr'},
