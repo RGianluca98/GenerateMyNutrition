@@ -1082,8 +1082,15 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
         body:JSON.stringify({messages:newMessages,activities})
       });
       const data=await res.json();
-      const reply=data.content?.[0]?.text||data.error||'Nessuna risposta';
-      setChatMessages([...newMessages,{role:'assistant',content:reply}]);
+      let reply='Nessuna risposta';
+      if(data.content&&Array.isArray(data.content)&&data.content[0]?.text){
+        reply=String(data.content[0].text);
+      }else if(typeof data.error==='string'){
+        reply='Errore: '+data.error;
+      }else if(data.message){
+        reply='Errore: '+String(data.message);
+      }
+      setChatMessages(prev=>[...prev,{role:'assistant',content:reply}]);
     }catch(e){setError('Errore AI: '+e.message);}
     setChatLoading(false);
   };
@@ -1158,17 +1165,20 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
               Chiedi al tuo coach AI come programmare gli allenamenti{isConnected?' basandosi sulle tue attività Strava':''}
             </div>
           )}
-          {chatMessages.map((m,i)=>(
-            <div key={i} style={{display:'flex',justifyContent:m.role==='user'?'flex-end':'flex-start'}}>
-              <div style={{maxWidth:'85%',padding:'8px 12px',borderRadius:'12px',fontSize:'13px',lineHeight:'1.5',
-                background:m.role==='user'?'var(--accent-soft)':'var(--surface)',
-                color:m.role==='user'?'var(--accent)':'var(--text)',
-                borderBottomRightRadius:m.role==='user'?'4px':undefined,
-                borderBottomLeftRadius:m.role==='assistant'?'4px':undefined}}>
-                {m.content}
+          {chatMessages.map((m,i)=>{
+            const txt=typeof m.content==='string'?m.content:JSON.stringify(m.content);
+            return(
+              <div key={i} style={{display:'flex',justifyContent:m.role==='user'?'flex-end':'flex-start'}}>
+                <div style={{maxWidth:'85%',padding:'8px 12px',borderRadius:'12px',fontSize:'13px',lineHeight:'1.6',
+                  background:m.role==='user'?'var(--accent-soft)':'var(--surface)',
+                  color:m.role==='user'?'var(--accent)':'var(--text)',whiteSpace:'pre-wrap',
+                  borderBottomRightRadius:m.role==='user'?'4px':undefined,
+                  borderBottomLeftRadius:m.role==='assistant'?'4px':undefined}}>
+                  {txt}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {chatLoading&&(
             <div style={{display:'flex',justifyContent:'flex-start'}}>
               <div style={{padding:'8px 12px',borderRadius:'12px',background:'var(--surface)',fontSize:'13px',color:'var(--text3)'}}>...</div>
