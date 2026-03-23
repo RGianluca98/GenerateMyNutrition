@@ -233,10 +233,10 @@ FOOD_DB.parmigiano_snack = [
   {name:'Formaggio fresco snack',qty:Q(40,40), uom:'g', kcal:134, limitKey:'cheese_all'},
 ];
 FOOD_DB.free_meal_dinner = [
-  {name:'Pizza 🍕 (pasto libero)',      qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
-  {name:'Lasagna (pasto libero)',       qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
-  {name:'Pasta al pesto (pasto libero)',qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
-  {name:'Pasto libero a scelta',        qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Pizza 🍕 (pasto libero)',      qty:Q(1,1), uom:'porz', kcal:850, limitKey:null},
+  {name:'Lasagna (pasto libero)',       qty:Q(1,1), uom:'porz', kcal:700, limitKey:null},
+  {name:'Pasta al pesto (pasto libero)',qty:Q(1,1), uom:'porz', kcal:550, limitKey:null},
+  {name:'Pasto libero a scelta',        qty:Q(1,1), uom:'porz', kcal:700, limitKey:null},
 ];
 FOOD_DB.sun_breakfast_sweet = [
   {name:'Cappuccino',qty:Q(200,200), uom:'ml', kcal:40, limitKey:'milk_default'},
@@ -248,11 +248,11 @@ FOOD_DB.sun_biscuits = [
   {name:'Gallette di mais',           qty:Q(8.75,8.75), uom:'pz', kcal:38, limitKey:'gallette_family'},
 ];
 FOOD_DB.free_meal_lunch = [
-  {name:'Lasagna (pasto libero)',          qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
-  {name:'Pasta al pesto (pasto libero)',   qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
-  {name:'Pasta al ragù (pasto libero)',    qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
-  {name:'Risotto (pasto libero)',          qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
-  {name:'Pasto libero a scelta',           qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
+  {name:'Lasagna (pasto libero)',          qty:Q(1,1), uom:'porz', kcal:700, limitKey:null},
+  {name:'Pasta al pesto (pasto libero)',   qty:Q(1,1), uom:'porz', kcal:550, limitKey:null},
+  {name:'Pasta al ragù (pasto libero)',    qty:Q(1,1), uom:'porz', kcal:600, limitKey:null},
+  {name:'Risotto (pasto libero)',          qty:Q(1,1), uom:'porz', kcal:580, limitKey:null},
+  {name:'Pasto libero a scelta',           qty:Q(1,1), uom:'porz', kcal:700, limitKey:null},
 ];
 FOOD_DB.sun_dinner_protein = [
   {name:'Uova',              qty:Q(120,120), uom:'g', kcal:143, limitKey:'eggs'},
