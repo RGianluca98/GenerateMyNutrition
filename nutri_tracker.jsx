@@ -636,6 +636,14 @@ function NavGlyph({id,active}){
       </svg>
     );
   }
+  if(id==='trainings'){
+    return(
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="5.5" stroke={stroke} strokeWidth="1.5"/>
+        <path d="M5.5 8.5l1.5 1.5 3.5-3.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    );
+  }
   return(
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3" stroke={stroke} strokeWidth="1.5"/>
@@ -961,6 +969,229 @@ function QtyEditor({value,uom,onSave,onCancel}){
         onKeyDown={e=>{if(e.key==='Enter')onSave(Number(v));if(e.key==='Escape')onCancel();}}/>
       <span style={{fontSize:'11px',color:'var(--text2)'}}>{uom}</span>
       <button onClick={()=>onSave(Number(v))} style={{background:'var(--accent)',border:'none',borderRadius:'6px',color:'#fff',fontSize:'11px',padding:'3px 6px'}}>✓</button>
+    </div>
+  );
+}
+
+// ── TRAININGS VIEW ─────────────────────────────────────────────
+const STRAVA_CLIENT_ID_PLACEHOLDER='YOUR_CLIENT_ID'; // sostituito da Netlify env
+const STRAVA_SCOPE='activity:read_all';
+const STRAVA_REDIRECT=typeof window!=='undefined'?`${window.location.origin}/strava-callback`:'';
+
+function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}){
+  const [activities,setActivities]=useState([]);
+  const [loadingAct,setLoadingAct]=useState(false);
+  const [chatMessages,setChatMessages]=useState([]);
+  const [chatInput,setChatInput]=useState('');
+  const [chatLoading,setChatLoading]=useState(false);
+  const [error,setError]=useState('');
+
+  // Legge il ?code= dall'URL dopo il redirect OAuth Strava
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const code=params.get('code');
+    if(code&&!stravaTokens?.access_token){
+      window.history.replaceState({},'',window.location.pathname);
+      exchangeCode(code);
+    }
+  },[]);
+
+  // Se abbiamo tokens e il token è scaduto, lo rinnoviamo
+  useEffect(()=>{
+    if(stravaTokens?.access_token){
+      const expired=stravaTokens.expires_at&&(stravaTokens.expires_at*1000)<Date.now();
+      if(expired)refreshToken();
+      else fetchActivities(stravaTokens.access_token);
+    }
+  },[stravaTokens?.access_token]);
+
+  const exchangeCode=async(code)=>{
+    setLoadingAct(true);setError('');
+    try{
+      const res=await fetch('/.netlify/functions/strava-token',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({code,grant_type:'authorization_code'})
+      });
+      const data=await res.json();
+      if(data.access_token){
+        const tokens={access_token:data.access_token,refresh_token:data.refresh_token,expires_at:data.expires_at,athlete:data.athlete};
+        setStravaTokens(tokens);
+        try{await window.storage.set('nt_stravaTokens',JSON.stringify(tokens));}catch(e){}
+      }else{setError('Errore connessione Strava: '+(data.message||JSON.stringify(data)));}
+    }catch(e){setError('Errore: '+e.message);}
+    setLoadingAct(false);
+  };
+
+  const refreshToken=async()=>{
+    try{
+      const res=await fetch('/.netlify/functions/strava-token',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({grant_type:'refresh_token',refresh_token:stravaTokens.refresh_token})
+      });
+      const data=await res.json();
+      if(data.access_token){
+        const tokens={...stravaTokens,access_token:data.access_token,refresh_token:data.refresh_token,expires_at:data.expires_at};
+        setStravaTokens(tokens);
+        try{await window.storage.set('nt_stravaTokens',JSON.stringify(tokens));}catch(e){}
+        fetchActivities(data.access_token);
+      }
+    }catch(e){}
+  };
+
+  const fetchActivities=async(token)=>{
+    setLoadingAct(true);setError('');
+    try{
+      const res=await fetch('/.netlify/functions/strava-activities?per_page=20',{
+        headers:{Authorization:`Bearer ${token}`}
+      });
+      const data=await res.json();
+      if(Array.isArray(data))setActivities(data);
+      else setError('Errore caricamento attività');
+    }catch(e){setError('Errore: '+e.message);}
+    setLoadingAct(false);
+  };
+
+  const disconnect=async()=>{
+    setStravaTokens(null);setActivities([]);setChatMessages([]);
+    try{await window.storage.set('nt_stravaTokens','null');}catch(e){}
+  };
+
+  const connectStrava=async()=>{
+    // Recupera il client_id dalla function (così non sta nel frontend)
+    try{
+      const res=await fetch('/.netlify/functions/strava-token',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({grant_type:'get_client_id'})
+      });
+      const data=await res.json();
+      const clientId=data.client_id;
+      if(!clientId){setError('Configurazione Strava mancante. Verifica le env vars su Netlify.');return;}
+      const url=`https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin)}&response_type=code&scope=${STRAVA_SCOPE}`;
+      window.location.href=url;
+    }catch(e){setError('Errore: '+e.message);}
+  };
+
+  const sendChat=async()=>{
+    if(!chatInput.trim()||chatLoading)return;
+    const userMsg={role:'user',content:chatInput.trim()};
+    const newMessages=[...chatMessages,userMsg];
+    setChatMessages(newMessages);setChatInput('');setChatLoading(true);setError('');
+    try{
+      const res=await fetch('/.netlify/functions/ai-chat',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({messages:newMessages,activities})
+      });
+      const data=await res.json();
+      const reply=data.content?.[0]?.text||data.error||'Nessuna risposta';
+      setChatMessages([...newMessages,{role:'assistant',content:reply}]);
+    }catch(e){setError('Errore AI: '+e.message);}
+    setChatLoading(false);
+  };
+
+  const actTypeIcon=(type)=>({Run:'🏃',Ride:'🚴',Walk:'🚶',Swim:'🏊',Soccer:'⚽',Football:'⚽',Workout:'💪',Hike:'🥾'})[type]||'🏅';
+
+  const isConnected=!!(stravaTokens?.access_token);
+
+  return(
+    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+      {/* Strava connection card */}
+      <div style={{...{borderRadius:'16px',background:'var(--card)',border:'1px solid var(--border)',padding:'16px'},display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+          <div style={{width:'40px',height:'40px',borderRadius:'12px',background:'#FC4C02',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px'}}>🏃</div>
+          <div>
+            <div style={{fontSize:'14px',fontWeight:700,color:'var(--text)'}}>Strava</div>
+            <div style={{fontSize:'12px',color:isConnected?'var(--accent)':'var(--text3)'}}>
+              {isConnected?(stravaTokens.athlete?`Connesso come ${stravaTokens.athlete.firstname} ${stravaTokens.athlete.lastname}`:'Connesso'):'Non connesso'}
+            </div>
+          </div>
+        </div>
+        <button onClick={isConnected?disconnect:connectStrava}
+          style={{padding:'8px 16px',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'13px',fontWeight:600,
+            background:isConnected?'var(--muted)':'#FC4C02',color:isConnected?'var(--text2)':'#fff'}}>
+          {isConnected?'Disconnetti':'Connetti'}
+        </button>
+      </div>
+
+      {error&&<div style={{fontSize:'12px',color:'#e05c5c',padding:'8px 12px',background:'#2c1a1a',borderRadius:'10px'}}>{error}</div>}
+
+      {/* Attività */}
+      {isConnected&&(
+        <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 2px'}}>
+            <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>ULTIME ATTIVITÀ</div>
+            <button onClick={()=>fetchActivities(stravaTokens.access_token)}
+              style={{fontSize:'11px',color:'var(--accent)',background:'none',border:'none',cursor:'pointer',fontWeight:600}}>
+              {loadingAct?'...':'↻ Aggiorna'}
+            </button>
+          </div>
+          {loadingAct&&<div style={{textAlign:'center',padding:'20px',color:'var(--text3)',fontSize:'13px'}}>Caricamento...</div>}
+          {!loadingAct&&activities.length===0&&<div style={{textAlign:'center',padding:'20px',color:'var(--text3)',fontSize:'13px'}}>Nessuna attività trovata</div>}
+          {activities.map(a=>{
+            const date=new Date(a.start_date).toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+            const dist=a.distance?(a.distance/1000).toFixed(1)+' km':'';
+            const dur=a.moving_time?Math.floor(a.moving_time/60)+"'":'' ;
+            const kcal=a.calories?a.calories+' kcal':'';
+            return(
+              <div key={a.id} style={{borderRadius:'12px',background:'var(--card)',border:'1px solid var(--border)',padding:'12px 14px',display:'flex',alignItems:'center',gap:'12px'}}>
+                <div style={{fontSize:'22px'}}>{actTypeIcon(a.type)}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:'13px',fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.name}</div>
+                  <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}}>{date}</div>
+                </div>
+                <div style={{display:'flex',gap:'8px',flexShrink:0}}>
+                  {dist&&<span style={{fontSize:'11px',color:'var(--text2)',fontWeight:600}}>{dist}</span>}
+                  {dur&&<span style={{fontSize:'11px',color:'var(--text3)'}}>{dur}</span>}
+                  {kcal&&<span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600}}>{kcal}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Chat AI */}
+      <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+        <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px',padding:'0 2px'}}>COACH AI 🤖</div>
+        <div style={{borderRadius:'14px',background:'var(--card)',border:'1px solid var(--border)',padding:'12px',display:'flex',flexDirection:'column',gap:'8px',minHeight:'120px',maxHeight:'320px',overflowY:'auto'}}>
+          {chatMessages.length===0&&(
+            <div style={{color:'var(--text3)',fontSize:'12px',textAlign:'center',padding:'20px 0'}}>
+              Chiedi al tuo coach AI come programmare gli allenamenti{isConnected?' basandosi sulle tue attività Strava':''}
+            </div>
+          )}
+          {chatMessages.map((m,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:m.role==='user'?'flex-end':'flex-start'}}>
+              <div style={{maxWidth:'85%',padding:'8px 12px',borderRadius:'12px',fontSize:'13px',lineHeight:'1.5',
+                background:m.role==='user'?'var(--accent-soft)':'var(--surface)',
+                color:m.role==='user'?'var(--accent)':'var(--text)',
+                borderBottomRightRadius:m.role==='user'?'4px':undefined,
+                borderBottomLeftRadius:m.role==='assistant'?'4px':undefined}}>
+                {m.content}
+              </div>
+            </div>
+          ))}
+          {chatLoading&&(
+            <div style={{display:'flex',justifyContent:'flex-start'}}>
+              <div style={{padding:'8px 12px',borderRadius:'12px',background:'var(--surface)',fontSize:'13px',color:'var(--text3)'}}>...</div>
+            </div>
+          )}
+        </div>
+        <div style={{display:'flex',gap:'8px'}}>
+          <input
+            type='text'
+            value={chatInput}
+            onChange={e=>setChatInput(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&sendChat()}
+            placeholder='Es: programma la settimana prossima...'
+            style={{flex:1,padding:'10px 14px',borderRadius:'12px',border:'1.5px solid var(--border)',
+              background:'var(--surface)',color:'var(--text)',fontSize:'13px',outline:'none'}}/>
+          <button onClick={sendChat} disabled={chatLoading||!chatInput.trim()}
+            style={{padding:'10px 18px',borderRadius:'12px',border:'none',cursor:'pointer',
+              background:'var(--accent)',color:'#fff',fontSize:'13px',fontWeight:600,
+              opacity:chatLoading||!chatInput.trim()?0.5:1}}>
+            →
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1304,6 +1535,7 @@ export default function App(){
   const [expandedDay,setExpandedDay]=useState(null);
   const [selectedDayIndex,setSelectedDayIndex]=useState(()=>{const g=new Date().getDay();return g===0?6:g-1;});
   const [dayTypes,setDayTypes]=useState({});
+  const [stravaTokens,setStravaTokens]=useState(null);
 
   useEffect(()=>{
     (async()=>{
@@ -1314,6 +1546,8 @@ export default function App(){
         if(dl?.value)setDailyLog(JSON.parse(dl.value));
         const dt=await window.storage.get('nt_dayTypes');
         if(dt?.value)setDayTypes(JSON.parse(dt.value));
+        const st=await window.storage.get('nt_stravaTokens');
+        if(st?.value){const v=JSON.parse(st.value);if(v)setStravaTokens(v);}
       }catch(e){}
     })();
   },[]);
@@ -1489,11 +1723,13 @@ export default function App(){
           setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
           weekPlan={weekPlan} dailyLog={dailyLog} getDayConsumedKcal={getDayConsumedKcal} dayTypes={dayTypes}/>}
+        {tab==='trainings'&&<TrainingsView stravaTokens={stravaTokens} setStravaTokens={setStravaTokens}
+          dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}/>}
       </div>
 
       {/* Bottom nav */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'var(--surface)',borderTop:'1px solid var(--border)',display:'flex',zIndex:100,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'home',label:'Home'},{id:'oggi',label:'Oggi'},{id:'planner',label:'Planner'},{id:'calendario',label:'Calendario'},{id:'dashboard',label:'Limiti'}].map(t=>(
+        {[{id:'home',label:'Home'},{id:'oggi',label:'Oggi'},{id:'planner',label:'Planner'},{id:'calendario',label:'Calendario'},{id:'dashboard',label:'Limiti'},{id:'trainings',label:'Sport'}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{flex:1,padding:'10px 0 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'}}>
             <NavGlyph id={t.id} active={tab===t.id}/>
