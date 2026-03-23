@@ -1117,18 +1117,9 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
         body:JSON.stringify({messages:newMessages,activities})
       });
       const rawText=await res.text();
-      let data;try{data=JSON.parse(rawText);}catch(e){setError('Risposta non JSON: '+rawText.slice(0,200));setChatLoading(false);return;}
-      let reply='';
-      if(data.content&&Array.isArray(data.content)&&data.content[0]?.text){
-        reply=String(data.content[0].text);
-      }else if(typeof data.error==='string'){
-        setError('Errore AI: '+data.error);setChatLoading(false);return;
-      }else if(data.message&&!data.content){
-        setError('Errore AI: '+String(data.message));setChatLoading(false);return;
-      }else{
-        setError('Risposta inattesa: '+rawText.slice(0,300));setChatLoading(false);return;
-      }
-      setChatMessages(prev=>[...prev,{role:'assistant',content:reply}]);
+      // Mostra sempre la risposta grezza per debug
+      setError('DEBUG: '+rawText.slice(0,400));
+      setChatLoading(false);return;
     }catch(e){setError('Errore AI: '+e.message);}
     setChatLoading(false);
   };
