@@ -1,4 +1,4 @@
-// Netlify Function: recupera le attività recenti di Strava
+// Netlify Function: recupera le attività Strava (lista o dettaglio singola)
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -15,13 +15,21 @@ exports.handler = async (event) => {
     return { statusCode: 401, headers, body: JSON.stringify({ error: 'No access token' }) };
   }
 
-  const perPage = event.queryStringParameters?.per_page || 20;
+  const activityId = event.queryStringParameters?.activity_id;
 
   try {
-    const res = await fetch(
-      `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
+    let url;
+    if (activityId) {
+      // Dettaglio singola attività: laps, splits, HR, elevation
+      url = `https://www.strava.com/api/v3/activities/${activityId}?include_all_efforts=true`;
+    } else {
+      const perPage = event.queryStringParameters?.per_page || 20;
+      url = `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}`;
+    }
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
     const data = await res.json();
     if (!res.ok) return { statusCode: res.status, headers, body: JSON.stringify(data) };
     return { statusCode: 200, headers, body: JSON.stringify(data) };
