@@ -839,28 +839,10 @@ function OggiView({
             );
           })}
         </div>
-        {(type==='Corsa'||type==='Calcio')&&(
-          <div style={{display:'flex',alignItems:'center',gap:'8px',marginTop:'10px'}}>
-            <span style={{fontSize:'13px',color:'var(--text2)',fontWeight:600}}>⚡ Kcal bruciate:</span>
-            <input type='text' inputMode='numeric' pattern='[0-9]*'
-              value={weekPlan.kcalBruciateAttivita?.[selectedISO]||''}
-              onChange={e=>{const v=e.target.value.replace(/\D/g,'');saveWP({...weekPlan,kcalBruciateAttivita:{...(weekPlan.kcalBruciateAttivita||{}),[selectedISO]:Number(v)||0}});}}
-              placeholder='0'
-              style={{width:'80px',padding:'4px 8px',borderRadius:'8px',
-                border:'1.5px solid var(--border)',background:'var(--surface)',
-                color:'var(--text)',fontSize:'13px',fontWeight:600}}/>
+        <div style={{marginTop:'10px'}}>
+          <div style={{fontSize:'13px',color:'var(--accent)',fontWeight:600}}>
+            {consumedKcal.toLocaleString('it-IT')} / {((type==='Corsa'||type==='Calcio')?2300:2100).toLocaleString('it-IT')} kcal
           </div>
-        )}
-        <div style={{marginTop:'10px',display:'flex',flexDirection:'column',gap:'4px'}}>
-          <div style={{fontSize:'13px',color:'var(--accent)',fontWeight:600,display:'flex',alignItems:'center',gap:'6px'}}>
-            <span>{consumedKcal.toLocaleString('it-IT')} kcal</span>
-          </div>
-          {(weekPlan.kcalBruciateAttivita?.[selectedISO]>0)&&(
-            <div style={{fontSize:'13px',color:'var(--text2)',fontWeight:600,display:'flex',alignItems:'center',gap:'6px'}}>
-              <span>⚡</span>
-              <span>Nette: {(consumedKcal-(weekPlan.kcalBruciateAttivita[selectedISO]||0)).toLocaleString('it-IT')} kcal</span>
-            </div>
-          )}
         </div>
       </div>
 
