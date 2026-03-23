@@ -1369,25 +1369,62 @@ function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayConsumedK
 }
 
 // ── SWAP MODAL ────────────────────────────────────────────────
+const CONTEXT_LABELS={
+  protein_equiv_chicken:'Proteine',lunch_carb_pasta:'Carboidrati pranzo',
+  dinner_carb_bread:'Carboidrati cena/colazione',oats_breakfast:'Cereali colazione',
+  milk_portion:'Latte e bevande',fruit_portion:'Frutta',yogurt_portion:'Yogurt',
+  nuts_snack:'Frutta secca e snack',oil_portion:'Olio',vegetable_side:'Verdure',
+  breakfast_dairy:'Latticini colazione',breakfast_protein:'Proteine colazione',
+  breakfast_toppings:'Topping colazione',speciali_farine:'Farine speciali',
+  latte_riso_portion:'Latte e alternative',ciocco_snack:'Cioccolato',
+  sat_bread:'Pane',sat_protein_lunch:'Proteine',sat_veg_lunch:'Verdure',
+  parmigiano_snack:'Formaggi snack',philly_portion:'Formaggi spalmabili',
+  feta_portion:'Formaggi stagionati',
+  ricotta_protein:'Ricotta e latticini',
+  pre_run_banana:'Pre-corsa',pre_run_bread:'Pre-corsa pane',
+  pre_soccer_bread:'Pre-calcio pane',pre_soccer_jam:'Pre-calcio dolce',
+  post_workout_milk:'Post-workout latte',post_workout_banana:'Post-workout banana',
+  post_workout_avocado:'Post-workout avocado',
+  free_meal_dinner:'Pasto libero cena',free_meal_lunch:'Pasto libero pranzo',
+  sun_breakfast_sweet:'Colazione domenica',sun_biscuits:'Biscotti',
+  sun_dinner_protein:'Proteine domenica',
+};
+
 function SwapModal({modal,weekPlan,onSwap,onClose}){
   const {dateISO,dayIndex,meal,itemIndex,context,currentName,type}=modal;
-  const alternatives=FOOD_DB[context]||[];
+  const allContexts=Object.keys(FOOD_DB);
+  const [selCtx,setSelCtx]=useState(context||allContexts[0]||'');
+  const [search,setSearch]=useState('');
+  const options=(FOOD_DB[selCtx]||[]).filter(f=>{
+    const qty=f.qty?.[type]??f.qty?.Riposo??0;
+    if(qty===0)return false;
+    if(search)return f.name.toLowerCase().includes(search.toLowerCase());
+    return true;
+  });
   return(
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'flex-end'}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'70vh',overflowY:'auto',boxShadow:'0 -8px 24px rgba(26,26,26,0.08)'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 -8px 24px rgba(26,26,26,0.08)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
           <div style={{fontFamily:'var(--display)',fontSize:'18px',color:'var(--text)'}}>Cambia alimento</div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text2)',fontSize:'20px'}}>×</button>
         </div>
-        <div style={{fontSize:'11px',color:'var(--text2)',marginBottom:'12px',letterSpacing:'0.5px'}}>
-          {meal.toUpperCase()} • Stesso gruppo nutrizionale
+        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)}
+          style={{width:'100%',padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:'14px',marginBottom:'12px',boxSizing:'border-box'}}/>
+        <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
+          {allContexts.map(ctx=>(
+            <button key={ctx} onClick={()=>{setSelCtx(ctx);setSearch('');}}
+              style={{border:'1px solid var(--border)',borderRadius:'7px',padding:'5px 9px',
+                background:selCtx===ctx?'var(--accent-soft)':'var(--card)',
+                color:selCtx===ctx?'var(--accent)':'var(--text2)',fontSize:'11px',fontWeight:600}}>
+              {CONTEXT_LABELS[ctx]||ctx.replaceAll('_',' ')}
+            </button>
+          ))}
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-          {alternatives.map((alt,i)=>{
+          {options.map((alt,i)=>{
             const isCurrent=alt.name===currentName;
-            const qty=alt.qty[type];
-            if(qty===0)return null;
+            const qty=alt.qty?.[type]??alt.qty?.Riposo;
             return(
               <button key={i} onClick={()=>onSwap(dateISO,dayIndex,meal,itemIndex,alt.name)}
                 style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
@@ -1402,7 +1439,7 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
                 </span>
               </button>
             );
-          }).filter(Boolean)}
+          })}
         </div>
       </div>
     </div>
@@ -1411,28 +1448,32 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
 
 function AddFoodModal({modal,onAdd,onClose}){
   const {dateISO,dayIndex,meal,type,contexts}=modal;
-  const [context,setContext]=useState(contexts[0]||'');
-  const options=(FOOD_DB[context]||[]).filter(f=>(f.qty?.[type]??f.qty?.Riposo??0)>0);
+  const allContexts=Object.keys(FOOD_DB);
+  const [context,setContext]=useState(contexts[0]||allContexts[0]||'');
+  const [search,setSearch]=useState('');
+  const options=(FOOD_DB[context]||[]).filter(f=>{
+    const qty=f.qty?.[type]??f.qty?.Riposo??0;
+    if(qty===0)return false;
+    if(search)return f.name.toLowerCase().includes(search.toLowerCase());
+    return true;
+  });
   return(
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'flex-end'}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'70vh',overflowY:'auto',boxShadow:'0 -8px 24px rgba(26,26,26,0.08)'}}>
+      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 -8px 24px rgba(26,26,26,0.08)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
           <div style={{fontFamily:'var(--display)',fontSize:'18px',color:'var(--text)'}}>Aggiungi alimento</div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text2)',fontSize:'20px'}}>×</button>
         </div>
-        <div style={{fontSize:'11px',color:'var(--text2)',marginBottom:'10px',letterSpacing:'0.5px'}}>
-          {meal.toUpperCase()} • Stessa categoria del pasto
-        </div>
+        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)}
+          style={{width:'100%',padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:'14px',marginBottom:'12px',boxSizing:'border-box'}}/>
         <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
-          {contexts.map(ctx=>(
-            <button key={ctx} onClick={()=>setContext(ctx)}
-              style={{
-                border:'1px solid var(--border)',borderRadius:'7px',padding:'5px 9px',
+          {allContexts.map(ctx=>(
+            <button key={ctx} onClick={()=>{setContext(ctx);setSearch('');}}
+              style={{border:'1px solid var(--border)',borderRadius:'7px',padding:'5px 9px',
                 background:context===ctx?'var(--accent-soft)':'var(--card)',
-                color:context===ctx?'var(--accent)':'var(--text2)',fontSize:'11px',fontWeight:600
-              }}>
-              {ctx.replaceAll('_',' ')}
+                color:context===ctx?'var(--accent)':'var(--text2)',fontSize:'11px',fontWeight:600}}>
+              {CONTEXT_LABELS[ctx]||ctx.replaceAll('_',' ')}
             </button>
           ))}
         </div>
@@ -1443,7 +1484,7 @@ function AddFoodModal({modal,onAdd,onClose}){
                 borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer'}}>
               <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
               <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
-                {food.qty[type]??food.qty.Riposo} {food.uom}
+                {food.qty?.[type]??food.qty?.Riposo} {food.uom}
               </span>
             </button>
           ))}
@@ -1456,26 +1497,6 @@ function AddFoodModal({modal,onAdd,onClose}){
 function ExtraFoodModal({modal,onAdd,onClose}){
   const {type,dateISO}=modal;
   const allContexts=Object.keys(FOOD_DB);
-  const CONTEXT_LABELS={
-    protein_equiv_chicken:'Proteine',lunch_carb_pasta:'Carboidrati pranzo',
-    dinner_carb_bread:'Carboidrati cena/colazione',oats_breakfast:'Cereali colazione',
-    milk_portion:'Latte e bevande',fruit_portion:'Frutta',yogurt_portion:'Yogurt',
-    nuts_snack:'Frutta secca e snack',oil_portion:'Olio',vegetable_side:'Verdure',
-    breakfast_dairy:'Latticini colazione',breakfast_protein:'Proteine colazione',
-    breakfast_toppings:'Topping colazione',speciali_farine:'Farine speciali',
-    latte_riso_portion:'Latte e alternative',ciocco_snack:'Cioccolato',
-    sat_bread:'Pane',sat_protein_lunch:'Proteine',sat_veg_lunch:'Verdure',
-    parmigiano_snack:'Formaggi snack',philly_portion:'Formaggi spalmabili',
-    feta_portion:'Formaggi stagionati',
-    ricotta_protein:'Ricotta e latticini',
-    pre_run_banana:'Pre-corsa',pre_run_bread:'Pre-corsa pane',
-    pre_soccer_bread:'Pre-calcio pane',pre_soccer_jam:'Pre-calcio dolce',
-    post_workout_milk:'Post-workout latte',post_workout_banana:'Post-workout banana',
-    post_workout_avocado:'Post-workout avocado',
-    free_meal_dinner:'Pasto libero cena',free_meal_lunch:'Pasto libero pranzo',
-    sun_breakfast_sweet:'Colazione domenica',sun_biscuits:'Biscotti',
-    sun_dinner_protein:'Proteine domenica',
-  };
   const [context,setContext]=useState(allContexts[0]||'');
   const [search,setSearch]=useState('');
   const options=(FOOD_DB[context]||[]).filter(f=>{
