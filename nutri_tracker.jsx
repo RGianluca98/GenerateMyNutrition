@@ -73,14 +73,14 @@ const FOOD_DB = {
     {name:'Fagioli cannellini secchi',qty:Q(75,80),uom:'g', kcal:335, limitKey:'legumes_dry'},
     {name:'Piselli secchi',        qty:Q(75,80),   uom:'g', kcal:350, limitKey:'legumes_dry'},
     {name:'Piselli cotti',         qty:Q(150,160), uom:'g', kcal:84,  limitKey:'legumes_cooked'},
-    {name:'Fiocchi di latte',      qty:Q(150,170), uom:'g', kcal:103, limitKey:'fresh_cheese'},
-    {name:'Mozzarella',            qty:Q(150,170), uom:'g', kcal:280, limitKey:'fresh_cheese'},
-    {name:'Ricotta',               qty:Q(150,170), uom:'g', kcal:174, limitKey:'fresh_cheese'},
-    {name:'Formaggio Linea Osella',qty:Q(150,170), uom:'g', kcal:100, limitKey:'fresh_cheese'},
-    {name:'Formaggio stagionato',  qty:Q(120,150), uom:'g', kcal:402, limitKey:'hard_cheese'},
-    {name:'Feta',                  qty:Q(150,170), uom:'g', kcal:264, limitKey:'hard_cheese'},
-    {name:'Stracchino light',      qty:Q(120,150), uom:'g', kcal:134, limitKey:'fresh_cheese'},
-    {name:'Formaggio fresco snack',qty:Q(40,40),   uom:'g', kcal:134, limitKey:'fresh_cheese'},
+    {name:'Fiocchi di latte',      qty:Q(150,170), uom:'g', kcal:103, limitKey:'cheese_all'},
+    {name:'Mozzarella',            qty:Q(150,170), uom:'g', kcal:280, limitKey:'cheese_all'},
+    {name:'Ricotta',               qty:Q(150,170), uom:'g', kcal:174, limitKey:'cheese_all'},
+    {name:'Formaggio Linea Osella',qty:Q(150,170), uom:'g', kcal:100, limitKey:'cheese_all'},
+    {name:'Formaggio stagionato',  qty:Q(120,150), uom:'g', kcal:402, limitKey:'cheese_all'},
+    {name:'Feta',                  qty:Q(150,170), uom:'g', kcal:264, limitKey:'cheese_all'},
+    {name:'Stracchino light',      qty:Q(120,150), uom:'g', kcal:134, limitKey:'cheese_all'},
+    {name:'Formaggio fresco snack',qty:Q(40,40),   uom:'g', kcal:134, limitKey:'cheese_all'},
     {name:'Yogurt greco',          qty:Q(170,200), uom:'g', kcal:59,  limitKey:'yogurt_skyr'},
   ],
   lunch_carb_pasta:[
@@ -154,8 +154,8 @@ const FOOD_DB = {
     {name:'Arachidi non salate',qty:Q(20,20),uom:'g',kcal:567, limitKey:'nuts'},
     {name:'Olive nere',        qty:Q(15,15),uom:'g',kcal:115, limitKey:'olive_default'},
     {name:'Olive verdi',       qty:Q(15,15),uom:'g',kcal:100, limitKey:'olive_default'},
-    {name:'Grana snack',       qty:Q(10,10),uom:'g',kcal:402, limitKey:'hard_cheese'},
-    {name:'Formaggio fresco snack',qty:Q(40,40),uom:'g',kcal:134, limitKey:'fresh_cheese'},
+    {name:'Grana snack',       qty:Q(10,10),uom:'g',kcal:402, limitKey:'cheese_all'},
+    {name:'Formaggio fresco snack',qty:Q(40,40),uom:'g',kcal:134, limitKey:'cheese_all'},
     {name:'Burro di arachidi', qty:Q(20,20),uom:'g',kcal:588, limitKey:'pb'},
     {name:'Marmellata zero zucc',qty:Q(20,20),uom:'g',kcal:30,  limitKey:'jam_default'},
   ],
@@ -200,9 +200,9 @@ const FOOD_DB = {
 
 // ── WEEKEND FOOD GROUPS ───────────────────────────────────────
 FOOD_DB.philly_portion = [
-  {name:'Philadelphia light', qty:Q(40,40), uom:'g', kcal:130, limitKey:'fresh_cheese'},
-  {name:'Ricotta',            qty:Q(40,50), uom:'g', kcal:174, limitKey:'fresh_cheese'},
-  {name:'Stracchino light',   qty:Q(40,50), uom:'g', kcal:134, limitKey:'fresh_cheese'},
+  {name:'Philadelphia light', qty:Q(40,40), uom:'g', kcal:130, limitKey:'cheese_all'},
+  {name:'Ricotta',            qty:Q(40,50), uom:'g', kcal:174, limitKey:'cheese_all'},
+  {name:'Stracchino light',   qty:Q(40,50), uom:'g', kcal:134, limitKey:'cheese_all'},
 ];
 FOOD_DB.sat_bread = [
   {name:'Pane di segale',  qty:Q(80,80), uom:'g', kcal:259, limitKey:'bread_family'},
@@ -215,8 +215,8 @@ FOOD_DB.sat_protein_lunch = [
   {name:'Merluzzo',          qty:Q(150,180), uom:'g', kcal:82,  limitKey:'fish_fresh'},
   {name:'Tonno al naturale', qty:Q(100,120), uom:'g', kcal:116, limitKey:'tuna_canned'},
   {name:'Bresaola',          qty:Q(80,100),  uom:'g', kcal:151, limitKey:'cured_lean'},
-  {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', kcal:103, limitKey:'fresh_cheese'},
-  {name:'Ricotta',           qty:Q(150,170), uom:'g', kcal:174, limitKey:'fresh_cheese'},
+  {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', kcal:103, limitKey:'cheese_all'},
+  {name:'Ricotta',           qty:Q(150,170), uom:'g', kcal:174, limitKey:'cheese_all'},
 ];
 FOOD_DB.sat_veg_lunch = [
   {name:'Bietole',       qty:Q(200,200), uom:'g', kcal:19, limitKey:'vegetable_daily'},
@@ -228,9 +228,9 @@ FOOD_DB.sat_veg_lunch = [
   {name:'Asparagi',      qty:Q(200,200), uom:'g', kcal:20, limitKey:'vegetable_daily'},
 ];
 FOOD_DB.parmigiano_snack = [
-  {name:'Parmigiano Reggiano',   qty:Q(30,30), uom:'g', kcal:402, limitKey:'hard_cheese'},
-  {name:'Grana snack',           qty:Q(30,30), uom:'g', kcal:402, limitKey:'hard_cheese'},
-  {name:'Formaggio fresco snack',qty:Q(40,40), uom:'g', kcal:134, limitKey:'fresh_cheese'},
+  {name:'Parmigiano Reggiano',   qty:Q(30,30), uom:'g', kcal:402, limitKey:'cheese_all'},
+  {name:'Grana snack',           qty:Q(30,30), uom:'g', kcal:402, limitKey:'cheese_all'},
+  {name:'Formaggio fresco snack',qty:Q(40,40), uom:'g', kcal:134, limitKey:'cheese_all'},
 ];
 FOOD_DB.free_meal_dinner = [
   {name:'Pizza 🍕 (pasto libero)',      qty:Q(1,1), uom:'porz', kcal:0, limitKey:null},
@@ -260,16 +260,16 @@ FOOD_DB.sun_dinner_protein = [
   {name:'Merluzzo',          qty:Q(150,180), uom:'g', kcal:82,  limitKey:'fish_fresh'},
   {name:'Tonno al naturale', qty:Q(100,120), uom:'g', kcal:116, limitKey:'tuna_canned'},
   {name:'Bresaola',          qty:Q(80,100),  uom:'g', kcal:151, limitKey:'cured_lean'},
-  {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', kcal:103, limitKey:'fresh_cheese'},
+  {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', kcal:103, limitKey:'cheese_all'},
 ];
 FOOD_DB.breakfast_dairy = [
   {name:'Yogurt greco',          qty:Q(170,170), uom:'g',  kcal:59,  limitKey:'yogurt_skyr'},
   {name:'Skyr',                  qty:Q(170,170), uom:'g',  kcal:63,  limitKey:'yogurt_skyr'},
   {name:'Kefir',                 qty:Q(200,200), uom:'ml', kcal:52,  limitKey:'yogurt_skyr'},
-  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  kcal:174, limitKey:'fresh_cheese'},
-  {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  kcal:103, limitKey:'fresh_cheese'},
-  {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'fresh_cheese'},
-  {name:'Formaggio Linea Osella',qty:Q(40,40),   uom:'g',  kcal:100, limitKey:'fresh_cheese'},
+  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  kcal:174, limitKey:'cheese_all'},
+  {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  kcal:103, limitKey:'cheese_all'},
+  {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'cheese_all'},
+  {name:'Formaggio Linea Osella',qty:Q(40,40),   uom:'g',  kcal:100, limitKey:'cheese_all'},
 ];
 FOOD_DB.breakfast_protein = [
   {name:'Latte',                 qty:Q(250,250), uom:'ml', kcal:49,  limitKey:'milk_default'},
@@ -279,9 +279,9 @@ FOOD_DB.breakfast_protein = [
   {name:'Yogurt greco',          qty:Q(170,170), uom:'g',  kcal:59,  limitKey:'yogurt_skyr'},
   {name:'Skyr',                  qty:Q(170,170), uom:'g',  kcal:63,  limitKey:'yogurt_skyr'},
   {name:'Kefir',                 qty:Q(200,200), uom:'ml', kcal:52,  limitKey:'yogurt_skyr'},
-  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  kcal:174, limitKey:'fresh_cheese'},
-  {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  kcal:103, limitKey:'fresh_cheese'},
-  {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'fresh_cheese'},
+  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  kcal:174, limitKey:'cheese_all'},
+  {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  kcal:103, limitKey:'cheese_all'},
+  {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'cheese_all'},
   {name:'Uova',                  qty:Q(2,2),     uom:'pz', kcal:70,  limitKey:'eggs'},
 ];
 FOOD_DB.breakfast_toppings = [
@@ -306,9 +306,9 @@ FOOD_DB.speciali_farine = [
 ];
 // Nuovi gruppi per i template feriali personalizzati
 FOOD_DB.feta_portion = [
-  {name:'Feta',               qty:Q(80,100),  uom:'g', kcal:264, limitKey:'hard_cheese'},
-  {name:'Formaggio stagionato',qty:Q(80,100), uom:'g', kcal:402, limitKey:'hard_cheese'},
-  {name:'Parmigiano Reggiano', qty:Q(30,30),  uom:'g', kcal:402, limitKey:'hard_cheese'},
+  {name:'Feta',               qty:Q(80,100),  uom:'g', kcal:264, limitKey:'cheese_all'},
+  {name:'Formaggio stagionato',qty:Q(80,100), uom:'g', kcal:402, limitKey:'cheese_all'},
+  {name:'Parmigiano Reggiano', qty:Q(30,30),  uom:'g', kcal:402, limitKey:'cheese_all'},
 ];
 FOOD_DB.latte_riso_portion = [
   {name:'Latte di riso',     qty:Q(250,250), uom:'ml', kcal:47, limitKey:'milk_default'},
@@ -320,9 +320,9 @@ FOOD_DB.ciocco_snack = [
   {name:'Cacao amaro',        qty:Q(5,5),   uom:'g', kcal:228, limitKey:null},
 ];
 FOOD_DB.ricotta_protein = [
-  {name:'Ricotta',         qty:Q(150,170), uom:'g', kcal:174, limitKey:'fresh_cheese'},
-  {name:'Fiocchi di latte',qty:Q(150,170), uom:'g', kcal:103, limitKey:'fresh_cheese'},
-  {name:'Formaggio Linea Osella',qty:Q(150,170),uom:'g',kcal:100,limitKey:'fresh_cheese'},
+  {name:'Ricotta',         qty:Q(150,170), uom:'g', kcal:174, limitKey:'cheese_all'},
+  {name:'Fiocchi di latte',qty:Q(150,170), uom:'g', kcal:103, limitKey:'cheese_all'},
+  {name:'Formaggio Linea Osella',qty:Q(150,170),uom:'g',kcal:100,limitKey:'cheese_all'},
 ];
 
 // ── TEMPLATES FERIALI (Mon–Fri) per tipo giorno ────────────────
@@ -545,8 +545,7 @@ const LIMIT_GROUPS = [
   {key:'oats_family',label:'Avena / Cereali',icon:'🌾',val:500,uom:'g'},
   {key:'nuts',label:'Frutta secca',icon:'🥜',val:200,uom:'g'},
   {key:'oil_evo',label:'Olio EVO',icon:'🫒',val:250,uom:'ml'},
-  {key:'fresh_cheese',label:'Formaggi freschi',icon:'🧀',val:600,uom:'g'},
-  {key:'hard_cheese',label:'Formaggi stagionati',icon:'🫕',val:120,uom:'g'},
+  {key:'cheese_all',label:'Formaggi',icon:'🧀',val:500,uom:'g'},
   {key:'cured_lean',label:'Affettati magri',icon:'🍖',val:350,uom:'g'},
   {key:'fruit_portion',label:'Frutta fresca',icon:'🍎',val:18,uom:'pz'},
   {key:'vegetable_daily',label:'Verdure',icon:'🥦',val:3500,uom:'g'},
@@ -685,13 +684,13 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
 }
 
 // ── PLANNER VIEW ──────────────────────────────────────────────
-function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,expandedDay,setExpandedDay,getDayCompliance,todayISO,resetMeal,dayTypes}){
+function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,expandedDay,setExpandedDay,getDayConsumedKcal,todayISO,resetMeal,dayTypes}){
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
       {weekDates.map((date,di)=>{
         const iso=toISO(date);const isToday=iso===todayISO;
         const type=getDayType(dayTypes,weekPlan,iso,di);const tc=TYPE_CFG[type];
-        const comp=getDayCompliance(iso,di);const expanded=expandedDay===di;
+        const kcal=getDayConsumedKcal(iso,di);const expanded=expandedDay===di;
         const dayItems=getDayItems(weekPlan,di,iso,dayTypes);
         return(
           <div key={di} style={{...S.card(),borderLeft:`2px solid ${expanded?'var(--accent)':'transparent'}`,transition:'all 0.2s',overflow:'hidden'}}>
@@ -721,10 +720,10 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
                   {di===5?'SAB':'DOM'}
                 </div>
               )}
-              {/* Compliance badge */}
-              {comp!==null&&(
-                <div style={{fontSize:'12px',fontWeight:600,color:comp>=80?'var(--accent)':'var(--text2)',minWidth:'30px',textAlign:'right'}}>
-                  {comp}%
+              {/* Kcal consumate badge */}
+              {kcal>0&&(
+                <div style={{fontSize:'12px',fontWeight:600,color:'var(--accent)',minWidth:'30px',textAlign:'right'}}>
+                  {kcal}
                 </div>
               )}
               <div style={{color:'var(--text3)',fontSize:'16px',transform:expanded?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▾</div>
@@ -988,7 +987,7 @@ function QtyEditor({value,uom,onSave,onCancel}){
 }
 
 // ── DASHBOARD VIEW ─────────────────────────────────────────────
-function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayCompliance,dayTypes}){
+function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayConsumedKcal,dayTypes}){
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
       {/* Daily compliance grid */}
@@ -997,7 +996,7 @@ function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayComplianc
         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'6px'}}>
           {weekDates.map((date,di)=>{
             const iso=toISO(date);const isToday=iso===toISO(new Date());
-            const comp=getDayCompliance(iso,di);const type=getDayType(dayTypes,weekPlan,iso,di);
+            const kcal=getDayConsumedKcal(iso,di);const type=getDayType(dayTypes,weekPlan,iso,di);
             const tc=TYPE_CFG[type];
             return(
               <div key={di} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px'}}>
@@ -1005,11 +1004,11 @@ function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayComplianc
                   {DAYS[di].slice(0,3).toUpperCase()}
                 </div>
                 <div style={{width:'32px',height:'32px',borderRadius:'8px',
-                  background:comp===null?'var(--surface)':comp>=80?'var(--accent-soft)':'var(--muted)',
-                  border:`1px solid ${isToday?'var(--accent)':(comp!==null?'#4f4952':'var(--border)')}`,
-                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:700,
-                  color:comp===null?'var(--text3)':comp>=80?'var(--accent)':'var(--text2)'}}>
-                  {comp===null?'—':`${comp}`}
+                  background:kcal>0?'var(--accent-soft)':'var(--surface)',
+                  border:`1px solid ${isToday?'var(--accent)':(kcal>0?'#4f4952':'var(--border)')}`,
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',fontWeight:700,
+                  color:kcal>0?'var(--accent)':'var(--text3)'}}>
+                  {kcal>0?kcal:'—'}
                 </div>
                 <div style={{fontSize:'9px',color:'var(--text3)'}}>{tc.icon}</div>
               </div>
@@ -1025,7 +1024,6 @@ function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayComplianc
         const pct=Math.min(used/g.val*100,100);
         const high=pct>=80;
         const color=high?'var(--accent)':'#45404a';
-        if(used===0&&g.val>100)return null; // hide empty food groups
         return(
           <div key={g.key} style={S.card({padding:'12px 14px'})}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'7px'}}>
@@ -1449,11 +1447,13 @@ export default function App(){
     return totals;
   };
 
-  const getDayCompliance=(iso,di)=>{
+  const getDayConsumedKcal=(iso,di)=>{
     const items=getDayItems(weekPlan,di,iso,dayTypes);const dl=dailyLog[iso]||{};
     const all=MEAL_ORDER.flatMap(m=>items[m]||[]);
-    if(!all.length)return null;
-    return Math.round(all.filter(it=>dl[it.key]?.checked).length/all.length*100);
+    return all.filter(it=>dl[it.key]?.checked).reduce((sum,it)=>{
+      const qty=dl[it.key]?.qtyOverride??it.qty;
+      return sum+(calcKcal({...it,qty})||0);
+    },0);
   };
 
   const weeklyTotals=getWeeklyTotals();
@@ -1498,7 +1498,7 @@ export default function App(){
         {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}/>}
         {tab==='planner'&&<PlannerView weekDates={weekDates} weekPlan={weekPlan} dailyLog={dailyLog}
           changeDayType={changeDayType} setSwapModal={setSwapModal} expandedDay={expandedDay}
-          setExpandedDay={setExpandedDay} getDayCompliance={getDayCompliance} todayISO={todayISO} resetMeal={resetMeal}
+          setExpandedDay={setExpandedDay} getDayConsumedKcal={getDayConsumedKcal} todayISO={todayISO} resetMeal={resetMeal}
           dayTypes={dayTypes}/>}
         {tab==='oggi'&&<OggiView weekPlan={weekPlan} weekDates={weekDates} todayISO={todayISO}
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
@@ -1509,7 +1509,7 @@ export default function App(){
         {tab==='calendario'&&<CalendarView dailyLog={dailyLog} dayTypes={dayTypes} weekPlan={weekPlan}
           setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
-          weekPlan={weekPlan} dailyLog={dailyLog} getDayCompliance={getDayCompliance} dayTypes={dayTypes}/>}
+          weekPlan={weekPlan} dailyLog={dailyLog} getDayConsumedKcal={getDayConsumedKcal} dayTypes={dayTypes}/>}
       </div>
 
       {/* Bottom nav */}
