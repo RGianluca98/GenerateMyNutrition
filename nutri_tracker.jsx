@@ -1425,6 +1425,7 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
           {options.map((alt,i)=>{
             const isCurrent=alt.name===currentName;
             const qty=alt.qty?.[type]??alt.qty?.Riposo;
+            const altKcal=calcKcal({...alt,qty});
             return(
               <button key={i} onClick={()=>onSwap(dateISO,dayIndex,meal,itemIndex,alt.name)}
                 style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
@@ -1434,9 +1435,12 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
                   {isCurrent&&<span style={{color:'var(--accent)',fontSize:'14px'}}>✓</span>}
                   <span style={{fontSize:'14px',color:isCurrent?'var(--accent)':'var(--text)',fontWeight:isCurrent?600:400}}>{alt.name}</span>
                 </div>
-                <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
-                  {qty} {alt.uom}
-                </span>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
+                  <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
+                    {qty} {alt.uom}
+                  </span>
+                  {altKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{altKcal} kcal</span>}
+                </div>
               </button>
             );
           })}
@@ -1478,16 +1482,23 @@ function AddFoodModal({modal,onAdd,onClose}){
           ))}
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-          {options.map((food,i)=>(
+          {options.map((food,i)=>{
+            const fqty=food.qty?.[type]??food.qty?.Riposo;
+            const fKcal=calcKcal({...food,qty:fqty});
+            return(
             <button key={i} onClick={()=>onAdd(dateISO,dayIndex,meal,context,food.name)}
               style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
                 borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer'}}>
               <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
-              <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
-                {food.qty?.[type]??food.qty?.Riposo} {food.uom}
-              </span>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
+                <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
+                  {fqty} {food.uom}
+                </span>
+                {fKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{fKcal} kcal</span>}
+              </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -1526,16 +1537,23 @@ function ExtraFoodModal({modal,onAdd,onClose}){
           ))}
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-          {options.map((food,i)=>(
+          {options.map((food,i)=>{
+            const fqty=food.qty?.[type]??food.qty?.Riposo;
+            const fKcal=calcKcal({...food,qty:fqty});
+            return(
             <button key={i} onClick={()=>onAdd(dateISO,context,food.name)}
               style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
                 borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer'}}>
               <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
-              <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
-                {food.qty[type]??food.qty.Riposo} {food.uom}
-              </span>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
+                <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
+                  {fqty} {food.uom}
+                </span>
+                {fKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{fKcal} kcal</span>}
+              </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
