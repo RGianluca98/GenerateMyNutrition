@@ -50,7 +50,6 @@ Rispondi in italiano, in modo conciso e pratico. Suggerisci allenamenti con dist
       });
       const data = await res.json();
       if (res.ok && data.choices?.[0]?.message?.content) {
-        // Normalizza risposta nello stesso formato di Claude
         return {
           statusCode: 200,
           headers,
@@ -59,10 +58,11 @@ Rispondi in italiano, in modo conciso e pratico. Suggerisci allenamenti con dist
           }),
         };
       }
-      // Se OpenAI fallisce, logga e prova Claude
-      console.error('OpenAI error:', JSON.stringify(data));
+      // OpenAI ha risposto ma con errore — restituiscilo direttamente
+      const openaiError = data.error?.message || JSON.stringify(data);
+      return { statusCode: res.status || 500, headers, body: JSON.stringify({ error: 'OpenAI: ' + openaiError }) };
     } catch (err) {
-      console.error('OpenAI fetch error:', err.message);
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'OpenAI fetch error: ' + err.message }) };
     }
   }
 
