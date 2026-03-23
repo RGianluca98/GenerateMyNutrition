@@ -1,4 +1,4 @@
-// Netlify Function: proxy AI — usa OpenAI GPT-4o-mini (fallback Claude)
+// Netlify Function: proxy Claude API
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -8,6 +8,10 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY non configurata' }) };
   }
 
   const { messages, activities } = JSON.parse(event.body || '{}');
@@ -29,68 +33,25 @@ ${activitySummary}
 
 Rispondi in italiano, in modo conciso e pratico. Suggerisci allenamenti con distanze, tempi e intensità specifiche.`;
 
-  // Prova prima OpenAI, poi Claude come fallback
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const openaiMessages = [
-        { role: 'system', content: systemPrompt },
-        ...(messages || []),
-      ];
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          max_tokens: 1024,
-          messages: openaiMessages,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.choices?.[0]?.message?.content) {
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            content: [{ type: 'text', text: data.choices[0].message.content }],
-          }),
-        };
-      }
-      // OpenAI ha risposto ma con errore — restituiscilo direttamente
-      const openaiError = data.error?.message || JSON.stringify(data);
-      return { statusCode: res.status || 500, headers, body: JSON.stringify({ error: 'OpenAI: ' + openaiError }) };
-    } catch (err) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: 'OpenAI fetch error: ' + err.message }) };
-    }
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: messages || [],
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { statusCode: res.status, headers, body: JSON.stringify({ error: data.error?.message || JSON.stringify(data) }) };
+    return { statusCode: 200, headers, body: JSON.stringify(data) };
+  } catch (err) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
   }
-
-  // Fallback: Claude
-  if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-haiku-20241022',
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages: messages || [],
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) return { statusCode: 200, headers, body: JSON.stringify(data) };
-      console.error('Claude error:', JSON.stringify(data));
-      return { statusCode: res.status, headers, body: JSON.stringify(data) };
-    } catch (err) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
-    }
-  }
-
-  return { statusCode: 500, headers, body: JSON.stringify({ error: 'Nessuna API key AI configurata (OPENAI_API_KEY o ANTHROPIC_API_KEY)' }) };
 };
