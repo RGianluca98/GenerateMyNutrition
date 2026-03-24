@@ -1183,9 +1183,10 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
             const dist=a.distance?(a.distance/1000).toFixed(2)+' km':'';
             const dur=a.moving_time?fmtTime(a.moving_time):'';
             const pace=a.distance&&a.moving_time?fmtPace(a.distance/a.moving_time):'';
-            const kcal=a.calories?a.calories+' kcal':'';
             const isExpanded=expandedActivity===a.id;
             const detail=activityDetails[a.id];
+            const kcalVal=detail?.calories??a.calories;
+            const kcal=kcalVal?Math.round(kcalVal)+' kcal':'';
             return(
               <div key={a.id} style={{borderRadius:'12px',background:'var(--card)',border:`1px solid ${isExpanded?'var(--accent)':'var(--border)'}`,overflow:'hidden'}}>
                 {/* Header card */}
@@ -1215,6 +1216,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
                       <>
                         {/* Stats generali */}
                         <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                          {detail.calories&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--surface)',color:'var(--accent)',fontWeight:600}}>🔥 {Math.round(detail.calories)} kcal</span>}
                           {detail.average_heartrate&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--surface)',color:'var(--text2)'}}>❤️ {Math.round(detail.average_heartrate)} bpm medio</span>}
                           {detail.max_heartrate&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--surface)',color:'var(--text2)'}}>❤️‍🔥 {Math.round(detail.max_heartrate)} bpm max</span>}
                           {detail.total_elevation_gain>0&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--surface)',color:'var(--text2)'}}>↑ {Math.round(detail.total_elevation_gain)} m</span>}
