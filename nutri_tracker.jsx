@@ -597,6 +597,164 @@ const S={
   btn:(color='var(--text2)',extra={})=>({background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',color,padding:'6px 14px',fontSize:'12px',fontWeight:500,...extra}),
 };
 
+// ── PESO VIEW ─────────────────────────────────────────────────
+function PesoView({weightLog,saveWeightLog}){
+  const todayISO=toISO(new Date());
+  const [inputDate,setInputDate]=useState(todayISO);
+  const [inputWeight,setInputWeight]=useState('');
+  const [editingDate,setEditingDate]=useState(null);
+
+  const sorted=[...weightLog].sort((a,b)=>a.date.localeCompare(b.date));
+
+  const handleSave=()=>{
+    const w=parseFloat(inputWeight.replace(',','.'));
+    if(!w||!inputDate)return;
+    const newLog=weightLog.filter(e=>e.date!==inputDate);
+    newLog.push({date:inputDate,weight:w});
+    newLog.sort((a,b)=>a.date.localeCompare(b.date));
+    saveWeightLog(newLog);
+    setInputWeight('');
+    setInputDate(todayISO);
+    setEditingDate(null);
+  };
+
+  const handleEdit=(entry)=>{
+    setInputDate(entry.date);
+    setInputWeight(String(entry.weight));
+    setEditingDate(entry.date);
+  };
+
+  const handleDelete=(date)=>{
+    saveWeightLog(weightLog.filter(e=>e.date!==date));
+    if(editingDate===date){setInputDate(todayISO);setInputWeight('');setEditingDate(null);}
+  };
+
+  // Grafico SVG
+  const W=300,H=120,PAD={t:16,r:16,b:24,l:36};
+  const chartW=W-PAD.l-PAD.r,chartH=H-PAD.t-PAD.b;
+  const renderChart=sorted.length>=2?(()=>{
+    const weights=sorted.map(e=>e.weight);
+    const minW=Math.min(...weights)-1,maxW=Math.max(...weights)+1;
+    const dates=sorted.map(e=>new Date(e.date).getTime());
+    const minD=Math.min(...dates),maxD=Math.max(...dates);
+    const xOf=d=>PAD.l+((new Date(d).getTime()-minD)/(maxD-minD||1))*chartW;
+    const yOf=w=>PAD.t+chartH-((w-minW)/(maxW-minW||1))*chartH;
+    const pts=sorted.map(e=>`${xOf(e.date).toFixed(1)},${yOf(e.weight).toFixed(1)}`).join(' ');
+    const yLabels=[minW,minW+(maxW-minW)/2,maxW].map(v=>Math.round(v*10)/10);
+    return(
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto',display:'block'}}>
+        {/* Griglie Y */}
+        {yLabels.map((v,i)=>{
+          const y=yOf(v);
+          return(<g key={i}>
+            <line x1={PAD.l} y1={y} x2={W-PAD.r} y2={y} stroke="var(--border)" strokeWidth="0.8" strokeDasharray="3,3"/>
+            <text x={PAD.l-4} y={y+4} fontSize="8" fill="var(--text3)" textAnchor="end">{v}</text>
+          </g>);
+        })}
+        {/* Linea */}
+        <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"/>
+        {/* Punti e label */}
+        {sorted.map((e,i)=>{
+          const x=xOf(e.date),y=yOf(e.weight);
+          const labelY=y>PAD.t+12?y-6:y+14;
+          return(<g key={i}>
+            <circle cx={x} cy={y} r="3.5" fill="var(--accent)" stroke="var(--surface)" strokeWidth="1.5"/>
+            <text x={x} y={labelY} fontSize="8" fill="var(--accent)" textAnchor="middle" fontWeight="600">{e.weight}</text>
+          </g>);
+        })}
+      </svg>
+    );
+  })():null;
+
+  const fmtDate=iso=>{const d=new Date(iso);return d.toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'});};
+  const delta=sorted.length>=2?(sorted[sorted.length-1].weight-sorted[0].weight).toFixed(1):null;
+
+  return(
+    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'100px'}}>
+      {/* Form inserimento */}
+      <div style={{background:'var(--card)',borderRadius:'16px',padding:'16px',border:'1px solid var(--border)'}}>
+        <div style={{fontFamily:'var(--display)',fontSize:'16px',color:'var(--text)',marginBottom:'12px'}}>
+          {editingDate?'Modifica misurazione':'Nuova misurazione'}
+        </div>
+        <div style={{display:'flex',gap:'8px',marginBottom:'10px'}}>
+          <input type="date" value={inputDate} onChange={e=>setInputDate(e.target.value)}
+            style={{flex:1,padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)',background:'var(--surface)',color:'var(--text)',fontSize:'14px'}}/>
+          <div style={{display:'flex',alignItems:'center',gap:'4px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px',flex:'0 0 auto'}}>
+            <input type="text" inputMode="decimal" value={inputWeight} onChange={e=>setInputWeight(e.target.value)}
+              placeholder="78.5"
+              style={{width:'52px',background:'none',border:'none',color:'var(--text)',fontSize:'14px',outline:'none',textAlign:'right'}}/>
+            <span style={{fontSize:'13px',color:'var(--text3)'}}>kg</span>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:'8px'}}>
+          <button onClick={handleSave}
+            style={{flex:1,padding:'10px',borderRadius:'10px',background:'var(--accent)',color:'#fff',border:'none',fontSize:'14px',fontWeight:600,cursor:'pointer'}}>
+            Salva
+          </button>
+          {editingDate&&(
+            <button onClick={()=>{setEditingDate(null);setInputDate(todayISO);setInputWeight('');}}
+              style={{padding:'10px 14px',borderRadius:'10px',background:'var(--surface)',color:'var(--text2)',border:'1px solid var(--border)',fontSize:'14px',cursor:'pointer'}}>
+              Annulla
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Grafico */}
+      {sorted.length>=2&&(
+        <div style={{background:'var(--card)',borderRadius:'16px',padding:'16px',border:'1px solid var(--border)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+            <div style={{fontFamily:'var(--display)',fontSize:'15px',color:'var(--text)'}}>Andamento</div>
+            {delta!=null&&(
+              <span style={{fontSize:'12px',fontWeight:600,color:parseFloat(delta)<=0?'#4caf50':'#e05252',background:'var(--surface)',padding:'3px 8px',borderRadius:'999px'}}>
+                {parseFloat(delta)>0?'+':''}{delta} kg
+              </span>
+            )}
+          </div>
+          {renderChart}
+          <div style={{display:'flex',justifyContent:'space-between',marginTop:'4px'}}>
+            <span style={{fontSize:'10px',color:'var(--text3)'}}>{fmtDate(sorted[0].date)}</span>
+            <span style={{fontSize:'10px',color:'var(--text3)'}}>{fmtDate(sorted[sorted.length-1].date)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Lista misurazioni */}
+      {sorted.length>0&&(
+        <div style={{background:'var(--card)',borderRadius:'16px',padding:'16px',border:'1px solid var(--border)'}}>
+          <div style={{fontFamily:'var(--display)',fontSize:'15px',color:'var(--text)',marginBottom:'10px'}}>Storico</div>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+            {[...sorted].reverse().map((entry,i)=>(
+              <div key={entry.date} onClick={()=>handleEdit(entry)}
+                style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 12px',
+                  borderRadius:'10px',background:editingDate===entry.date?'var(--accent-soft)':'var(--surface)',
+                  border:`1px solid ${editingDate===entry.date?'var(--accent)':'var(--border)'}`,cursor:'pointer'}}>
+                <span style={{fontSize:'13px',color:'var(--text2)'}}>{fmtDate(entry.date)}</span>
+                <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                  <span style={{fontSize:'15px',fontWeight:700,color:'var(--text)'}}>{entry.weight} kg</span>
+                  {i<sorted.length-1&&(()=>{
+                    const prev=sorted[sorted.length-1-i-1];
+                    const d=(entry.weight-prev.weight).toFixed(1);
+                    return <span style={{fontSize:'11px',color:parseFloat(d)<=0?'#4caf50':'#e05252'}}>{parseFloat(d)>0?'+':''}{d}</span>;
+                  })()}
+                  <button onClick={e=>{e.stopPropagation();handleDelete(entry.date);}}
+                    style={{background:'none',border:'none',color:'#e05252',fontSize:'16px',cursor:'pointer',padding:'0 2px',lineHeight:1}}>×</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {sorted.length===0&&(
+        <div style={{textAlign:'center',padding:'40px 16px',color:'var(--text3)',fontSize:'14px'}}>
+          Inserisci la tua prima misurazione
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NavGlyph({id,active}){
   const stroke=active?'var(--accent)':'var(--text3)';
   if(id==='home'){
@@ -640,6 +798,16 @@ function NavGlyph({id,active}){
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <circle cx="8" cy="8" r="5.5" stroke={stroke} strokeWidth="1.5"/>
         <path d="M5.5 8.5l1.5 1.5 3.5-3.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    );
+  }
+  if(id==='peso'){
+    return(
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2" y="7" width="12" height="7" rx="1.5" stroke={stroke} strokeWidth="1.5"/>
+        <path d="M5 7c0-1.657 1.343-3 3-3s3 1.343 3 3" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="8" y1="9" x2="8" y2="11" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="6.5" y1="10" x2="9.5" y2="10" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     );
   }
@@ -1696,6 +1864,8 @@ export default function App(){
   const [selectedDayIndex,setSelectedDayIndex]=useState(()=>{const g=new Date().getDay();return g===0?6:g-1;});
   const [dayTypes,setDayTypes]=useState({});
   const [stravaTokens,setStravaTokens]=useState(null);
+  const [weightLog,setWeightLog]=useState([]);
+  const saveWeightLog=async log=>{setWeightLog(log);try{await window.storage.set('nt_weightLog',JSON.stringify(log));}catch(e){}};
 
   useEffect(()=>{
     (async()=>{
@@ -1708,6 +1878,8 @@ export default function App(){
         if(dt?.value)setDayTypes(JSON.parse(dt.value));
         const st=await window.storage.get('nt_stravaTokens');
         if(st?.value){const v=JSON.parse(st.value);if(v)setStravaTokens(v);}
+        const wl=await window.storage.get('nt_weightLog');
+        if(wl?.value)setWeightLog(JSON.parse(wl.value));
       }catch(e){}
     })();
   },[]);
@@ -1892,11 +2064,12 @@ export default function App(){
           weekPlan={weekPlan} dailyLog={dailyLog} getDayConsumedKcal={getDayConsumedKcal} dayTypes={dayTypes}/>}
         {tab==='trainings'&&<TrainingsView stravaTokens={stravaTokens} setStravaTokens={setStravaTokens}
           dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}/>}
+        {tab==='peso'&&<PesoView weightLog={weightLog} saveWeightLog={saveWeightLog}/>}
       </div>
 
       {/* Bottom nav */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'var(--surface)',borderTop:'1px solid var(--border)',display:'flex',zIndex:100,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'home',label:'Home'},{id:'oggi',label:'Oggi'},{id:'planner',label:'Planner'},{id:'calendario',label:'Calendario'},{id:'dashboard',label:'Limiti'},{id:'trainings',label:'Sport'}].map(t=>(
+        {[{id:'home',label:'Home'},{id:'oggi',label:'Oggi'},{id:'peso',label:'Peso'},{id:'planner',label:'Planner'},{id:'calendario',label:'Calendario'},{id:'dashboard',label:'Limiti'},{id:'trainings',label:'Sport'}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{flex:1,padding:'10px 0 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'}}>
             <NavGlyph id={t.id} active={tab===t.id}/>
