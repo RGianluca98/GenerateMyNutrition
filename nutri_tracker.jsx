@@ -691,7 +691,7 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
 }
 
 // ── PLANNER VIEW ──────────────────────────────────────────────
-function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,expandedDay,setExpandedDay,getDayConsumedKcal,todayISO,resetMeal,dayTypes}){
+function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,expandedDay,setExpandedDay,getDayConsumedKcal,todayISO,resetMeal,dayTypes,removeFood}){
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
       {weekDates.map((date,di)=>{
@@ -752,19 +752,28 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
                         </button>
                       )}
                     </div>
-                    {dayItems[meal].map((item,ii)=>(
+                    {dayItems[meal].map((item)=>{
+                      const idx=Number(item.key.split('_').pop());
+                      return(
                       <div key={item.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
-                        <button onClick={()=>{if(FOOD_DB[item.context]?.length>1)setSwapModal({dateISO:iso,dayIndex:di,meal,itemIndex:ii,context:item.context,currentName:item.name,type});}}
-                          style={{background:'none',border:'none',color:FOOD_DB[item.context]?.length>1?'var(--text)':'var(--text2)',
-                            textAlign:'left',fontSize:'13px',cursor:FOOD_DB[item.context]?.length>1?'pointer':'default',display:'flex',alignItems:'center',gap:'4px'}}>
-                          {item.name}
-                          {FOOD_DB[item.context]?.length>1&&<span style={{color:'var(--text3)',fontSize:'10px'}}>⇄</span>}
-                        </button>
-                        <span style={{fontSize:'12px',color:'var(--text2)',fontWeight:500,background:'var(--chip)',padding:'2px 8px',borderRadius:'999px'}}>
-                          {item.qty} {item.uom}
-                        </span>
+                        <div style={{display:'flex',alignItems:'center',gap:'4px',flex:1,minWidth:0}}>
+                          <button onClick={()=>{if(FOOD_DB[item.context]?.length>1)setSwapModal({dateISO:iso,dayIndex:di,meal,itemIndex:idx,context:item.context,currentName:item.name,type});}}
+                            style={{background:'none',border:'none',color:FOOD_DB[item.context]?.length>1?'var(--text)':'var(--text2)',
+                              textAlign:'left',fontSize:'13px',cursor:FOOD_DB[item.context]?.length>1?'pointer':'default',display:'flex',alignItems:'center',gap:'4px',padding:0}}>
+                            {item.name}
+                            {FOOD_DB[item.context]?.length>1&&<span style={{color:'var(--text3)',fontSize:'10px'}}>⇄</span>}
+                          </button>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                          <span style={{fontSize:'12px',color:'var(--text2)',fontWeight:500,background:'var(--chip)',padding:'2px 8px',borderRadius:'999px'}}>
+                            {item.qty} {item.uom}
+                          </span>
+                          <button onClick={()=>removeFood(iso,di,meal,idx)}
+                            style={{background:'none',border:'none',color:'#e05252',fontSize:'14px',cursor:'pointer',padding:'0 2px',lineHeight:1}}>×</button>
+                        </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ))}
               </div>
@@ -780,7 +789,7 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
 function OggiView({
   weekPlan,weekDates,todayISO,selectedDayIndex,setSelectedDayIndex,dailyLog,
   toggleLogItem,updateLogQty,editQty,setEditQty,setSwapModal,setAddModal,
-  setExtraModal,dayTypes,changeDayType
+  setExtraModal,dayTypes,changeDayType,removeFood
 }){
   const di=selectedDayIndex>=0&&selectedDayIndex<7?selectedDayIndex:0;
   const selectedISO=toISO(weekDates[di]);
@@ -903,19 +912,23 @@ function OggiView({
                   <span>{item.name}</span>
                   {FOOD_DB[item.context]?.length>1&&<span style={{color:'var(--text3)',fontSize:'10px'}}>⇄</span>}
                 </button>
-                {/* Qty */}
+                {/* Qty + remove */}
                 {isEditing?(
                   <QtyEditor value={displayQty} uom={item.uom}
                     onSave={v=>{updateLogQty(selectedISO,item.key,v);setEditQty(null);}}
                     onCancel={()=>setEditQty(null)}/>
                 ):(
-                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
-                    <button onClick={()=>setEditQty({key:item.key})}
-                      style={{fontSize:'12px',color:'var(--text2)',fontWeight:500,background:'var(--chip)',
-                        padding:'3px 10px',borderRadius:'999px',border:'none',minWidth:'56px',textAlign:'center'}}>
-                      {displayQty} {item.uom}
-                    </button>
-                    {itemKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{itemKcal} kcal</span>}
+                  <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
+                      <button onClick={()=>setEditQty({key:item.key})}
+                        style={{fontSize:'12px',color:'var(--text2)',fontWeight:500,background:'var(--chip)',
+                          padding:'3px 10px',borderRadius:'999px',border:'none',minWidth:'56px',textAlign:'center'}}>
+                        {displayQty} {item.uom}
+                      </button>
+                      {itemKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{itemKcal} kcal</span>}
+                    </div>
+                    <button onClick={()=>removeFood(selectedISO,di,meal,Number(item.key.split('_').pop()))}
+                      style={{background:'none',border:'none',color:'#e05252',fontSize:'16px',cursor:'pointer',padding:'0 2px',lineHeight:1,flexShrink:0}}>×</button>
                   </div>
                 )}
               </div>
@@ -1427,7 +1440,7 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
             const qty=alt.qty?.[type]??alt.qty?.Riposo;
             const altKcal=calcKcal({...alt,qty});
             return(
-              <button key={i} onClick={()=>onSwap(dateISO,dayIndex,meal,itemIndex,alt.name)}
+              <button key={i} onClick={()=>onSwap(dateISO,dayIndex,meal,itemIndex,alt.name,selCtx)}
                 style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
                   borderRadius:'10px',border:`1px solid ${isCurrent?'var(--accent)':'var(--border)'}`,
                   background:isCurrent?'var(--accent-soft)':'var(--card)',cursor:'pointer'}}>
@@ -1766,11 +1779,18 @@ export default function App(){
     setExtraModal(null);
   };
 
-  const swapFood=(dateISO,dayIndex,meal,ii,newFood)=>{
+  const swapFood=(dateISO,dayIndex,meal,ii,newFood,newCtx)=>{
     const cur=getMealSourceItems(weekPlan,dayIndex,meal,dateISO);
-    const upd=cur.map((item,i)=>i===ii?{...item,name:newFood}:item);
+    const upd=cur.map((item,i)=>i===ii?{...item,name:newFood,context:newCtx??item.context}:item);
     setMealOverrides(dateISO,meal,upd);
     setSwapModal(null);
+  };
+
+  const removeFood=(dateISO,dayIndex,meal,ii)=>{
+    const cur=getMealSourceItems(weekPlan,dayIndex,meal,dateISO);
+    const upd=cur.filter((_,i)=>i!==ii);
+    if(upd.length===0){resetMeal(dateISO,meal);}
+    else{setMealOverrides(dateISO,meal,upd);}
   };
 
   const addFood=(dateISO,dayIndex,meal,context,name)=>{
@@ -1857,13 +1877,13 @@ export default function App(){
         {tab==='planner'&&<PlannerView weekDates={weekDates} weekPlan={weekPlan} dailyLog={dailyLog}
           changeDayType={changeDayType} setSwapModal={setSwapModal} expandedDay={expandedDay}
           setExpandedDay={setExpandedDay} getDayConsumedKcal={getDayConsumedKcal} todayISO={todayISO} resetMeal={resetMeal}
-          dayTypes={dayTypes}/>}
+          dayTypes={dayTypes} removeFood={removeFood}/>}
         {tab==='oggi'&&<OggiView weekPlan={weekPlan} weekDates={weekDates} todayISO={todayISO}
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
           dailyLog={dailyLog} toggleLogItem={toggleLog} updateLogQty={updateQty}
           editQty={editQty} setEditQty={setEditQty} setSwapModal={setSwapModal}
           setAddModal={setAddModal} setExtraModal={setExtraModal} dayTypes={dayTypes}
-          changeDayType={changeDayType}/>}
+          changeDayType={changeDayType} removeFood={removeFood}/>}
         {tab==='calendario'&&<CalendarView dailyLog={dailyLog} dayTypes={dayTypes} weekPlan={weekPlan}
           setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
