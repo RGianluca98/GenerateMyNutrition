@@ -819,41 +819,158 @@ function NavGlyph({id,active}){
   );
 }
 
+const FRASI=[
+  'La costanza batte sempre la perfezione.',
+  'Ogni pasto è una scelta, ogni scelta è un passo.',
+  'Non serve essere perfetti, serve essere presenti.',
+  'Il corpo si ricorda di ogni cosa che gli dai.',
+  'Piccoli gesti ogni giorno costruiscono grandi risultati.',
+  'Mangia bene, muoviti bene, dormi bene.',
+  'La disciplina è libertà.',
+  'Nutrì il corpo come se fosse l\'unico che hai.',
+];
+
 function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
-  const todayISO=toISO(weekDates[selectedDayIndex]);
-  const dayItems=getDayItems(weekPlan,selectedDayIndex,toISO(weekDates[selectedDayIndex]),dayTypes);
-  const dayLog=dailyLog[todayISO]||{};
+  const iso=toISO(weekDates[selectedDayIndex]);
+  const di=selectedDayIndex;
+  const type=getDayType(dayTypes,weekPlan,iso,di);
+  const dayItems=getDayItems(weekPlan,di,iso,dayTypes);
+  const dayLog=dailyLog[iso]||{};
   const allItems=MEAL_ORDER.flatMap(m=>dayItems[m]||[]);
-  const checked=allItems.filter(it=>dayLog[it.key]?.checked).length;
-  const pct=allItems.length?Math.round(checked/allItems.length*100):0;
+  const checkedItems=allItems.filter(it=>dayLog[it.key]?.checked);
+  const consumedKcal=checkedItems.reduce((s,it)=>{
+    const qty=dayLog[it.key]?.qtyOverride??it.qty;
+    return s+(calcKcal({...it,qty})||0);
+  },0);
+  const targetKcal=(type==='Corsa'||type==='Calcio')?2300:2100;
+  const kcalPct=Math.min(consumedKcal/targetKcal,1);
+
+  // proteine stimate: items con kcal proteiche (pollo, pesce, uova, latticini) — approssimazione con FOOD_DB
+  const estimatedProtein=checkedItems.reduce((s,it)=>{
+    const qty=dayLog[it.key]?.qtyOverride??it.qty;
+    // stima grezza: 25% kcal da proteine per item proteici (context contiene 'protein' o 'chicken')
+    const isProtein=it.context&&(it.context.includes('protein')||it.context.includes('chicken')||it.context.includes('yogurt')||it.context.includes('dairy'));
+    if(!isProtein)return s;
+    const kcal=calcKcal({...it,qty})||0;
+    return s+Math.round(kcal*0.25/4); // kcal → g proteina
+  },0);
+
+  // meal strip
+  const mealLabels={Colazione:'Col',Spuntino:'Spu',Pranzo:'Pra','Spuntino pom.':'Spu·',
+    'Pre-workout':'Pre',Cena:'Cen','Post-workout':'Post'};
+  const activeMeals=MEAL_ORDER.filter(m=>dayItems[m]&&dayItems[m].length>0);
+
+  // SVG arc
+  const R=40,CX=50,CY=50;
+  const circ=2*Math.PI*R;
+  const arcFull=circ*0.78;
+  const arcOffset=circ*(1-0.78)+circ*0.78*(1-kcalPct);
+  const arcStart=circ*(1-0.78)/2;
+
+  // badge tipo
+  const typeCfg={
+    Corsa:{bg:'rgba(74,178,107,0.15)',color:'#4ab26b',icon:'🏃'},
+    Calcio:{bg:'rgba(74,130,210,0.15)',color:'#4a82d2',icon:'⚽'},
+    Riposo:{bg:'var(--chip)',color:'var(--text3)',icon:'😴'},
+  }[type]||{bg:'var(--chip)',color:'var(--text3)',icon:'·'};
+
+  const giorni=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  const mesi=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+  const d=weekDates[selectedDayIndex];
+  const dataLabel=`${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]}`;
+  const frase=FRASI[d.getDay()%FRASI.length];
+
   return(
-    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
-      <div style={{...S.card(),padding:'18px',position:'relative',overflow:'hidden'}}>
-        <div style={{position:'absolute',right:'-30px',top:'-30px',width:'120px',height:'120px',borderRadius:'50%',background:'var(--accent-soft)'}}/>
-        <div style={{position:'relative'}}>
-          <div style={{fontFamily:'var(--display)',fontSize:'32px',lineHeight:1,color:'var(--text)',marginBottom:'6px'}}>63 kg</div>
-          <div style={{fontSize:'12px',color:'var(--text2)',marginBottom:'14px'}}>Peso attuale</div>
-          <div style={{fontSize:'13px',color:'var(--text2)',lineHeight:1.5}}>
-            "La costanza batte sempre la perfezione."
+    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'8px'}}>
+
+      {/* Header giorno */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:'4px'}}>
+        <div>
+          <div style={{fontFamily:'var(--display)',fontSize:'22px',color:'var(--text)',lineHeight:1.1}}>{dataLabel}</div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:'6px',background:typeCfg.bg,padding:'5px 10px',borderRadius:'999px'}}>
+          <span style={{fontSize:'13px'}}>{typeCfg.icon}</span>
+          <span style={{fontSize:'12px',fontWeight:600,color:typeCfg.color}}>{type}</span>
+        </div>
+      </div>
+
+      {/* Card kcal con arco SVG */}
+      <div style={{...S.card(),padding:'18px 20px',display:'flex',alignItems:'center',gap:'20px',position:'relative',overflow:'hidden'}}>
+        <div style={{position:'absolute',right:'-20px',bottom:'-20px',width:'100px',height:'100px',borderRadius:'50%',background:'var(--accent-soft)',opacity:0.5}}/>
+        {/* Arc */}
+        <div style={{flexShrink:0}}>
+          <svg viewBox="0 0 100 100" width="90" height="90">
+            <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--chip)" strokeWidth="7"
+              strokeDasharray={`${arcFull} ${circ}`}
+              strokeDashoffset={-arcStart}
+              strokeLinecap="round" transform="rotate(-90 50 50)" style={{transformOrigin:'50% 50%'}}/>
+            <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--accent)" strokeWidth="7"
+              strokeDasharray={`${(arcFull*kcalPct).toFixed(1)} ${circ}`}
+              strokeDashoffset={-arcStart}
+              strokeLinecap="round" transform="rotate(-90 50 50)" style={{transformOrigin:'50% 50%'}}/>
+            <text x="50" y="47" textAnchor="middle" fontSize="14" fontWeight="700" fill="var(--text)" fontFamily="var(--font)">{consumedKcal.toLocaleString('it-IT')}</text>
+            <text x="50" y="59" textAnchor="middle" fontSize="8" fill="var(--text3)" fontFamily="var(--font)">kcal</text>
+          </svg>
+        </div>
+        {/* Info destra */}
+        <div style={{position:'relative',flex:1,minWidth:0}}>
+          <div style={{fontSize:'11px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'4px'}}>CALORIE</div>
+          <div style={{display:'flex',alignItems:'baseline',gap:'4px',marginBottom:'2px'}}>
+            <span style={{fontFamily:'var(--display)',fontSize:'28px',lineHeight:1,color:'var(--text)'}}>{consumedKcal.toLocaleString('it-IT')}</span>
+          </div>
+          <div style={{fontSize:'12px',color:'var(--text3)'}}>di {targetKcal.toLocaleString('it-IT')} kcal obiettivo</div>
+          <div style={{marginTop:'10px',height:'3px',borderRadius:'3px',background:'var(--chip)',overflow:'hidden'}}>
+            <div style={{height:'100%',width:`${Math.round(kcalPct*100)}%`,background:'var(--accent)',borderRadius:'3px',transition:'width 0.4s'}}/>
+          </div>
+          <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px'}}>{Math.round(kcalPct*100)}% del target giornaliero</div>
+        </div>
+      </div>
+
+      {/* Meal strip */}
+      {activeMeals.length>0&&(
+        <div style={{...S.card(),padding:'14px'}}>
+          <div style={{fontSize:'11px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'10px'}}>PASTI DI OGGI</div>
+          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+            {activeMeals.map(meal=>{
+              const items=dayItems[meal]||[];
+              const done=items.filter(it=>dayLog[it.key]?.checked).length;
+              const total=items.length;
+              const pct=total?done/total:0;
+              const full=pct===1,partial=pct>0&&pct<1;
+              return(
+                <div key={meal} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',flex:'1 1 0',minWidth:'36px'}}>
+                  <div style={{width:'100%',height:'5px',borderRadius:'3px',background:full?'var(--accent)':partial?'rgba(193,122,90,0.4)':'var(--chip)'}}/>
+                  <span style={{fontSize:'9px',color:full?'var(--accent)':partial?'var(--text2)':'var(--text3)',fontWeight:full?600:400,textAlign:'center',letterSpacing:'0.2px'}}>
+                    {mealLabels[meal]||meal.slice(0,3)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
-      </div>
-      <div style={{...S.card(),padding:'14px'}}>
-        <div style={{fontSize:'11px',color:'var(--text2)',letterSpacing:'0.8px',fontWeight:600,marginBottom:'10px'}}>FOCUS DI OGGI</div>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
-          <div style={{fontSize:'14px',color:'var(--text)'}}>Completamento pasti</div>
-          <div style={{fontFamily:'var(--display)',fontSize:'24px',color:'var(--accent)'}}>{pct}%</div>
+      )}
+
+      {/* Quick stats */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+        <div style={{...S.card(),padding:'14px'}}>
+          <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>PASTI</div>
+          <div style={{fontFamily:'var(--display)',fontSize:'26px',lineHeight:1,color:'var(--text)'}}>{checkedItems.length}<span style={{fontSize:'14px',color:'var(--text3)',fontFamily:'var(--font)'}}>/{allItems.length}</span></div>
+          <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'4px'}}>alimenti spuntati</div>
         </div>
-        <div style={{height:'4px',borderRadius:'4px',background:'#2c2a33',overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${pct}%`,background:'var(--accent)'}}/>
-        </div>
-      </div>
-      <div style={{...S.card(),padding:'14px'}}>
-        <div style={{fontSize:'11px',color:'var(--text2)',letterSpacing:'0.8px',fontWeight:600,marginBottom:'8px'}}>PROMEMORIA</div>
-        <div style={{fontSize:'13px',color:'var(--text2)',lineHeight:1.5}}>
-          Bevi acqua durante la giornata, rispetta le porzioni e spunta ogni voce appena completata.
+        <div style={{...S.card(),padding:'14px'}}>
+          <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>PROTEINE EST.</div>
+          <div style={{fontFamily:'var(--display)',fontSize:'26px',lineHeight:1,color:'var(--text)'}}>~{estimatedProtein}<span style={{fontSize:'14px',color:'var(--text3)',fontFamily:'var(--font)'}}>g</span></div>
+          <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'4px'}}>da fonti proteiche</div>
         </div>
       </div>
+
+      {/* Frase del giorno */}
+      <div style={{...S.card(),padding:'16px 18px',borderLeft:'3px solid var(--accent)'}}>
+        <div style={{fontFamily:'var(--display)',fontSize:'15px',color:'var(--text2)',lineHeight:1.6,fontStyle:'italic'}}>
+          "{frase}"
+        </div>
+      </div>
+
     </div>
   );
 }
