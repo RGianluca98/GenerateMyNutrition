@@ -2003,22 +2003,12 @@ export default function App(){
         <div style={{textAlign:'center'}}>
           <svg width="80" height="80" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginBottom:'14px'}}>
             <circle cx="36" cy="36" r="34" fill="#FBA828" opacity="0.08"/>
-            <circle cx="36" cy="36" r="28" fill="none" stroke="#FBA828" strokeWidth="2.5"/>
-            {[0,30,60,90,120,150,180,210,240,270,300,330].map((deg,i)=>{
-              const rad=deg*Math.PI/180;
-              const x1=36+25*Math.sin(rad), y1=36-25*Math.cos(rad);
-              const x2=36+(i%3===0?19:22)*Math.sin(rad), y2=36-(i%3===0?19:22)*Math.cos(rad);
-              return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#FBA828" strokeWidth={i%3===0?2:1} strokeLinecap="round"/>;
-            })}
-            <line x1="36" y1="17" x2="36" y2="36" stroke="#EFF1F8" strokeWidth="2.5" strokeLinecap="round"/>
-            <line x1="36" y1="36" x2="50" y2="30" stroke="#FBA828" strokeWidth="2" strokeLinecap="round"/>
-            <circle cx="36" cy="36" r="3" fill="#EFF1F8"/>
-            <circle cx="50" cy="20" r="3" fill="#00C49A"/>
-            <path d="M50 23 L48 30 L44 36" stroke="#00C49A" strokeWidth="2" strokeLinecap="round" fill="none"/>
-            <path d="M48 30 L53 34" stroke="#00C49A" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M44 36 L42 42 M44 36 L48 41" stroke="#00C49A" strokeWidth="2" strokeLinecap="round"/>
+            <rect x="26" y="18" width="9" height="38" rx="4.5" fill="#FBA828"/>
+            <circle cx="30.5" cy="14" r="6" fill="#FBA828"/>
+            <path d="M35 34 L54 16" stroke="#FBA828" strokeWidth="9" strokeLinecap="round"/>
+            <path d="M35 38 L54 56" stroke="#FBA828" strokeWidth="9" strokeLinecap="round"/>
           </svg>
-          <div style={{fontFamily:'var(--display)',fontSize:'30px',fontWeight:800,color:'var(--text)',letterSpacing:'5px'}}>KRONOS</div>
+          <div style={{fontFamily:'var(--display)',fontSize:'32px',fontWeight:900,color:'var(--accent)',letterSpacing:'3px'}}>KRONOS</div>
           <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'6px',letterSpacing:'0.5px'}}>Keep Records Of Nutrition, Objectives &amp; Sport</div>
         </div>
         {/* Dots */}
@@ -2146,7 +2136,7 @@ export default function App(){
     <div style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)',fontFamily:'var(--font)',paddingBottom:'80px'}}>
       {/* Header */}
       <div style={{padding:'20px 20px 12px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,background:'var(--bg)',zIndex:10}}>
-        <div style={{fontFamily:'var(--display)',fontSize:'18px',letterSpacing:'0px',fontWeight:700}}>
+        <div style={{fontFamily:'var(--display)',fontSize:'18px',letterSpacing:'2px',fontWeight:900,color:'var(--accent)'}}>
           KRONOS
         </div>
         {tab==='home'&&(
