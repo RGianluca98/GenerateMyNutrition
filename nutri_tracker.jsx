@@ -906,6 +906,11 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'8px'}}>
 
+      {/* Logo */}
+      <div style={{textAlign:'center',paddingTop:'8px'}}>
+        <img src="./logo_kronos.png" alt="KRONOS" style={{width:'72px',height:'auto',mixBlendMode:'screen',display:'block',margin:'0 auto'}}/>
+      </div>
+
       {/* Header giorno */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:'4px'}}>
         <div>
@@ -2001,7 +2006,7 @@ export default function App(){
     return(
       <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'28px',padding:'24px'}}>
         <div style={{textAlign:'center'}}>
-          <img src="./logo_kronos.png" width="90" height="90" alt="KRONOS" style={{marginBottom:'14px',display:'block',mixBlendMode:'screen'}}/>
+          <img src="./logo_kronos.png" alt="KRONOS" style={{width:'110px',height:'auto',display:'block',margin:'0 auto 14px',mixBlendMode:'screen'}}/>
           <div style={{fontFamily:'var(--display)',fontSize:'32px',fontWeight:900,color:'var(--accent)',letterSpacing:'3px'}}>KRONOS</div>
           <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'6px',letterSpacing:'0.5px'}}>Keep Records Of Nutrition, Objectives &amp; Sport</div>
         </div>
@@ -2130,8 +2135,9 @@ export default function App(){
     <div style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)',fontFamily:'var(--font)',paddingBottom:'80px'}}>
       {/* Header */}
       <div style={{padding:'20px 20px 12px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,background:'var(--bg)',zIndex:10}}>
-        <div style={{fontFamily:'var(--display)',fontSize:'18px',letterSpacing:'2px',fontWeight:900,color:'var(--accent)'}}>
-          KRONOS
+        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+          <img src="./logo_kronos.png" alt="" style={{width:'28px',height:'auto',mixBlendMode:'screen'}}/>
+          <span style={{fontFamily:'var(--display)',fontSize:'18px',letterSpacing:'2px',fontWeight:900,color:'var(--accent)'}}>KRONOS</span>
         </div>
         {tab==='home'&&(
           <div style={{fontSize:'12px',color:'var(--text2)'}}>
