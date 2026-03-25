@@ -906,11 +906,6 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'8px'}}>
 
-      {/* Logo */}
-      <div style={{textAlign:'center',paddingTop:'8px'}}>
-        <img src="./logo_kronos.png" alt="KRONOS" style={{width:'72px',height:'auto',mixBlendMode:'screen',display:'block',margin:'0 auto'}}/>
-      </div>
-
       {/* Header giorno */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:'4px'}}>
         <div>
