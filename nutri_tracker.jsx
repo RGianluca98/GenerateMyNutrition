@@ -122,9 +122,15 @@ const FOOD_DB = {
     {name:'Gallette di mais',          qty:Q(8.75,8.75), uom:'pz', kcal:38, limitKey:'gallette_family'},
   ],
   milk_portion:[
-    {name:'Latte',      qty:Q(250,250),uom:'ml',kcal:64, limitKey:'milk_default'},
-    {name:'Cappuccino', qty:Q(200,200),uom:'ml',kcal:40, limitKey:'milk_default'},
-    {name:'Spremuta di arancia',qty:Q(150,150),uom:'ml',kcal:45, limitKey:'juice_portion'},
+    {name:'Latte',                      qty:Q(250,250),uom:'ml',kcal:64,  limitKey:'milk_default'},
+    {name:'Latte senza lattosio',        qty:Q(250,250),uom:'ml',kcal:64,  limitKey:'milk_default'},
+    {name:'Latte di cocco',              qty:Q(200,200),uom:'ml',kcal:230, limitKey:'milk_default'},
+    {name:'Latte di cocco e riso',       qty:Q(200,200),uom:'ml',kcal:80,  limitKey:'milk_default'},
+    {name:'Latte di riso',               qty:Q(200,200),uom:'ml',kcal:47,  limitKey:'milk_default'},
+    {name:'Latte di mandorla',           qty:Q(200,200),uom:'ml',kcal:24,  limitKey:'milk_default'},
+    {name:'Latte di soia',               qty:Q(200,200),uom:'ml',kcal:54,  limitKey:'milk_default'},
+    {name:'Cappuccino',                  qty:Q(200,200),uom:'ml',kcal:40,  limitKey:'milk_default'},
+    {name:'Spremuta di arancia',         qty:Q(150,150),uom:'ml',kcal:45,  limitKey:'juice_portion'},
   ],
   fruit_portion:[
     {name:'Mela',          qty:Q(1,1),    uom:'pz',   kcal:80,  limitKey:null},
@@ -282,10 +288,13 @@ FOOD_DB.breakfast_dairy = [
   {name:'Formaggio Linea Osella',qty:Q(40,40),   uom:'g',  kcal:100, limitKey:'cheese_all'},
 ];
 FOOD_DB.breakfast_protein = [
-  {name:'Latte',                         qty:Q(250,250), uom:'ml', kcal:64, limitKey:'milk_default'},
+  {name:'Latte',                         qty:Q(250,250), uom:'ml', kcal:64,  limitKey:'milk_default'},
+  {name:'Latte senza lattosio',          qty:Q(250,250), uom:'ml', kcal:64,  limitKey:'milk_default'},
   {name:'Latte di cocco',                qty:Q(200,200), uom:'ml', kcal:230, limitKey:'milk_default'},
+  {name:'Latte di cocco e riso',         qty:Q(200,200), uom:'ml', kcal:80,  limitKey:'milk_default'},
   {name:'Latte di riso',                 qty:Q(200,200), uom:'ml', kcal:47,  limitKey:'milk_default'},
   {name:'Latte di mandorla',             qty:Q(200,200), uom:'ml', kcal:24,  limitKey:'milk_default'},
+  {name:'Latte di soia',                 qty:Q(200,200), uom:'ml', kcal:54,  limitKey:'milk_default'},
   {name:'Yogurt Greco 0% Bianco',        qty:Q(170,170), uom:'g',  kcal:53, limitKey:'yogurt_skyr'},
   {name:'Yogurt Greco 0% Senza Lattosio',qty:Q(170,170), uom:'g',  kcal:53, limitKey:'yogurt_skyr'},
   {name:'Yogurt Greco 0% Vaniglia',      qty:Q(170,170), uom:'g',  kcal:84, limitKey:'yogurt_skyr'},
@@ -1705,46 +1714,42 @@ const CONTEXT_LABELS={
 };
 
 function SwapModal({modal,weekPlan,onSwap,onClose}){
-  const {dateISO,dayIndex,meal,itemIndex,context,currentName,type}=modal;
-  const allContexts=Object.keys(FOOD_DB);
-  const [selCtx,setSelCtx]=useState(context||allContexts[0]||'');
+  const {dateISO,dayIndex,meal,itemIndex,currentName,type}=modal;
   const [search,setSearch]=useState('');
-  const options=(FOOD_DB[selCtx]||[]).filter(f=>{
-    const qty=f.qty?.[type]??f.qty?.Riposo??0;
-    if(qty===0)return false;
-    if(search)return f.name.toLowerCase().includes(search.toLowerCase());
-    return true;
-  });
+  // Build deduplicated sorted list, highlight current
+  const seen=new Set();
+  const all=[];
+  for(const ctx of Object.keys(FOOD_DB)){
+    for(const f of FOOD_DB[ctx]){
+      if(seen.has(f.name))continue;
+      const qty=f.qty?.[type]??f.qty?.Riposo??0;
+      if(qty===0)continue;
+      seen.add(f.name);
+      all.push({...f,ctx});
+    }
+  }
+  all.sort((a,b)=>a.name.localeCompare(b.name,'it'));
+  const filtered=search?all.filter(f=>f.name.toLowerCase().includes(search.toLowerCase())):all;
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'flex-end'}}
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:200,display:'flex',alignItems:'flex-end'}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 -8px 24px rgba(26,26,26,0.08)'}}>
+      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'82vh',overflowY:'auto'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
-          <div style={{fontFamily:'var(--display)',fontSize:'18px',color:'var(--text)'}}>Cambia alimento</div>
+          <div style={{fontFamily:'var(--display)',fontSize:'18px',fontWeight:700,color:'var(--text)'}}>Cambia alimento</div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text2)',fontSize:'20px'}}>×</button>
         </div>
-        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)}
+        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)} autoFocus
           style={{width:'100%',padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:'14px',marginBottom:'12px',boxSizing:'border-box'}}/>
-        <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
-          {allContexts.map(ctx=>(
-            <button key={ctx} onClick={()=>{setSelCtx(ctx);setSearch('');}}
-              style={{border:'1px solid var(--border)',borderRadius:'7px',padding:'5px 9px',
-                background:selCtx===ctx?'var(--accent-soft)':'var(--card)',
-                color:selCtx===ctx?'var(--accent)':'var(--text2)',fontSize:'11px',fontWeight:600}}>
-              {CONTEXT_LABELS[ctx]||ctx.replaceAll('_',' ')}
-            </button>
-          ))}
-        </div>
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-          {options.map((alt,i)=>{
+          {filtered.map((alt,i)=>{
             const isCurrent=alt.name===currentName;
             const qty=alt.qty?.[type]??alt.qty?.Riposo;
             const altKcal=calcKcal({...alt,qty});
             return(
-              <button key={i} onClick={()=>onSwap(dateISO,dayIndex,meal,itemIndex,alt.name,selCtx)}
+              <button key={i} onClick={()=>onSwap(dateISO,dayIndex,meal,itemIndex,alt.name,alt.ctx)}
                 style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
                   borderRadius:'10px',border:`1px solid ${isCurrent?'var(--accent)':'var(--border)'}`,
-                  background:isCurrent?'var(--accent-soft)':'var(--card)',cursor:'pointer'}}>
+                  background:isCurrent?'var(--accent-soft)':'var(--card)',cursor:'pointer',textAlign:'left'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                   {isCurrent&&<span style={{color:'var(--accent)',fontSize:'14px'}}>✓</span>}
                   <span style={{fontSize:'14px',color:isCurrent?'var(--accent)':'var(--text)',fontWeight:isCurrent?600:400}}>{alt.name}</span>
@@ -1753,7 +1758,7 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
                   <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
                     {qty} {alt.uom}
                   </span>
-                  {altKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{altKcal} kcal</span>}
+                  {altKcal!=null&&<span style={{fontSize:'10px',color:'var(--accent)'}}>{altKcal} kcal</span>}
                 </div>
               </button>
             );
@@ -1764,56 +1769,58 @@ function SwapModal({modal,weekPlan,onSwap,onClose}){
   );
 }
 
-function AddFoodModal({modal,onAdd,onClose}){
-  const {dateISO,dayIndex,meal,type,contexts}=modal;
-  const allContexts=Object.keys(FOOD_DB);
-  const [context,setContext]=useState(contexts[0]||allContexts[0]||'');
-  const [search,setSearch]=useState('');
-  const options=(FOOD_DB[context]||[]).filter(f=>{
-    const qty=f.qty?.[type]??f.qty?.Riposo??0;
-    if(qty===0)return false;
-    if(search)return f.name.toLowerCase().includes(search.toLowerCase());
-    return true;
-  });
+function AllFoodList({type,search,onSelect}){
+  // Deduplica per nome, prende il primo contesto trovato
+  const seen=new Set();
+  const all=[];
+  for(const ctx of Object.keys(FOOD_DB)){
+    for(const f of FOOD_DB[ctx]){
+      if(seen.has(f.name))continue;
+      const qty=f.qty?.[type]??f.qty?.Riposo??0;
+      if(qty===0)continue;
+      seen.add(f.name);
+      all.push({...f,ctx});
+    }
+  }
+  all.sort((a,b)=>a.name.localeCompare(b.name,'it'));
+  const filtered=search?all.filter(f=>f.name.toLowerCase().includes(search.toLowerCase())):all;
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'flex-end'}}
+    <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+      {filtered.map((food,i)=>{
+        const fqty=food.qty?.[type]??food.qty?.Riposo;
+        const fKcal=calcKcal({...food,qty:fqty});
+        return(
+          <button key={i} onClick={()=>onSelect(food.ctx,food.name)}
+            style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
+              borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer',textAlign:'left'}}>
+            <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
+              <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
+                {fqty} {food.uom}
+              </span>
+              {fKcal!=null&&<span style={{fontSize:'10px',color:'var(--accent)'}}>{fKcal} kcal</span>}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AddFoodModal({modal,onAdd,onClose}){
+  const {dateISO,dayIndex,meal,type}=modal;
+  const [search,setSearch]=useState('');
+  return(
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:200,display:'flex',alignItems:'flex-end'}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 -8px 24px rgba(26,26,26,0.08)'}}>
+      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'82vh',overflowY:'auto'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
-          <div style={{fontFamily:'var(--display)',fontSize:'18px',color:'var(--text)'}}>Aggiungi alimento</div>
+          <div style={{fontFamily:'var(--display)',fontSize:'18px',fontWeight:700,color:'var(--text)'}}>Aggiungi alimento</div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text2)',fontSize:'20px'}}>×</button>
         </div>
-        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)}
+        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)} autoFocus
           style={{width:'100%',padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:'14px',marginBottom:'12px',boxSizing:'border-box'}}/>
-        <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
-          {allContexts.map(ctx=>(
-            <button key={ctx} onClick={()=>{setContext(ctx);setSearch('');}}
-              style={{border:'1px solid var(--border)',borderRadius:'7px',padding:'5px 9px',
-                background:context===ctx?'var(--accent-soft)':'var(--card)',
-                color:context===ctx?'var(--accent)':'var(--text2)',fontSize:'11px',fontWeight:600}}>
-              {CONTEXT_LABELS[ctx]||ctx.replaceAll('_',' ')}
-            </button>
-          ))}
-        </div>
-        <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-          {options.map((food,i)=>{
-            const fqty=food.qty?.[type]??food.qty?.Riposo;
-            const fKcal=calcKcal({...food,qty:fqty});
-            return(
-            <button key={i} onClick={()=>onAdd(dateISO,dayIndex,meal,context,food.name)}
-              style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
-                borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer'}}>
-              <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
-              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
-                <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
-                  {fqty} {food.uom}
-                </span>
-                {fKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{fKcal} kcal</span>}
-              </div>
-            </button>
-            );
-          })}
-        </div>
+        <AllFoodList type={type} search={search} onSelect={(ctx,name)=>{onAdd(dateISO,dayIndex,meal,ctx,name);}}/>
       </div>
     </div>
   );
@@ -1821,54 +1828,18 @@ function AddFoodModal({modal,onAdd,onClose}){
 
 function ExtraFoodModal({modal,onAdd,onClose}){
   const {type,dateISO}=modal;
-  const allContexts=Object.keys(FOOD_DB);
-  const [context,setContext]=useState(allContexts[0]||'');
   const [search,setSearch]=useState('');
-  const options=(FOOD_DB[context]||[]).filter(f=>{
-    const qty=f.qty?.[type]??f.qty?.Riposo??0;
-    if(qty===0)return false;
-    if(search)return f.name.toLowerCase().includes(search.toLowerCase());
-    return true;
-  });
   return(
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'flex-end'}}
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:200,display:'flex',alignItems:'flex-end'}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 -8px 24px rgba(26,26,26,0.08)'}}>
+      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',maxHeight:'82vh',overflowY:'auto'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
-          <div style={{fontFamily:'var(--display)',fontSize:'18px',color:'var(--text)'}}>Pasto Extra</div>
+          <div style={{fontFamily:'var(--display)',fontSize:'18px',fontWeight:700,color:'var(--text)'}}>Pasto Extra</div>
           <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text2)',fontSize:'20px'}}>×</button>
         </div>
-        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)}
+        <input placeholder="Cerca alimento..." value={search} onChange={e=>setSearch(e.target.value)} autoFocus
           style={{width:'100%',padding:'10px 12px',borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:'14px',marginBottom:'12px',boxSizing:'border-box'}}/>
-        <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'12px'}}>
-          {allContexts.map(ctx=>(
-            <button key={ctx} onClick={()=>{setContext(ctx);setSearch('');}}
-              style={{border:'1px solid var(--border)',borderRadius:'7px',padding:'5px 9px',
-                background:context===ctx?'var(--accent-soft)':'var(--card)',
-                color:context===ctx?'var(--accent)':'var(--text2)',fontSize:'11px',fontWeight:600}}>
-              {CONTEXT_LABELS[ctx]||ctx.replaceAll('_',' ')}
-            </button>
-          ))}
-        </div>
-        <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-          {options.map((food,i)=>{
-            const fqty=food.qty?.[type]??food.qty?.Riposo;
-            const fKcal=calcKcal({...food,qty:fqty});
-            return(
-            <button key={i} onClick={()=>onAdd(dateISO,context,food.name)}
-              style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',
-                borderRadius:'10px',border:'1px solid var(--border)',background:'var(--card)',cursor:'pointer'}}>
-              <span style={{fontSize:'14px',color:'var(--text)'}}>{food.name}</span>
-              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px'}}>
-                <span style={{fontSize:'12px',color:'var(--text2)',background:'var(--chip)',padding:'3px 8px',borderRadius:'999px'}}>
-                  {fqty} {food.uom}
-                </span>
-                {fKcal!=null&&<span style={{fontSize:'10px',color:'var(--text3)'}}>{fKcal} kcal</span>}
-              </div>
-            </button>
-            );
-          })}
-        </div>
+        <AllFoodList type={type} search={search} onSelect={(ctx,name)=>{onAdd(dateISO,ctx,name);}}/>
       </div>
     </div>
   );
