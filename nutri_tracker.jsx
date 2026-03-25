@@ -4,25 +4,26 @@ import { useState, useEffect, useRef } from "react";
 (() => {
   const l = document.createElement('link');
   l.rel = 'stylesheet';
-  l.href = 'https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;700&family=Inter:wght@400;500;600;700&display=swap';
+  l.href = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap';
   document.head.appendChild(l);
   const s = document.createElement('style');
   s.textContent = `
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg:#101015;--surface:#17171d;--card:#1d1d24;--border:rgba(255,255,255,0.1);
-      --accent:#c17a5a;--accent-soft:rgba(193,122,90,0.14);
-      --text:#f2eee7;--text2:#b8afa3;--text3:#7d756b;
-      --font:'Inter',sans-serif;--display:'EB Garamond',serif;
-      --chip:#24242d;--muted:#22222a;
-      --shadow:0 1px 1px rgba(0,0,0,0.3),0 10px 28px rgba(0,0,0,0.24);
+      --bg:#F7F9F5;--surface:#FFFFFF;--card:#FFFFFF;--border:#DDE8DA;
+      --accent:#7BAF7B;--accent-soft:rgba(123,175,123,0.12);
+      --accent2:#F2956E;
+      --text:#2A2E26;--text2:#6B7468;--text3:#9CAE99;
+      --font:'Manrope',sans-serif;--display:'Manrope',sans-serif;
+      --chip:#EDF4EC;--muted:#F2F7F1;
+      --shadow:0 1px 2px rgba(42,46,38,0.06),0 8px 24px rgba(42,46,38,0.10);
     }
     html,body{background:var(--bg);color:var(--text);font-family:var(--font)}
     input:focus{outline:none}
     button{cursor:pointer;font-family:var(--font)}
     ::-webkit-scrollbar{width:6px}
     ::-webkit-scrollbar-track{background:transparent}
-    ::-webkit-scrollbar-thumb{background:#34343f;border-radius:6px}
+    ::-webkit-scrollbar-thumb{background:#C5D9C3;border-radius:6px}
   `;
   document.head.appendChild(s);
 })();
@@ -32,9 +33,9 @@ const DAYS = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','
 const MEAL_ORDER = ['Colazione','Spuntino','Pranzo','Spuntino pom.','Pre-workout','Cena','Post-workout'];
 const MEAL_LABEL = {Colazione:'COL',Spuntino:'SPU',Pranzo:'PRA','Spuntino pom.':'POM','Pre-workout':'PRE',Cena:'CEN','Post-workout':'POST'};
 const TYPE_CFG = {
-  Riposo: {label:'Riposo', short:'R', icon:'😴', color:'#8d9aab'},
-  Corsa:  {label:'Corsa',  short:'C', icon:'🏃', color:'#6B8F71'},
-  Calcio: {label:'Calcio', short:'F', icon:'⚽', color:'#c17a5a'},
+  Riposo: {label:'Riposo', short:'R', icon:'😴', color:'#8B9EB8'},
+  Corsa:  {label:'Corsa',  short:'C', icon:'🏃', color:'#7BAF7B'},
+  Calcio: {label:'Calcio', short:'F', icon:'⚽', color:'#F2956E'},
 };
 
 // Tutte le quantità dal foglio "Quantità". Calcio = Corsa (foglio non distingue tipo sport).
@@ -2015,39 +2016,58 @@ export default function App(){
 
   if(!unlocked){
     return(
-      <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'32px',padding:'24px'}}>
+      <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'28px',padding:'24px'}}>
         <div style={{textAlign:'center'}}>
-          <div style={{fontSize:'36px',marginBottom:'8px'}}>🥗</div>
-          <div style={{fontFamily:'var(--display)',fontSize:'26px',color:'var(--text)'}}>NutriTracker</div>
-          <div style={{fontSize:'13px',color:'var(--text2)',marginTop:'6px'}}>Inserisci il codice di accesso</div>
+          <svg width="80" height="80" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginBottom:'14px'}}>
+            <circle cx="36" cy="36" r="34" fill="#7BAF7B" opacity="0.12"/>
+            <circle cx="36" cy="36" r="28" fill="none" stroke="#7BAF7B" strokeWidth="2.5"/>
+            {[0,30,60,90,120,150,180,210,240,270,300,330].map((deg,i)=>{
+              const rad=deg*Math.PI/180;
+              const x1=36+25*Math.sin(rad), y1=36-25*Math.cos(rad);
+              const x2=36+(i%3===0?19:22)*Math.sin(rad), y2=36-(i%3===0?19:22)*Math.cos(rad);
+              return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#7BAF7B" strokeWidth={i%3===0?2:1} strokeLinecap="round"/>;
+            })}
+            <line x1="36" y1="17" x2="36" y2="36" stroke="#2A2E26" strokeWidth="2.5" strokeLinecap="round"/>
+            <line x1="36" y1="36" x2="50" y2="30" stroke="#F2956E" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="36" cy="36" r="3" fill="#2A2E26"/>
+            <circle cx="50" cy="20" r="3" fill="#F2956E"/>
+            <path d="M50 23 L48 30 L44 36" stroke="#F2956E" strokeWidth="2" strokeLinecap="round" fill="none"/>
+            <path d="M48 30 L53 34" stroke="#F2956E" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M44 36 L42 42 M44 36 L48 41" stroke="#F2956E" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+          <div style={{fontFamily:'var(--display)',fontSize:'30px',fontWeight:800,color:'var(--text)',letterSpacing:'5px'}}>KRONOS</div>
+          <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'6px',letterSpacing:'0.5px'}}>Keep Records Of Nutrition, Objectives &amp; Sport</div>
         </div>
         {/* Dots */}
-        <div style={{display:'flex',gap:'14px'}}>
+        <div style={{display:'flex',gap:'14px',marginTop:'4px'}}>
           {Array.from({length:APP_PIN.length}).map((_,i)=>(
-            <div key={i} style={{width:'14px',height:'14px',borderRadius:'50%',
-              background:i<pinInput.length?(pinError?'#e05c5c':'var(--accent)'):'var(--border)',
+            <div key={i} style={{width:'13px',height:'13px',borderRadius:'50%',
+              background:i<pinInput.length?(pinError?'#E05C5C':'var(--accent)'):'var(--border)',
               transition:'background 0.15s',
-              boxShadow:i<pinInput.length&&!pinError?'0 0 8px var(--accent)':undefined}}/>
+              boxShadow:i<pinInput.length&&!pinError?'0 0 0 3px rgba(123,175,123,0.25)':undefined}}/>
           ))}
         </div>
         {/* Keypad */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px',width:'220px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',width:'216px'}}>
           {[1,2,3,4,5,6,7,8,9].map(n=>(
             <button key={n} onClick={()=>handlePin(String(n))}
-              style={{height:'60px',borderRadius:'14px',border:'1px solid var(--border)',background:'var(--card)',
-                color:'var(--text)',fontSize:'22px',fontWeight:600,cursor:'pointer',transition:'background 0.1s'}}>
+              style={{height:'58px',borderRadius:'16px',border:'1.5px solid var(--border)',background:'var(--surface)',
+                color:'var(--text)',fontSize:'22px',fontWeight:600,cursor:'pointer',
+                boxShadow:'0 1px 3px rgba(42,46,38,0.08)',transition:'background 0.1s'}}>
               {n}
             </button>
           ))}
           <div/>
           <button onClick={()=>handlePin('0')}
-            style={{height:'60px',borderRadius:'14px',border:'1px solid var(--border)',background:'var(--card)',
-              color:'var(--text)',fontSize:'22px',fontWeight:600,cursor:'pointer'}}>
+            style={{height:'58px',borderRadius:'16px',border:'1.5px solid var(--border)',background:'var(--surface)',
+              color:'var(--text)',fontSize:'22px',fontWeight:600,cursor:'pointer',
+              boxShadow:'0 1px 3px rgba(42,46,38,0.08)'}}>
             0
           </button>
           <button onClick={handleDel}
-            style={{height:'60px',borderRadius:'14px',border:'1px solid var(--border)',background:'var(--card)',
-              color:'var(--text2)',fontSize:'20px',cursor:'pointer'}}>
+            style={{height:'58px',borderRadius:'16px',border:'1.5px solid var(--border)',background:'var(--surface)',
+              color:'var(--text2)',fontSize:'20px',cursor:'pointer',
+              boxShadow:'0 1px 3px rgba(42,46,38,0.08)'}}>
             ⌫
           </button>
         </div>
@@ -2144,11 +2164,11 @@ export default function App(){
       {/* Header */}
       <div style={{padding:'20px 20px 12px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,background:'var(--bg)',zIndex:10}}>
         <div style={{fontFamily:'var(--display)',fontSize:'18px',letterSpacing:'0px',fontWeight:700}}>
-          NutriTrack
+          KRONOS
         </div>
         {tab==='home'&&(
           <div style={{fontSize:'12px',color:'var(--text2)'}}>
-            Il tuo percorso nutrizionale
+            Il tuo percorso
           </div>
         )}
         {tab==='planner'&&(
