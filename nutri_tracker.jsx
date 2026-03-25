@@ -2002,7 +2002,20 @@ export default function App(){
     (async()=>{
       try{
         const wp=await window.storage.get('nt_weekPlan');
-        if(wp?.value)setWeekPlan(JSON.parse(wp.value));
+        if(wp?.value){
+          const parsed=JSON.parse(wp.value);
+          // Rimuovi override vuoti [] che nascondono i pasti del template
+          if(parsed.overrides){
+            for(const date of Object.keys(parsed.overrides)){
+              for(const meal of Object.keys(parsed.overrides[date])){
+                if(Array.isArray(parsed.overrides[date][meal])&&parsed.overrides[date][meal].length===0){
+                  delete parsed.overrides[date][meal];
+                }
+              }
+            }
+          }
+          setWeekPlan(parsed);
+        }
         const dl=await window.storage.get('nt_dailyLog');
         if(dl?.value)setDailyLog(JSON.parse(dl.value));
         const dt=await window.storage.get('nt_dayTypes');
