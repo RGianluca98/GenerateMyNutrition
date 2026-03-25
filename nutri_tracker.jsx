@@ -581,7 +581,8 @@ function getMealSourceItems(weekPlan, dayIndex, meal, dateISO){
   const tmpl=getTemplateForDay(weekPlan,dayIndex);
   const tmplItems=tmpl[meal]||[];
   const base=tmplItems.map(t=>({context:t.context,name:t.def,qtyOverride:t.qtyOverride}));
-  return weekPlan.overrides?.[dateISO]?.[meal]||base;
+  const override=weekPlan.overrides?.[dateISO]?.[meal];
+  return (override&&override.length>0)?override:base;
 }
 
 function getDayItems(weekPlan, dayIndex, dateISO, dayTypes){
