@@ -30,8 +30,8 @@ import { useState, useEffect, useRef } from "react";
 
 // ── DATA ──────────────────────────────────────────────────────
 const DAYS = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
-const MEAL_ORDER = ['Colazione','Spuntino','Pranzo','Spuntino pom.','Pre-workout','Cena','Post-workout'];
-const MEAL_LABEL = {Colazione:'COL',Spuntino:'SPU',Pranzo:'PRA','Spuntino pom.':'POM','Pre-workout':'PRE',Cena:'CEN','Post-workout':'POST'};
+const MEAL_ORDER = ['Colazione','Spuntino mattina','Pranzo','Spuntino pomeriggio','Pre-workout','Cena','Post-workout'];
+const MEAL_LABEL = {Colazione:'COL','Spuntino mattina':'SPU',Pranzo:'PRA','Spuntino pomeriggio':'POM','Pre-workout':'PRE',Cena:'CEN','Post-workout':'POST'};
 const TYPE_CFG = {
   Riposo: {label:'Riposo', short:'R', icon:'😴', color:'#8B9EB8'},
   Corsa:  {label:'Corsa',  short:'C', icon:'🏃', color:'#7BAF7B'},
@@ -344,8 +344,8 @@ const TEMPLATES = {
   // ── Riposo — usato solo come fallback, i giorni hanno template per indice
   Riposo:{
     Colazione:[{context:'oats_breakfast',def:'Avena'},{context:'milk_portion',def:'Latte'},{context:'fruit_portion',def:'Mela'}],
-    Spuntino:[{context:'fruit_portion',def:'Mela'}],
-    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino mattina':[{context:'fruit_portion',def:'Mela'}],
+    'Spuntino pomeriggio':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[{context:'lunch_carb_pasta',def:'Pasta integrale'},{context:'protein_equiv_chicken',def:'Petto di pollo'},{context:'vegetable_side',def:'Zucchine'},{context:'oil_portion',def:'Olio EVO'}],
     'Pre-workout':[],
     Cena:[{context:'dinner_carb_bread',def:'Pane integrale'},{context:'protein_equiv_chicken',def:'Merluzzo'},{context:'vegetable_side',def:'Broccoli'},{context:'oil_portion',def:'Olio EVO'}],
@@ -353,8 +353,8 @@ const TEMPLATES = {
   },
   Corsa:{
     Colazione:[{context:'oats_breakfast',def:'Avena'},{context:'milk_portion',def:'Latte'},{context:'fruit_portion',def:'Banana'}],
-    Spuntino:[{context:'fruit_portion',def:'Mela'}],
-    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino mattina':[{context:'fruit_portion',def:'Mela'}],
+    'Spuntino pomeriggio':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[{context:'lunch_carb_pasta',def:'Riso basmati'},{context:'protein_equiv_chicken',def:'Petto di pollo'},{context:'vegetable_side',def:'Zucchine'},{context:'oil_portion',def:'Olio EVO'}],
     'Pre-workout':[{context:'pre_run_banana',def:'Banana pre-corsa'},{context:'pre_run_bread',def:'Pane bianco pre-corsa'}],
     Cena:[{context:'dinner_carb_bread',def:'Patate'},{context:'protein_equiv_chicken',def:'Merluzzo'},{context:'vegetable_side',def:'Broccoli'},{context:'oil_portion',def:'Olio EVO'}],
@@ -362,8 +362,8 @@ const TEMPLATES = {
   },
   Calcio:{
     Colazione:[{context:'oats_breakfast',def:'Avena'},{context:'milk_portion',def:'Latte'},{context:'fruit_portion',def:'Banana'}],
-    Spuntino:[{context:'fruit_portion',def:'Mela'}],
-    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino mattina':[{context:'fruit_portion',def:'Mela'}],
+    'Spuntino pomeriggio':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[{context:'lunch_carb_pasta',def:'Riso basmati'},{context:'protein_equiv_chicken',def:'Petto di pollo'},{context:'vegetable_side',def:'Zucchine'},{context:'oil_portion',def:'Olio EVO'}],
     'Pre-workout':[{context:'pre_soccer_bread',def:'Pane pre-calcio'},{context:'pre_soccer_jam',def:'Marmellata pre-calcio'}],
     Cena:[{context:'dinner_carb_bread',def:'Patate'},{context:'protein_equiv_chicken',def:'Merluzzo'},{context:'vegetable_side',def:'Broccoli'},{context:'oil_portion',def:'Olio EVO'}],
@@ -383,8 +383,8 @@ const DAY_TEMPLATES = {
       {context:'breakfast_toppings', def:'Burro di arachidi'},
       {context:'breakfast_toppings', def:'Cacao amaro'},
     ],
-    Spuntino:[{context:'fruit_portion', def:'Pera'}],
-    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino mattina':[{context:'fruit_portion', def:'Pera'}],
+    'Spuntino pomeriggio':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[
       {context:'lunch_carb_pasta',       def:'Farro'},
       {context:'protein_equiv_chicken',   def:'Feta'},
@@ -407,8 +407,8 @@ const DAY_TEMPLATES = {
       {context:'fruit_portion',          def:'Mirtilli'},
       {context:'breakfast_toppings',     def:'Miele'},
     ],
-    Spuntino:[{context:'breakfast_dairy', def:'Yogurt Greco 0% Bianco'}],
-    'Spuntino pom.':[{context:'fruit_portion',def:'Mela'},{context:'nuts_snack',def:'Noci'}],
+    'Spuntino mattina':[{context:'breakfast_dairy', def:'Yogurt Greco 0% Bianco'}],
+    'Spuntino pomeriggio':[{context:'fruit_portion',def:'Mela'},{context:'nuts_snack',def:'Noci'}],
     Pranzo:[
       {context:'lunch_carb_pasta',       def:'Riso'},
       {context:'protein_equiv_chicken',  def:'Salmone'},
@@ -432,8 +432,8 @@ const DAY_TEMPLATES = {
       {context:'breakfast_toppings',    def:'Nocciole'},
       {context:'ciocco_snack',          def:'Cioccolato fondente'},
     ],
-    Spuntino:[{context:'fruit_portion', def:'Mela'}],
-    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
+    'Spuntino mattina':[{context:'fruit_portion', def:'Mela'}],
+    'Spuntino pomeriggio':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[
       {context:'lunch_carb_pasta',      def:'Riso basmati'},
       {context:'protein_equiv_chicken', def:'Lenticchie cotte'},
@@ -457,8 +457,8 @@ const DAY_TEMPLATES = {
       {context:'oats_breakfast',        def:'Avena'},
       {context:'breakfast_toppings',    def:'Burro di arachidi'},
     ],
-    Spuntino:[{context:'fruit_portion', def:'Kiwi'}],
-    'Spuntino pom.':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Noci'}],
+    'Spuntino mattina':[{context:'fruit_portion', def:'Kiwi'}],
+    'Spuntino pomeriggio':[{context:'breakfast_dairy',def:'Skyr'},{context:'nuts_snack',def:'Noci'}],
     Pranzo:[
       {context:'lunch_carb_pasta',      def:'Pasta integrale'},
       {context:'protein_equiv_chicken', def:'Petto di pollo'},
@@ -480,8 +480,8 @@ const DAY_TEMPLATES = {
       {context:'breakfast_dairy',       def:'Ricotta'},
       {context:'breakfast_toppings',    def:'Miele'},
     ],
-    Spuntino:[{context:'fruit_portion', def:'Arancia'}],
-    'Spuntino pom.':[{context:'nuts_snack',def:'Mandorle'},{context:'fruit_portion',def:'Mela'}],
+    'Spuntino mattina':[{context:'fruit_portion', def:'Arancia'}],
+    'Spuntino pomeriggio':[{context:'nuts_snack',def:'Mandorle'},{context:'fruit_portion',def:'Mela'}],
     Pranzo:[
       {context:'lunch_carb_pasta',      def:'Pasta integrale'},
       {context:'protein_equiv_chicken', def:'Piselli cotti'},
@@ -504,11 +504,11 @@ const DAY_TEMPLATES = {
       {context:'breakfast_dairy', def:'Philadelphia light'},
       {context:'fruit_portion',   def:'Mirtilli'},
     ],
-    Spuntino:[
+    'Spuntino mattina':[
       {context:'fruit_portion',   def:'Mela'},
       {context:'nuts_snack',      def:'Mandorle'},
     ],
-    'Spuntino pom.':[{context:'parmigiano_snack',def:'Parmigiano Reggiano'}],
+    'Spuntino pomeriggio':[{context:'parmigiano_snack',def:'Parmigiano Reggiano'}],
     Pranzo:[
       {context:'sat_protein_lunch',def:'Uova'},
       {context:'sat_veg_lunch',    def:'Bietole'},
@@ -524,11 +524,11 @@ const DAY_TEMPLATES = {
       {context:'sun_breakfast_sweet', def:'Cappuccino'},
       {context:'sun_biscuits',        def:'Biscotti'},
     ],
-    Spuntino:[
+    'Spuntino mattina':[
       {context:'fruit_portion', def:'Mela'},
       {context:'nuts_snack',    def:'Noci'},
     ],
-    'Spuntino pom.':[],
+    'Spuntino pomeriggio':[{context:'fruit_portion',def:'Arancia'},{context:'nuts_snack',def:'Mandorle'}],
     Pranzo:[{context:'free_meal_lunch',def:'Pasto libero a scelta'}],
     'Pre-workout':[],
     Cena:[
@@ -870,7 +870,7 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
   },0);
 
   // meal strip
-  const mealLabels={Colazione:'Col',Spuntino:'Spu',Pranzo:'Pra','Spuntino pom.':'Spu·',
+  const mealLabels={Colazione:'Col','Spuntino mattina':'Mat',Pranzo:'Pra','Spuntino pomeriggio':'Pom',
     'Pre-workout':'Pre',Cena:'Cen','Post-workout':'Post'};
   const activeMeals=MEAL_ORDER.filter(m=>dayItems[m]&&dayItems[m].length>0);
 
@@ -2004,15 +2004,17 @@ export default function App(){
         const wp=await window.storage.get('nt_weekPlan');
         if(wp?.value){
           const parsed=JSON.parse(wp.value);
-          // Rimuovi override vuoti [] che nascondono i pasti del template
+          // Migrazione nomi pasti e pulizia override vuoti
           let dirty=false;
           if(parsed.overrides){
             for(const date of Object.keys(parsed.overrides)){
-              for(const meal of Object.keys(parsed.overrides[date])){
-                if(Array.isArray(parsed.overrides[date][meal])&&parsed.overrides[date][meal].length===0){
-                  delete parsed.overrides[date][meal];
-                  dirty=true;
-                }
+              const d=parsed.overrides[date];
+              // Rinomina vecchie chiavi → nuovi nomi
+              if('Spuntino' in d){d['Spuntino mattina']=d['Spuntino'];delete d['Spuntino'];dirty=true;}
+              if('Spuntino pom.' in d){d['Spuntino pomeriggio']=d['Spuntino pom.'];delete d['Spuntino pom.'];dirty=true;}
+              // Rimuovi override vuoti []
+              for(const meal of Object.keys(d)){
+                if(Array.isArray(d[meal])&&d[meal].length===0){delete d[meal];dirty=true;}
               }
             }
           }
