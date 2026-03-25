@@ -1041,7 +1041,7 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
                   <div key={meal} style={{marginTop:'12px'}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}}>
                       <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>
-                        {MEAL_LABEL[meal]} {meal.toUpperCase()}
+                        {meal.toUpperCase()}
                       </div>
                       {weekPlan.overrides?.[iso]?.[meal]&&(
                         <button onClick={()=>resetMeal(iso,meal)}
@@ -1169,7 +1169,7 @@ function OggiView({
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
               <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>
-                {MEAL_LABEL[meal]} {meal.toUpperCase()}
+                {meal.toUpperCase()}
               </div>
               {mealKcal>0&&<span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600}}>{mealKcal} kcal</span>}
             </div>
@@ -2005,16 +2005,20 @@ export default function App(){
         if(wp?.value){
           const parsed=JSON.parse(wp.value);
           // Rimuovi override vuoti [] che nascondono i pasti del template
+          let dirty=false;
           if(parsed.overrides){
             for(const date of Object.keys(parsed.overrides)){
               for(const meal of Object.keys(parsed.overrides[date])){
                 if(Array.isArray(parsed.overrides[date][meal])&&parsed.overrides[date][meal].length===0){
                   delete parsed.overrides[date][meal];
+                  dirty=true;
                 }
               }
             }
           }
           setWeekPlan(parsed);
+          // Riscrivi su Supabase se abbiamo pulito qualcosa
+          if(dirty){try{await window.storage.set('nt_weekPlan',JSON.stringify(parsed));}catch(e){}}
         }
         const dl=await window.storage.get('nt_dailyLog');
         if(dl?.value)setDailyLog(JSON.parse(dl.value));
