@@ -2001,13 +2001,7 @@ export default function App(){
     return(
       <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'28px',padding:'24px'}}>
         <div style={{textAlign:'center'}}>
-          <svg width="80" height="80" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginBottom:'14px'}}>
-            <circle cx="36" cy="36" r="34" fill="#FBA828" opacity="0.08"/>
-            <rect x="26" y="18" width="9" height="38" rx="4.5" fill="#FBA828"/>
-            <circle cx="30.5" cy="14" r="6" fill="#FBA828"/>
-            <path d="M35 34 L54 16" stroke="#FBA828" strokeWidth="9" strokeLinecap="round"/>
-            <path d="M35 38 L54 56" stroke="#FBA828" strokeWidth="9" strokeLinecap="round"/>
-          </svg>
+          <img src="./logo_kronos.png" width="90" height="90" alt="KRONOS" style={{marginBottom:'14px',display:'block',mixBlendMode:'screen'}}/>
           <div style={{fontFamily:'var(--display)',fontSize:'32px',fontWeight:900,color:'var(--accent)',letterSpacing:'3px'}}>KRONOS</div>
           <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'6px',letterSpacing:'0.5px'}}>Keep Records Of Nutrition, Objectives &amp; Sport</div>
         </div>
