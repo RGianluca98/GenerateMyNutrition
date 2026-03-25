@@ -42,18 +42,18 @@ const Q = (r,c) => ({Riposo:r, Corsa:c, Calcio:c});
 
 const FOOD_DB = {
   protein_equiv_chicken:[
-    {name:'Petto di pollo',        qty:Q(160,180), uom:'g', kcal:110, limitKey:'white_meat_fresh'},
-    {name:'Merluzzo',              qty:Q(150,180), uom:'g', kcal:82,  limitKey:'fish_fresh'},
-    {name:'Salmone',               qty:Q(160,180), uom:'g', kcal:208, limitKey:'fish_fresh'},
-    {name:'Orata',                 qty:Q(160,180), uom:'g', kcal:96,  limitKey:'fish_fresh'},
+    {name:'Petto di pollo',        qty:Q(160,180), uom:'g', kcal:105, limitKey:'white_meat_fresh'},
+    {name:'Merluzzo',              qty:Q(150,180), uom:'g', kcal:71,  limitKey:'fish_fresh'},
+    {name:'Salmone',               qty:Q(160,180), uom:'g', kcal:195, limitKey:'fish_fresh'},
+    {name:'Orata',                 qty:Q(160,180), uom:'g', kcal:121, limitKey:'fish_fresh'},
     {name:'Spigola',               qty:Q(160,180), uom:'g', kcal:97,  limitKey:'fish_fresh'},
-    {name:'Sgombro',               qty:Q(160,180), uom:'g', kcal:205, limitKey:'fish_fresh'},
+    {name:'Sgombro',               qty:Q(160,180), uom:'g', kcal:170, limitKey:'fish_fresh'},
     {name:'Sogliola',              qty:Q(160,180), uom:'g', kcal:83,  limitKey:'fish_fresh'},
-    {name:'Tonno al naturale',     qty:Q(100,120), uom:'g', kcal:116, limitKey:'tuna_canned'},
+    {name:'Tonno al naturale',     qty:Q(100,120), uom:'g', kcal:100, limitKey:'tuna_canned'},
     {name:'Salmone affumicato',    qty:Q(75,80),   uom:'g', kcal:142, limitKey:'fish_smoked'},
     {name:'Polpo',                 qty:Q(200,220), uom:'g', kcal:82,  limitKey:'fish_fresh'},
-    {name:'Calamari',              qty:Q(220,250), uom:'g', kcal:92,  limitKey:'fish_fresh'},
-    {name:'Gamberi sgusciati',     qty:Q(220,250), uom:'g', kcal:85,  limitKey:'fish_fresh'},
+    {name:'Calamari',              qty:Q(220,250), uom:'g', kcal:78,  limitKey:'fish_fresh'},
+    {name:'Gamberi sgusciati',     qty:Q(220,250), uom:'g', kcal:71,  limitKey:'fish_fresh'},
     {name:'Seppie',                qty:Q(220,250), uom:'g', kcal:79,  limitKey:'fish_fresh'},
     {name:'Molluschi sgusciati',   qty:Q(220,250), uom:'g', kcal:75,  limitKey:'fish_fresh'},
     {name:'Bresaola',              qty:Q(80,100),  uom:'g', kcal:151, limitKey:'cured_lean'},
@@ -74,14 +74,17 @@ const FOOD_DB = {
     {name:'Piselli secchi',        qty:Q(75,80),   uom:'g', kcal:350, limitKey:'legumes_dry'},
     {name:'Piselli cotti',         qty:Q(150,160), uom:'g', kcal:84,  limitKey:'legumes_cooked'},
     {name:'Fiocchi di latte',      qty:Q(150,170), uom:'g', kcal:103, limitKey:'cheese_all'},
-    {name:'Mozzarella',            qty:Q(150,170), uom:'g', kcal:280, limitKey:'cheese_all'},
-    {name:'Ricotta',               qty:Q(150,170), uom:'g', kcal:174, limitKey:'cheese_all'},
+    {name:'Mozzarella',            qty:Q(150,170), uom:'g', kcal:253, limitKey:'cheese_all'},
+    {name:'Ricotta',               qty:Q(150,170), uom:'g', kcal:146, limitKey:'cheese_all'},
     {name:'Formaggio Linea Osella',qty:Q(150,170), uom:'g', kcal:100, limitKey:'cheese_all'},
     {name:'Formaggio stagionato',  qty:Q(120,150), uom:'g', kcal:402, limitKey:'cheese_all'},
     {name:'Feta',                  qty:Q(150,170), uom:'g', kcal:264, limitKey:'cheese_all'},
     {name:'Stracchino light',      qty:Q(120,150), uom:'g', kcal:134, limitKey:'cheese_all'},
     {name:'Formaggio fresco snack',qty:Q(40,40),   uom:'g', kcal:134, limitKey:'cheese_all'},
-    {name:'Yogurt greco',          qty:Q(170,200), uom:'g', kcal:59,  limitKey:'yogurt_skyr'},
+    {name:'Yogurt Greco 0% Bianco',        qty:Q(170,200), uom:'g', kcal:53, limitKey:'yogurt_skyr'},
+    {name:'Yogurt Greco 0% Senza Lattosio',qty:Q(170,200), uom:'g', kcal:53, limitKey:'yogurt_skyr'},
+    {name:'Yogurt Greco 0% Vaniglia',      qty:Q(170,200), uom:'g', kcal:84, limitKey:'yogurt_skyr'},
+    {name:'Yogurt Greco 0% Frutti di Bosco',qty:Q(170,200),uom:'g', kcal:74, limitKey:'yogurt_skyr'},
   ],
   lunch_carb_pasta:[
     {name:'Pasta integrale', qty:Q(80,90),   uom:'g', kcal:356, limitKey:'pasta_family'},
@@ -92,12 +95,12 @@ const FOOD_DB = {
     {name:'Riso basmati',    qty:Q(80,100),  uom:'g', kcal:360, limitKey:'rice_family'},
     {name:'Riso jasmine',    qty:Q(80,100),  uom:'g', kcal:360, limitKey:'rice_family'},
     {name:'Farro',           qty:Q(80,100),  uom:'g', kcal:341, limitKey:'grain_alt_family'},
-    {name:'Orzo',            qty:Q(80,100),  uom:'g', kcal:354, limitKey:'grain_alt_family'},
+    {name:'Orzo',            qty:Q(80,100),  uom:'g', kcal:319, limitKey:'grain_alt_family'},
     {name:'Quinoa',          qty:Q(80,100),  uom:'g', kcal:368, limitKey:'grain_alt_family'},
     {name:'Miglio',          qty:Q(80,100),  uom:'g', kcal:378, limitKey:'grain_alt_family'},
     {name:'Cous cous',       qty:Q(80,100),  uom:'g', kcal:376, limitKey:'grain_alt_family'},
     {name:'Spatzle',         qty:Q(80,100),  uom:'g', kcal:300, limitKey:'pasta_family'},
-    {name:'Gnocchi',         qty:Q(200,225), uom:'g', kcal:109, limitKey:'gnocchi_family'},
+    {name:'Gnocchi',         qty:Q(200,225), uom:'g', kcal:135, limitKey:'gnocchi_family'},
     {name:'Piadina',         qty:Q(1,1),     uom:'pz',kcal:290, limitKey:'piadina_family'},
   ],
   dinner_carb_bread:[
@@ -118,40 +121,43 @@ const FOOD_DB = {
     {name:'Gallette di mais',          qty:Q(8.75,8.75), uom:'pz', kcal:38, limitKey:'gallette_family'},
   ],
   milk_portion:[
-    {name:'Latte',      qty:Q(250,250),uom:'ml',kcal:49, limitKey:'milk_default'},
+    {name:'Latte',      qty:Q(250,250),uom:'ml',kcal:64, limitKey:'milk_default'},
     {name:'Cappuccino', qty:Q(200,200),uom:'ml',kcal:40, limitKey:'milk_default'},
     {name:'Spremuta di arancia',qty:Q(150,150),uom:'ml',kcal:45, limitKey:'juice_portion'},
   ],
   fruit_portion:[
     {name:'Mela',          qty:Q(1,1),    uom:'pz',   kcal:80,  limitKey:null},
-    {name:'Banana',        qty:Q(1,1),    uom:'pz',   kcal:90,  limitKey:null},
+    {name:'Banana',        qty:Q(1,1),    uom:'pz',   kcal:105, limitKey:null},
     {name:'Pera',          qty:Q(1,1),    uom:'pz',   kcal:85,  limitKey:null},
     {name:'Arancia',       qty:Q(1,1),    uom:'pz',   kcal:60,  limitKey:null},
-    {name:'Kiwi',          qty:Q(2,2),    uom:'pz',   kcal:30,  limitKey:null},
+    {name:'Kiwi',          qty:Q(2,2),    uom:'pz',   kcal:46,  limitKey:null},
     {name:'Pesche',        qty:Q(2,2),    uom:'pz',   kcal:35,  limitKey:null},
     {name:'Mandaranci',    qty:Q(2,2),    uom:'pz',   kcal:25,  limitKey:null},
     {name:'Prugne',        qty:Q(2,2),    uom:'pz',   kcal:20,  limitKey:null},
     {name:'Clementine',    qty:Q(2,2),    uom:'pz',   kcal:25,  limitKey:null},
     {name:'Albicocche',    qty:Q(4,4),    uom:'pz',   kcal:15,  limitKey:null},
-    {name:'Fragole',       qty:Q(250,250),uom:'g',    kcal:33,  limitKey:null},
+    {name:'Fragole',       qty:Q(250,250),uom:'g',    kcal:27,  limitKey:null},
     {name:'Mirtilli',      qty:Q(150,150),uom:'g',    kcal:57,  limitKey:null},
     {name:'Frutti di bosco',qty:Q(150,150),uom:'g',   kcal:45,  limitKey:null},
     {name:'Uva',           qty:Q(130,130),uom:'g',    kcal:67,  limitKey:null},
-    {name:'Ananas',        qty:Q(200,200),uom:'g',    kcal:50,  limitKey:null},
-    {name:'Ciliegie',      qty:Q(150,150),uom:'g',    kcal:63,  limitKey:null},
+    {name:'Ananas',        qty:Q(200,200),uom:'g',    kcal:40,  limitKey:null},
+    {name:'Ciliegie',      qty:Q(150,150),uom:'g',    kcal:48,  limitKey:null},
     {name:'Anguria',       qty:Q(1,1),    uom:'fetta',kcal:80,  limitKey:null},
     {name:'Melone',        qty:Q(2,2),    uom:'fetta',kcal:60,  limitKey:null},
   ],
   yogurt_portion:[
-    {name:'Skyr',        qty:Q(170,170),uom:'g',kcal:63, limitKey:'yogurt_skyr'},
-    {name:'Yogurt greco',qty:Q(170,200),uom:'g',kcal:59, limitKey:'yogurt_skyr'},
+    {name:'Skyr',                          qty:Q(170,170),uom:'g',kcal:66, limitKey:'yogurt_skyr'},
+    {name:'Yogurt Greco 0% Bianco',        qty:Q(170,200),uom:'g',kcal:53, limitKey:'yogurt_skyr'},
+    {name:'Yogurt Greco 0% Senza Lattosio',qty:Q(170,200),uom:'g',kcal:53, limitKey:'yogurt_skyr'},
+    {name:'Yogurt Greco 0% Vaniglia',      qty:Q(170,200),uom:'g',kcal:84, limitKey:'yogurt_skyr'},
+    {name:'Yogurt Greco 0% Frutti di Bosco',qty:Q(170,200),uom:'g',kcal:74, limitKey:'yogurt_skyr'},
   ],
   nuts_snack:[
-    {name:'Mandorle',          qty:Q(20,20),uom:'g',kcal:579, limitKey:'nuts'},
+    {name:'Mandorle',          qty:Q(20,20),uom:'g',kcal:603, limitKey:'nuts'},
     {name:'Noci',              qty:Q(20,20),uom:'g',kcal:654, limitKey:'nuts'},
     {name:'Nocciole',          qty:Q(20,20),uom:'g',kcal:628, limitKey:'nuts'},
     {name:'Anacardi',          qty:Q(20,20),uom:'g',kcal:553, limitKey:'nuts'},
-    {name:'Arachidi non salate',qty:Q(20,20),uom:'g',kcal:567, limitKey:'nuts'},
+    {name:'Arachidi non salate',qty:Q(20,20),uom:'g',kcal:594, limitKey:'nuts'},
     {name:'Olive nere',        qty:Q(15,15),uom:'g',kcal:115, limitKey:'olive_default'},
     {name:'Olive verdi',       qty:Q(15,15),uom:'g',kcal:100, limitKey:'olive_default'},
     {name:'Grana snack',       qty:Q(10,10),uom:'g',kcal:402, limitKey:'cheese_all'},
@@ -186,22 +192,22 @@ const FOOD_DB = {
     {name:'Rape',               qty:Q(200,200),uom:'g',kcal:22, limitKey:'vegetable_daily'},
     {name:'Funghi',             qty:Q(200,200),uom:'g',kcal:22, limitKey:'vegetable_daily'},
   ],
-  pre_run_banana:[{name:'Banana pre-corsa',      qty:{Riposo:0,Corsa:1,Calcio:0},  uom:'pz',kcal:90,  limitKey:null}],
+  pre_run_banana:[{name:'Banana pre-corsa',      qty:{Riposo:0,Corsa:1,Calcio:0},  uom:'pz',kcal:105, limitKey:null}],
   pre_run_bread: [{name:'Pane bianco pre-corsa',  qty:{Riposo:0,Corsa:30,Calcio:0}, uom:'g', kcal:275, limitKey:'bread_family'}],
   pre_soccer_bread:[{name:'Pane pre-calcio',      qty:{Riposo:0,Corsa:0,Calcio:60}, uom:'g', kcal:275, limitKey:'bread_family'}],
   pre_soccer_jam:[
     {name:'Marmellata pre-calcio',qty:{Riposo:0,Corsa:0,Calcio:20},uom:'g',kcal:260,limitKey:'jam_default'},
     {name:'Miele pre-calcio',     qty:{Riposo:0,Corsa:0,Calcio:10},uom:'g',kcal:304,limitKey:'honey_default'},
   ],
-  post_workout_milk:  [{name:'Latte post-workout',   qty:{Riposo:0,Corsa:250,Calcio:250},uom:'ml',kcal:49, limitKey:'milk_default'}],
-  post_workout_banana:[{name:'Banana post-workout',  qty:{Riposo:0,Corsa:1,Calcio:1},   uom:'pz',kcal:90, limitKey:null}],
+  post_workout_milk:  [{name:'Latte post-workout',   qty:{Riposo:0,Corsa:250,Calcio:250},uom:'ml',kcal:64, limitKey:'milk_default'}],
+  post_workout_banana:[{name:'Banana post-workout',  qty:{Riposo:0,Corsa:1,Calcio:1},   uom:'pz',kcal:105, limitKey:null}],
   post_workout_avocado:[{name:'Avocado',             qty:{Riposo:0,Corsa:70,Calcio:70}, uom:'g', kcal:160, limitKey:'avocado'}],
 };
 
 // ── WEEKEND FOOD GROUPS ───────────────────────────────────────
 FOOD_DB.philly_portion = [
   {name:'Philadelphia light', qty:Q(40,40), uom:'g', kcal:130, limitKey:'cheese_all'},
-  {name:'Ricotta',            qty:Q(40,50), uom:'g', kcal:174, limitKey:'cheese_all'},
+  {name:'Ricotta',            qty:Q(40,50), uom:'g', kcal:146, limitKey:'cheese_all'},
   {name:'Stracchino light',   qty:Q(40,50), uom:'g', kcal:134, limitKey:'cheese_all'},
 ];
 FOOD_DB.sat_bread = [
@@ -211,12 +217,12 @@ FOOD_DB.sat_bread = [
 ];
 FOOD_DB.sat_protein_lunch = [
   {name:'Uova',              qty:Q(120,120), uom:'g', kcal:143, limitKey:'eggs'},
-  {name:'Petto di pollo',    qty:Q(160,180), uom:'g', kcal:110, limitKey:'white_meat_fresh'},
-  {name:'Merluzzo',          qty:Q(150,180), uom:'g', kcal:82,  limitKey:'fish_fresh'},
-  {name:'Tonno al naturale', qty:Q(100,120), uom:'g', kcal:116, limitKey:'tuna_canned'},
+  {name:'Petto di pollo',    qty:Q(160,180), uom:'g', kcal:105, limitKey:'white_meat_fresh'},
+  {name:'Merluzzo',          qty:Q(150,180), uom:'g', kcal:71,  limitKey:'fish_fresh'},
+  {name:'Tonno al naturale', qty:Q(100,120), uom:'g', kcal:100, limitKey:'tuna_canned'},
   {name:'Bresaola',          qty:Q(80,100),  uom:'g', kcal:151, limitKey:'cured_lean'},
   {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', kcal:103, limitKey:'cheese_all'},
-  {name:'Ricotta',           qty:Q(150,170), uom:'g', kcal:174, limitKey:'cheese_all'},
+  {name:'Ricotta',           qty:Q(150,170), uom:'g', kcal:146, limitKey:'cheese_all'},
 ];
 FOOD_DB.sat_veg_lunch = [
   {name:'Bietole',       qty:Q(200,200), uom:'g', kcal:19, limitKey:'vegetable_daily'},
@@ -240,7 +246,7 @@ FOOD_DB.free_meal_dinner = [
 ];
 FOOD_DB.sun_breakfast_sweet = [
   {name:'Cappuccino',qty:Q(200,200), uom:'ml', kcal:40, limitKey:'milk_default'},
-  {name:'Latte',     qty:Q(250,250), uom:'ml', kcal:49, limitKey:'milk_default'},
+  {name:'Latte',     qty:Q(250,250), uom:'ml', kcal:64, limitKey:'milk_default'},
 ];
 FOOD_DB.sun_biscuits = [
   {name:'Biscotti',                   qty:Q(40,40), uom:'g',  kcal:470, limitKey:'bread_family'},
@@ -256,30 +262,36 @@ FOOD_DB.free_meal_lunch = [
 ];
 FOOD_DB.sun_dinner_protein = [
   {name:'Uova',              qty:Q(120,120), uom:'g', kcal:143, limitKey:'eggs'},
-  {name:'Petto di pollo',    qty:Q(160,180), uom:'g', kcal:110, limitKey:'white_meat_fresh'},
-  {name:'Merluzzo',          qty:Q(150,180), uom:'g', kcal:82,  limitKey:'fish_fresh'},
-  {name:'Tonno al naturale', qty:Q(100,120), uom:'g', kcal:116, limitKey:'tuna_canned'},
+  {name:'Petto di pollo',    qty:Q(160,180), uom:'g', kcal:105, limitKey:'white_meat_fresh'},
+  {name:'Merluzzo',          qty:Q(150,180), uom:'g', kcal:71,  limitKey:'fish_fresh'},
+  {name:'Tonno al naturale', qty:Q(100,120), uom:'g', kcal:100, limitKey:'tuna_canned'},
   {name:'Bresaola',          qty:Q(80,100),  uom:'g', kcal:151, limitKey:'cured_lean'},
   {name:'Fiocchi di latte',  qty:Q(150,170), uom:'g', kcal:103, limitKey:'cheese_all'},
 ];
 FOOD_DB.breakfast_dairy = [
-  {name:'Yogurt greco',          qty:Q(170,170), uom:'g',  kcal:59,  limitKey:'yogurt_skyr'},
-  {name:'Skyr',                  qty:Q(170,170), uom:'g',  kcal:63,  limitKey:'yogurt_skyr'},
-  {name:'Kefir',                 qty:Q(200,200), uom:'ml', kcal:52,  limitKey:'yogurt_skyr'},
-  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  kcal:174, limitKey:'cheese_all'},
+  {name:'Yogurt Greco 0% Bianco',        qty:Q(170,170), uom:'g',  kcal:53, limitKey:'yogurt_skyr'},
+  {name:'Yogurt Greco 0% Senza Lattosio',qty:Q(170,170), uom:'g',  kcal:53, limitKey:'yogurt_skyr'},
+  {name:'Yogurt Greco 0% Vaniglia',      qty:Q(170,170), uom:'g',  kcal:84, limitKey:'yogurt_skyr'},
+  {name:'Yogurt Greco 0% Frutti di Bosco',qty:Q(170,170),uom:'g',  kcal:74, limitKey:'yogurt_skyr'},
+  {name:'Skyr',                          qty:Q(170,170), uom:'g',  kcal:66, limitKey:'yogurt_skyr'},
+  {name:'Kefir',                         qty:Q(200,200), uom:'ml', kcal:40, limitKey:'yogurt_skyr'},
+  {name:'Ricotta',                       qty:Q(40,40),   uom:'g',  kcal:146, limitKey:'cheese_all'},
   {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  kcal:103, limitKey:'cheese_all'},
   {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'cheese_all'},
   {name:'Formaggio Linea Osella',qty:Q(40,40),   uom:'g',  kcal:100, limitKey:'cheese_all'},
 ];
 FOOD_DB.breakfast_protein = [
-  {name:'Latte',                 qty:Q(250,250), uom:'ml', kcal:49,  limitKey:'milk_default'},
-  {name:'Latte di cocco',        qty:Q(200,200), uom:'ml', kcal:230, limitKey:'milk_default'},
-  {name:'Latte di riso',         qty:Q(200,200), uom:'ml', kcal:47,  limitKey:'milk_default'},
-  {name:'Latte di mandorla',     qty:Q(200,200), uom:'ml', kcal:24,  limitKey:'milk_default'},
-  {name:'Yogurt greco',          qty:Q(170,170), uom:'g',  kcal:59,  limitKey:'yogurt_skyr'},
-  {name:'Skyr',                  qty:Q(170,170), uom:'g',  kcal:63,  limitKey:'yogurt_skyr'},
-  {name:'Kefir',                 qty:Q(200,200), uom:'ml', kcal:52,  limitKey:'yogurt_skyr'},
-  {name:'Ricotta',               qty:Q(40,40),   uom:'g',  kcal:174, limitKey:'cheese_all'},
+  {name:'Latte',                         qty:Q(250,250), uom:'ml', kcal:64, limitKey:'milk_default'},
+  {name:'Latte di cocco',                qty:Q(200,200), uom:'ml', kcal:230, limitKey:'milk_default'},
+  {name:'Latte di riso',                 qty:Q(200,200), uom:'ml', kcal:47,  limitKey:'milk_default'},
+  {name:'Latte di mandorla',             qty:Q(200,200), uom:'ml', kcal:24,  limitKey:'milk_default'},
+  {name:'Yogurt Greco 0% Bianco',        qty:Q(170,170), uom:'g',  kcal:53, limitKey:'yogurt_skyr'},
+  {name:'Yogurt Greco 0% Senza Lattosio',qty:Q(170,170), uom:'g',  kcal:53, limitKey:'yogurt_skyr'},
+  {name:'Yogurt Greco 0% Vaniglia',      qty:Q(170,170), uom:'g',  kcal:84, limitKey:'yogurt_skyr'},
+  {name:'Yogurt Greco 0% Frutti di Bosco',qty:Q(170,170),uom:'g',  kcal:74, limitKey:'yogurt_skyr'},
+  {name:'Skyr',                          qty:Q(170,170), uom:'g',  kcal:66, limitKey:'yogurt_skyr'},
+  {name:'Kefir',                         qty:Q(200,200), uom:'ml', kcal:40, limitKey:'yogurt_skyr'},
+  {name:'Ricotta',                       qty:Q(40,40),   uom:'g',  kcal:146, limitKey:'cheese_all'},
   {name:'Fiocchi di latte',      qty:Q(40,40),   uom:'g',  kcal:103, limitKey:'cheese_all'},
   {name:'Philadelphia light',    qty:Q(40,40),   uom:'g',  kcal:130, limitKey:'cheese_all'},
   {name:'Uova',                  qty:Q(2,2),     uom:'pz', kcal:70,  limitKey:'eggs'},
@@ -288,15 +300,15 @@ FOOD_DB.breakfast_toppings = [
   {name:'Burro di arachidi',  qty:Q(20,20), uom:'g', kcal:588, limitKey:'pb'},
   {name:'Nocciole',           qty:Q(15,15), uom:'g', kcal:628, limitKey:'nuts'},
   {name:'Noci',               qty:Q(15,15), uom:'g', kcal:654, limitKey:'nuts'},
-  {name:'Mandorle',           qty:Q(15,15), uom:'g', kcal:579, limitKey:'nuts'},
-  {name:'Cacao amaro',        qty:Q(10,10), uom:'g', kcal:228, limitKey:null},
+  {name:'Mandorle',           qty:Q(15,15), uom:'g', kcal:603, limitKey:'nuts'},
+  {name:'Cacao amaro',        qty:Q(10,10), uom:'g', kcal:355, limitKey:null},
   {name:'Miele',              qty:Q(10,10), uom:'g', kcal:304, limitKey:'honey_default'},
   {name:'Farina di cocco',    qty:Q(10,10), uom:'g', kcal:604, limitKey:'flour_special'},
   {name:"Sciroppo d'acero",   qty:Q(10,10), uom:'g', kcal:260, limitKey:null},
 ];
 FOOD_DB.speciali_farine = [
-  {name:'Farina 0',           qty:Q(20,20), uom:'g', kcal:364, limitKey:'flour_special'},
-  {name:'Farina 00',          qty:Q(20,20), uom:'g', kcal:364, limitKey:'flour_special'},
+  {name:'Farina 0',           qty:Q(20,20), uom:'g', kcal:345, limitKey:'flour_special'},
+  {name:'Farina 00',          qty:Q(20,20), uom:'g', kcal:340, limitKey:'flour_special'},
   {name:'Farina integrale',   qty:Q(20,20), uom:'g', kcal:340, limitKey:'flour_special'},
   {name:'Farina di ceci',     qty:Q(30,30), uom:'g', kcal:387, limitKey:'flour_special'},
   {name:'Farina di mais',     qty:Q(20,20), uom:'g', kcal:362, limitKey:'flour_special'},
@@ -312,15 +324,15 @@ FOOD_DB.feta_portion = [
 ];
 FOOD_DB.latte_riso_portion = [
   {name:'Latte di riso',     qty:Q(250,250), uom:'ml', kcal:47, limitKey:'milk_default'},
-  {name:'Latte',             qty:Q(250,250), uom:'ml', kcal:49, limitKey:'milk_default'},
+  {name:'Latte',             qty:Q(250,250), uom:'ml', kcal:64, limitKey:'milk_default'},
   {name:'Cappuccino',        qty:Q(200,200), uom:'ml', kcal:40, limitKey:'milk_default'},
 ];
 FOOD_DB.ciocco_snack = [
-  {name:'Cioccolato fondente',qty:Q(20,20), uom:'g', kcal:598, limitKey:null},
-  {name:'Cacao amaro',        qty:Q(5,5),   uom:'g', kcal:228, limitKey:null},
+  {name:'Cioccolato fondente',qty:Q(20,20), uom:'g', kcal:515, limitKey:null},
+  {name:'Cacao amaro',        qty:Q(5,5),   uom:'g', kcal:355, limitKey:null},
 ];
 FOOD_DB.ricotta_protein = [
-  {name:'Ricotta',         qty:Q(150,170), uom:'g', kcal:174, limitKey:'cheese_all'},
+  {name:'Ricotta',         qty:Q(150,170), uom:'g', kcal:146, limitKey:'cheese_all'},
   {name:'Fiocchi di latte',qty:Q(150,170), uom:'g', kcal:103, limitKey:'cheese_all'},
   {name:'Formaggio Linea Osella',qty:Q(150,170),uom:'g',kcal:100,limitKey:'cheese_all'},
 ];
@@ -364,7 +376,7 @@ const DAY_TEMPLATES = {
   // ── LUNEDÌ (dayIndex 0) — Corsa ───────────────────────────────
   0:{
     Colazione:[
-      {context:'breakfast_dairy',    def:'Yogurt greco'},
+      {context:'breakfast_dairy',    def:'Yogurt Greco 0% Bianco'},
       {context:'fruit_portion',      def:'Banana'},
       {context:'oats_breakfast',     def:'Avena'},
       {context:'breakfast_toppings', def:'Burro di arachidi'},
@@ -394,7 +406,7 @@ const DAY_TEMPLATES = {
       {context:'fruit_portion',          def:'Mirtilli'},
       {context:'breakfast_toppings',     def:'Miele'},
     ],
-    Spuntino:[{context:'breakfast_dairy', def:'Yogurt greco'}],
+    Spuntino:[{context:'breakfast_dairy', def:'Yogurt Greco 0% Bianco'}],
     'Spuntino pom.':[{context:'fruit_portion',def:'Mela'},{context:'nuts_snack',def:'Noci'}],
     Pranzo:[
       {context:'lunch_carb_pasta',       def:'Riso'},
@@ -439,7 +451,7 @@ const DAY_TEMPLATES = {
   // ── GIOVEDÌ (dayIndex 3) — Corsa ──────────────────────────────
   3:{
     Colazione:[
-      {context:'breakfast_protein',     def:'Yogurt greco'},
+      {context:'breakfast_protein',     def:'Yogurt Greco 0% Bianco'},
       {context:'fruit_portion',         def:'Banana'},
       {context:'oats_breakfast',        def:'Avena'},
       {context:'breakfast_toppings',    def:'Burro di arachidi'},
