@@ -2001,26 +2001,18 @@ export default function App(){
   useEffect(()=>{
     (async()=>{
       try{
+        const SCHEMA_VERSION=3; // incrementa ogni volta che i template cambiano in modo incompatibile
         const wp=await window.storage.get('nt_weekPlan');
         if(wp?.value){
           const parsed=JSON.parse(wp.value);
-          // Migrazione nomi pasti e pulizia override vuoti
-          let dirty=false;
-          if(parsed.overrides){
-            for(const date of Object.keys(parsed.overrides)){
-              const d=parsed.overrides[date];
-              // Rinomina vecchie chiavi → nuovi nomi
-              if('Spuntino' in d){d['Spuntino mattina']=d['Spuntino'];delete d['Spuntino'];dirty=true;}
-              if('Spuntino pom.' in d){d['Spuntino pomeriggio']=d['Spuntino pom.'];delete d['Spuntino pom.'];dirty=true;}
-              // Rimuovi override vuoti []
-              for(const meal of Object.keys(d)){
-                if(Array.isArray(d[meal])&&d[meal].length===0){delete d[meal];dirty=true;}
-              }
-            }
+          // Se la versione schema è vecchia, cancella gli override così i template aggiornati
+          // si applicano a tutti i giorni. Le personalizzazioni manuali vanno rifatte.
+          if((parsed._schemaVersion||0)<SCHEMA_VERSION){
+            parsed.overrides={};
+            parsed._schemaVersion=SCHEMA_VERSION;
+            try{await window.storage.set('nt_weekPlan',JSON.stringify(parsed));}catch(e){}
           }
           setWeekPlan(parsed);
-          // Riscrivi su Supabase se abbiamo pulito qualcosa
-          if(dirty){try{await window.storage.set('nt_weekPlan',JSON.stringify(parsed));}catch(e){}}
         }
         const dl=await window.storage.get('nt_dailyLog');
         if(dl?.value)setDailyLog(JSON.parse(dl.value));
