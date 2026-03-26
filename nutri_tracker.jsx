@@ -853,7 +853,7 @@ const FRASI=[
   'Nutrì il corpo come se fosse l\'unico che hai.',
 ];
 
-function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
+function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,setSelectedDayIndex,setWeekStart}){
   const iso=toISO(weekDates[selectedDayIndex]);
   const di=selectedDayIndex;
   const type=getDayType(dayTypes,weekPlan,iso,di);
@@ -993,6 +993,16 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes}){
           "{frase}"
         </div>
       </div>
+
+      {/* Calendario mensile */}
+      <CalendarView
+        dailyLog={dailyLog}
+        dayTypes={dayTypes}
+        weekPlan={weekPlan}
+        setTab={setTab}
+        setSelectedDayIndex={setSelectedDayIndex}
+        setWeekStart={setWeekStart}
+      />
 
     </div>
   );
@@ -2139,20 +2149,9 @@ export default function App(){
             Il tuo percorso
           </div>
         )}
-        {tab==='planner'&&(
-          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-            <button onClick={()=>setWeekStart(d=>{const n=new Date(d);n.setDate(n.getDate()-7);return n;})}
-              style={{...S.btn('var(--text3)',{padding:'4px 10px',borderRadius:'6px',fontSize:'14px'})}}>‹</button>
-            <span style={{fontSize:'11px',color:'var(--text2)',minWidth:'100px',textAlign:'center'}}>
-              {weekDates[0].toLocaleDateString('it-IT',{day:'numeric',month:'short'})} – {weekDates[6].toLocaleDateString('it-IT',{day:'numeric',month:'short'})}
-            </span>
-            <button onClick={()=>setWeekStart(d=>{const n=new Date(d);n.setDate(n.getDate()+7);return n;})}
-              style={{...S.btn('var(--text3)',{padding:'4px 10px',borderRadius:'6px',fontSize:'14px'})}}>›</button>
-          </div>
-        )}
         {tab==='oggi'&&(
-          <div style={{fontSize:'12px',color:'var(--text2)',textTransform:'capitalize'}}>
-            {weekDates[selectedDayIndex]?.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}
+          <div style={{fontSize:'12px',color:'var(--text2)'}}>
+            Nutri Tracker
           </div>
         )}
         {tab==='dashboard'&&(
@@ -2164,19 +2163,13 @@ export default function App(){
 
       {/* Content */}
       <div style={{paddingTop:'12px'}}>
-        {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}/>}
-        {tab==='planner'&&<PlannerView weekDates={weekDates} weekPlan={weekPlan} dailyLog={dailyLog}
-          changeDayType={changeDayType} setSwapModal={setSwapModal} expandedDay={expandedDay}
-          setExpandedDay={setExpandedDay} getDayConsumedKcal={getDayConsumedKcal} todayISO={todayISO} resetMeal={resetMeal}
-          dayTypes={dayTypes} removeFood={removeFood}/>}
+        {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes} setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart}/>}
         {tab==='oggi'&&<OggiView weekPlan={weekPlan} weekDates={weekDates} todayISO={todayISO}
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
           dailyLog={dailyLog} toggleLogItem={toggleLog} updateLogQty={updateQty}
           editQty={editQty} setEditQty={setEditQty} setSwapModal={setSwapModal}
           setAddModal={setAddModal} setExtraModal={setExtraModal} dayTypes={dayTypes}
           changeDayType={changeDayType} removeFood={removeFood}/>}
-        {tab==='calendario'&&<CalendarView dailyLog={dailyLog} dayTypes={dayTypes} weekPlan={weekPlan}
-          setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
           weekPlan={weekPlan} dailyLog={dailyLog} getDayConsumedKcal={getDayConsumedKcal} dayTypes={dayTypes}/>}
         {tab==='trainings'&&<TrainingsView stravaTokens={stravaTokens} setStravaTokens={setStravaTokens}
@@ -2186,7 +2179,7 @@ export default function App(){
 
       {/* Bottom nav */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'var(--surface)',borderTop:'1px solid var(--border)',display:'flex',zIndex:100,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'home',label:'Home'},{id:'oggi',label:'Oggi'},{id:'peso',label:'Peso'},{id:'planner',label:'Planner'},{id:'calendario',label:'Calendario'},{id:'dashboard',label:'Limiti'},{id:'trainings',label:'Sport'}].map(t=>(
+        {[{id:'home',label:'Home'},{id:'trainings',label:'Sport'},{id:'peso',label:'Peso'},{id:'oggi',label:'Nutri Tracker'},{id:'dashboard',label:'Weekly food portions'}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{flex:1,padding:'10px 0 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'}}>
             <NavGlyph id={t.id} active={tab===t.id}/>
