@@ -1172,7 +1172,7 @@ function OggiView({
 
       {/* Meals */}
       {MEAL_ORDER.filter(m=>dayItems[m]).map(meal=>{
-        const mealKcal=(dayItems[meal]||[]).reduce((sum,item)=>sum+(calcKcal(item)||0),0);
+        const mealKcal=(dayItems[meal]||[]).filter(item=>dayLog[item.key]?.checked).reduce((sum,item)=>{const qty=dayLog[item.key]?.qtyOverride??item.qty;return sum+(calcKcal({...item,qty})||0);},0);
         return(
         <div key={meal} style={S.card({padding:'12px 14px'})}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
