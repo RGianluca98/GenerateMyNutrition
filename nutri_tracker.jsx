@@ -834,6 +834,16 @@ function NavGlyph({id,active}){
       </svg>
     );
   }
+  if(id==='ricette'){
+    return(
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2" y="1.5" width="10" height="13" rx="1.5" stroke={stroke} strokeWidth="1.5"/>
+        <line x1="4.5" y1="5" x2="9.5" y2="5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="4.5" y1="7.5" x2="9.5" y2="7.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="4.5" y1="10" x2="7.5" y2="10" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    );
+  }
   return(
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3" stroke={stroke} strokeWidth="1.5"/>
@@ -852,6 +862,340 @@ const FRASI=[
   'La disciplina è libertà.',
   'Nutrì il corpo come se fosse l\'unico che hai.',
 ];
+
+// ── RICETTE DEFAULT ───────────────────────────────────────────
+const RECIPE_CATEGORIES=[
+  {id:'colazione',label:'Colazione',icon:'🌅'},
+  {id:'pranzo',label:'Pranzo',icon:'🥗'},
+  {id:'cena',label:'Cena',icon:'🍽️'},
+  {id:'dolci',label:'Dolci',icon:'🍫'},
+  {id:'altre',label:'Altre',icon:'🥣'},
+];
+
+const DEFAULT_RECIPES=[
+  {id:'def_1',name:'Colazione base',category:'colazione',isDefault:true,ingredients:[
+    {name:'Avena',qty:80,uom:'g',kcal:372},{name:'Latte parzialmente scremato',qty:200,uom:'ml',kcal:46},
+    {name:'Mela',qty:150,uom:'g',kcal:50},{name:'Yogurt Greco 0% Bianco',qty:170,uom:'g',kcal:53},
+  ]},
+  {id:'def_2',name:'Colazione weekend',category:'colazione',isDefault:true,ingredients:[
+    {name:'Fette biscottate',qty:40,uom:'g',kcal:403},{name:'Miele',qty:15,uom:'g',kcal:304},
+    {name:'Banana',qty:120,uom:'g',kcal:89},{name:'Latte parzialmente scremato',qty:200,uom:'ml',kcal:46},
+  ]},
+  {id:'def_3',name:'Pancake proteico',category:'dolci',isDefault:true,ingredients:[
+    {name:'Avena',qty:60,uom:'g',kcal:372},{name:'Uova',qty:120,uom:'g',kcal:143},
+    {name:'Banana',qty:100,uom:'g',kcal:89},{name:'Cacao amaro',qty:10,uom:'g',kcal:330},
+    {name:'Miele',qty:10,uom:'g',kcal:304},{name:'Cocco rapé',qty:10,uom:'g',kcal:604},
+  ]},
+  {id:'def_4',name:'Pasta con pollo',category:'pranzo',isDefault:true,ingredients:[
+    {name:'Pasta integrale',qty:80,uom:'g',kcal:356},{name:'Petto di pollo',qty:160,uom:'g',kcal:105},
+    {name:'Zucchine',qty:200,uom:'g',kcal:17},{name:'Olio EVO',qty:10,uom:'g',kcal:884},
+  ]},
+  {id:'def_5',name:'Riso e pesce',category:'pranzo',isDefault:true,ingredients:[
+    {name:'Riso',qty:80,uom:'g',kcal:360},{name:'Merluzzo',qty:150,uom:'g',kcal:71},
+    {name:'Broccoli',qty:200,uom:'g',kcal:34},{name:'Olio EVO',qty:10,uom:'g',kcal:884},
+  ]},
+  {id:'def_6',name:'Cena proteica',category:'cena',isDefault:true,ingredients:[
+    {name:'Petto di pollo',qty:160,uom:'g',kcal:105},{name:'Insalata mista',qty:150,uom:'g',kcal:15},
+    {name:'Pane integrale',qty:50,uom:'g',kcal:224},{name:'Olio EVO',qty:10,uom:'g',kcal:884},
+  ]},
+  {id:'def_7',name:'Cena leggera',category:'cena',isDefault:true,ingredients:[
+    {name:'Fiocchi di latte',qty:150,uom:'g',kcal:103},{name:'Pomodorini',qty:150,uom:'g',kcal:20},
+    {name:'Cetriolo',qty:150,uom:'g',kcal:12},{name:'Pane integrale',qty:30,uom:'g',kcal:224},
+  ]},
+  {id:'def_8',name:'Pre-workout',category:'altre',isDefault:true,ingredients:[
+    {name:'Banana',qty:120,uom:'g',kcal:89},{name:'Pane integrale',qty:50,uom:'g',kcal:224},
+  ]},
+  {id:'def_9',name:'Post-workout',category:'altre',isDefault:true,ingredients:[
+    {name:'Latte parzialmente scremato',qty:300,uom:'ml',kcal:46},{name:'Banana',qty:120,uom:'g',kcal:89},
+  ]},
+];
+
+function calcRecipeKcal(ingredients){
+  return Math.round(ingredients.reduce((s,i)=>{
+    if(!i.kcal||!i.qty)return s;
+    return s+(i.uom==='g'||i.uom==='ml'?i.kcal*i.qty/100:i.kcal*i.qty);
+  },0));
+}
+
+// ── RECIPES VIEW ──────────────────────────────────────────────
+function RecipesView({userRecipes,saveRecipes,weekDates,setTab,setSelectedDayIndex,setWeekStart,setMealOverrides}){
+  const [catFilter,setCatFilter]=useState('tutte');
+  const [useModal,setUseModal]=useState(null); // {recipe}
+  const [createModal,setCreateModal]=useState(false);
+  const [saveFromMealModal,setSaveFromMealModal]=useState(null);
+  // useModal state
+  const [useDayIdx,setUseDayIdx]=useState(0);
+  const [useMeal,setUseMeal]=useState(MEAL_ORDER[0]);
+
+  const allRecipes=[...DEFAULT_RECIPES,...userRecipes];
+  const filtered=catFilter==='tutte'?allRecipes:allRecipes.filter(r=>r.category===catFilter);
+
+  const deleteRecipe=(id)=>{
+    saveRecipes(userRecipes.filter(r=>r.id!==id));
+  };
+
+  const applyRecipe=(recipe,dayIdx,meal)=>{
+    const dateISO=toISO(weekDates[dayIdx]);
+    // Converti ingredienti in formato item compatibile con getMealSourceItems
+    const items=recipe.ingredients.map(ing=>({
+      context:'recipe',
+      name:ing.name,
+      qty:ing.qty,
+      uom:ing.uom,
+      kcal:ing.kcal,
+      key:`recipe_${ing.name}_${meal}_${dateISO}`,
+    }));
+    setMealOverrides(dateISO,meal,items);
+    setUseModal(null);
+    setSelectedDayIndex(dayIdx);
+    // Allinea weekStart se necessario
+    const d=weekDates[dayIdx];
+    setWeekStart(d);
+    setTab('oggi');
+  };
+
+  return(
+    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'8px'}}>
+      {/* Category filter */}
+      <div style={{display:'flex',gap:'6px',overflowX:'auto',paddingBottom:'4px',paddingTop:'4px'}}>
+        <button onClick={()=>setCatFilter('tutte')}
+          style={{flexShrink:0,padding:'5px 12px',borderRadius:'999px',border:'1px solid var(--border)',
+            background:catFilter==='tutte'?'var(--accent-soft)':'var(--surface)',
+            color:catFilter==='tutte'?'var(--accent)':'var(--text2)',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
+          Tutte
+        </button>
+        {RECIPE_CATEGORIES.map(c=>(
+          <button key={c.id} onClick={()=>setCatFilter(c.id)}
+            style={{flexShrink:0,padding:'5px 12px',borderRadius:'999px',border:'1px solid var(--border)',
+              background:catFilter===c.id?'var(--accent-soft)':'var(--surface)',
+              color:catFilter===c.id?'var(--accent)':'var(--text2)',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
+            {c.icon} {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Add button */}
+      <button onClick={()=>setCreateModal(true)}
+        style={{padding:'11px',borderRadius:'12px',border:'1.5px dashed var(--border)',
+          background:'none',color:'var(--text2)',fontSize:'13px',fontWeight:600,cursor:'pointer'}}>
+        + Crea nuova ricetta
+      </button>
+
+      {/* Recipe cards */}
+      {filtered.length===0&&(
+        <div style={{textAlign:'center',color:'var(--text3)',fontSize:'13px',padding:'32px 0'}}>
+          Nessuna ricetta in questa categoria
+        </div>
+      )}
+      {filtered.map(recipe=>{
+        const kcal=calcRecipeKcal(recipe.ingredients);
+        const cat=RECIPE_CATEGORIES.find(c=>c.id===recipe.category);
+        return(
+          <div key={recipe.id} style={{...S.card(),padding:'14px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
+              <div style={{fontWeight:700,fontSize:'15px',color:'var(--text)'}}>{recipe.name}</div>
+              <div style={{fontSize:'12px',fontWeight:700,color:'var(--accent)'}}>{kcal} kcal</div>
+            </div>
+            <div style={{marginBottom:'8px'}}>
+              <span style={{fontSize:'11px',background:'var(--card)',color:'var(--text2)',padding:'2px 8px',borderRadius:'999px',border:'1px solid var(--border)'}}>
+                {cat?.icon} {cat?.label}
+              </span>
+            </div>
+            <div style={{fontSize:'12px',color:'var(--text3)',marginBottom:'10px',lineHeight:1.6}}>
+              {recipe.ingredients.map(i=>`${i.name} ${i.qty}${i.uom}`).join(' · ')}
+            </div>
+            <div style={{display:'flex',gap:'8px'}}>
+              <button onClick={()=>{setUseModal(recipe);setUseDayIdx(0);setUseMeal(MEAL_ORDER[0]);}}
+                style={{flex:1,padding:'8px',borderRadius:'8px',background:'var(--accent-soft)',border:'none',
+                  color:'var(--accent)',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
+                Usa nel pasto
+              </button>
+              {!recipe.isDefault&&(
+                <button onClick={()=>deleteRecipe(recipe.id)}
+                  style={{padding:'8px 12px',borderRadius:'8px',background:'var(--surface)',border:'1px solid var(--border)',
+                    color:'var(--text3)',fontSize:'12px',cursor:'pointer'}}>
+                  Elimina
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Usa nel pasto modal */}
+      {useModal&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',alignItems:'flex-end'}}>
+          <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px'}}>
+            <div style={{fontWeight:700,fontSize:'16px',marginBottom:'4px',color:'var(--text)'}}>{useModal.name}</div>
+            <div style={{fontSize:'12px',color:'var(--text3)',marginBottom:'16px'}}>Scegli giorno e pasto</div>
+            <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,marginBottom:'6px',letterSpacing:'0.5px'}}>GIORNO</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px',marginBottom:'14px'}}>
+              {weekDates.map((d,idx)=>(
+                <button key={idx} onClick={()=>setUseDayIdx(idx)}
+                  style={{padding:'6px 2px',borderRadius:'8px',border:`1.5px solid ${useDayIdx===idx?'var(--accent)':'var(--border)'}`,
+                    background:useDayIdx===idx?'var(--accent-soft)':'var(--card)',
+                    color:useDayIdx===idx?'var(--accent)':'var(--text2)',fontSize:'10px',fontWeight:600,cursor:'pointer'}}>
+                  {DAYS[idx].slice(0,3)}
+                </button>
+              ))}
+            </div>
+            <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,marginBottom:'6px',letterSpacing:'0.5px'}}>PASTO</div>
+            <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'16px'}}>
+              {MEAL_ORDER.map(m=>(
+                <button key={m} onClick={()=>setUseMeal(m)}
+                  style={{padding:'9px 12px',borderRadius:'8px',border:`1.5px solid ${useMeal===m?'var(--accent)':'var(--border)'}`,
+                    background:useMeal===m?'var(--accent-soft)':'var(--card)',
+                    color:useMeal===m?'var(--accent)':'var(--text)',fontSize:'13px',fontWeight:useMeal===m?700:400,
+                    cursor:'pointer',textAlign:'left'}}>
+                  {m}
+                </button>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:'10px'}}>
+              <button onClick={()=>setUseModal(null)}
+                style={{flex:1,padding:'12px',borderRadius:'12px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text2)',fontSize:'14px',cursor:'pointer'}}>
+                Annulla
+              </button>
+              <button onClick={()=>applyRecipe(useModal,useDayIdx,useMeal)}
+                style={{flex:2,padding:'12px',borderRadius:'12px',border:'none',background:'var(--accent)',color:'#0C0E14',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
+                Applica ricetta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Crea nuova ricetta modal */}
+      {createModal&&<CreateRecipeModal onSave={(r)=>{saveRecipes([...userRecipes,r]);setCreateModal(false);}} onClose={()=>setCreateModal(false)}/>}
+    </div>
+  );
+}
+
+// ── CREATE RECIPE MODAL ────────────────────────────────────────
+function CreateRecipeModal({onSave,onClose}){
+  const [name,setName]=useState('');
+  const [category,setCategory]=useState('colazione');
+  const [ingredients,setIngredients]=useState([]);
+  const [search,setSearch]=useState('');
+  const [showSearch,setShowSearch]=useState(false);
+
+  const addIngredient=(item)=>{
+    const qty=item.qty?.Riposo??item.qty??100;
+    setIngredients(prev=>[...prev,{name:item.name,qty:typeof qty==='number'?qty:100,uom:item.uom||'g',kcal:item.kcal||0}]);
+    setSearch('');setShowSearch(false);
+  };
+
+  const removeIng=(idx)=>setIngredients(prev=>prev.filter((_,i)=>i!==idx));
+  const updateQtyIng=(idx,val)=>setIngredients(prev=>prev.map((it,i)=>i===idx?{...it,qty:Number(val)||it.qty}:it));
+
+  const totalKcal=calcRecipeKcal(ingredients);
+
+  const handleSave=()=>{
+    if(!name.trim()||ingredients.length===0)return;
+    onSave({id:'u_'+Date.now(),name:name.trim(),category,ingredients,isDefault:false});
+  };
+
+  return(
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',alignItems:'flex-end'}}>
+      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px',maxHeight:'90vh',overflowY:'auto'}}>
+        <div style={{fontWeight:700,fontSize:'16px',marginBottom:'16px',color:'var(--text)'}}>Nuova ricetta</div>
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Nome ricetta"
+          style={{width:'100%',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px',
+            color:'var(--text)',fontSize:'14px',marginBottom:'10px'}}/>
+        <select value={category} onChange={e=>setCategory(e.target.value)}
+          style={{width:'100%',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px',
+            color:'var(--text)',fontSize:'14px',marginBottom:'14px'}}>
+          {RECIPE_CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+        </select>
+
+        <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.5px',marginBottom:'8px'}}>INGREDIENTI {totalKcal>0&&<span style={{color:'var(--accent)'}}> · {totalKcal} kcal totali</span>}</div>
+        {ingredients.map((ing,idx)=>(
+          <div key={idx} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
+            <div style={{flex:1,fontSize:'13px',color:'var(--text)'}}>{ing.name}</div>
+            <input type="number" value={ing.qty} onChange={e=>updateQtyIng(idx,e.target.value)}
+              style={{width:'60px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',padding:'4px 6px',color:'var(--text)',fontSize:'12px',textAlign:'center'}}/>
+            <span style={{fontSize:'11px',color:'var(--text3)'}}>{ing.uom}</span>
+            <button onClick={()=>removeIng(idx)}
+              style={{background:'none',border:'none',color:'var(--text3)',fontSize:'16px',cursor:'pointer',padding:'0 4px'}}>×</button>
+          </div>
+        ))}
+        <button onClick={()=>setShowSearch(s=>!s)}
+          style={{width:'100%',marginTop:'10px',padding:'9px',borderRadius:'8px',border:'1.5px dashed var(--border)',
+            background:'none',color:'var(--text2)',fontSize:'13px',cursor:'pointer'}}>
+          + Aggiungi ingrediente
+        </button>
+        {showSearch&&(
+          <div style={{marginTop:'8px'}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca alimento..."
+              autoFocus
+              style={{width:'100%',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 10px',
+                color:'var(--text)',fontSize:'13px',marginBottom:'6px'}}/>
+            <div style={{maxHeight:'200px',overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px',background:'var(--card)'}}>
+              <AllFoodList type="Riposo" search={search} onSelect={(item)=>addIngredient(item)}/>
+            </div>
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:'10px',marginTop:'18px'}}>
+          <button onClick={onClose}
+            style={{flex:1,padding:'12px',borderRadius:'12px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text2)',fontSize:'14px',cursor:'pointer'}}>
+            Annulla
+          </button>
+          <button onClick={handleSave}
+            disabled={!name.trim()||ingredients.length===0}
+            style={{flex:2,padding:'12px',borderRadius:'12px',border:'none',
+              background:name.trim()&&ingredients.length>0?'var(--accent)':'var(--border)',
+              color:name.trim()&&ingredients.length>0?'#0C0E14':'var(--text3)',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
+            Salva ricetta
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SAVE AS RECIPE MODAL ───────────────────────────────────────
+function SaveAsRecipeModal({meal,items,onSave,onClose}){
+  const [name,setName]=useState(meal);
+  const [category,setCategory]=useState('colazione');
+  const ingredients=items.map(it=>({
+    name:it.name,
+    qty:typeof it.qty==='object'?(it.qty?.Riposo??100):it.qty??100,
+    uom:it.uom||'g',
+    kcal:it.kcal||0,
+  }));
+  const totalKcal=calcRecipeKcal(ingredients);
+
+  return(
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',alignItems:'flex-end'}}>
+      <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px 16px 32px'}}>
+        <div style={{fontWeight:700,fontSize:'16px',marginBottom:'4px',color:'var(--text)'}}>Salva come ricetta</div>
+        <div style={{fontSize:'12px',color:'var(--text3)',marginBottom:'14px'}}>{ingredients.length} ingredienti · {totalKcal} kcal</div>
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Nome ricetta"
+          style={{width:'100%',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px',
+            color:'var(--text)',fontSize:'14px',marginBottom:'10px'}}/>
+        <select value={category} onChange={e=>setCategory(e.target.value)}
+          style={{width:'100%',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px',
+            color:'var(--text)',fontSize:'14px',marginBottom:'16px'}}>
+          {RECIPE_CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+        </select>
+        <div style={{fontSize:'11px',color:'var(--text3)',marginBottom:'16px',lineHeight:1.6}}>
+          {ingredients.map(i=>`${i.name} ${i.qty}${i.uom}`).join(' · ')}
+        </div>
+        <div style={{display:'flex',gap:'10px'}}>
+          <button onClick={onClose}
+            style={{flex:1,padding:'12px',borderRadius:'12px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text2)',fontSize:'14px',cursor:'pointer'}}>
+            Annulla
+          </button>
+          <button onClick={()=>onSave({id:'u_'+Date.now(),name:name.trim()||meal,category,ingredients,isDefault:false})}
+            style={{flex:2,padding:'12px',borderRadius:'12px',border:'none',background:'var(--accent)',color:'#0C0E14',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
+            Salva
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,setSelectedDayIndex,setWeekStart}){
   const iso=toISO(weekDates[selectedDayIndex]);
@@ -1107,7 +1451,7 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
 function OggiView({
   weekPlan,weekDates,todayISO,selectedDayIndex,setSelectedDayIndex,dailyLog,
   toggleLogItem,updateLogQty,editQty,setEditQty,setSwapModal,setAddModal,
-  setExtraModal,dayTypes,changeDayType,removeFood
+  setExtraModal,dayTypes,changeDayType,removeFood,onSaveRecipe
 }){
   const di=selectedDayIndex>=0&&selectedDayIndex<7?selectedDayIndex:0;
   const selectedISO=toISO(weekDates[di]);
@@ -1192,14 +1536,21 @@ function OggiView({
               </div>
               {mealKcal>0&&<span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600}}>{mealKcal} kcal</span>}
             </div>
-            <button
-              onClick={()=>{
-                const mealContexts=[...new Set([...(dayItems[meal]||[]).map(i=>i.context).filter(Boolean),'vegetable_side','breakfast_protein','breakfast_toppings'])];
-                setAddModal({dateISO:selectedISO,dayIndex:di,meal,type,contexts:mealContexts});
-              }}
-              style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',fontSize:'12px',padding:'2px 8px'}}>
-              + aggiungi
-            </button>
+            <div style={{display:'flex',gap:'6px'}}>
+              <button onClick={()=>onSaveRecipe&&onSaveRecipe(meal,dayItems[meal]||[])}
+                style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text3)',fontSize:'11px',padding:'2px 7px'}}
+                title="Salva come ricetta">
+                💾
+              </button>
+              <button
+                onClick={()=>{
+                  const mealContexts=[...new Set([...(dayItems[meal]||[]).map(i=>i.context).filter(Boolean),'vegetable_side','breakfast_protein','breakfast_toppings'])];
+                  setAddModal({dateISO:selectedISO,dayIndex:di,meal,type,contexts:mealContexts});
+                }}
+                style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text2)',fontSize:'12px',padding:'2px 8px'}}>
+                + aggiungi
+              </button>
+            </div>
           </div>
           {dayItems[meal].map((item)=>{
             const logEntry=dayLog[item.key]||{};
@@ -1978,6 +2329,9 @@ export default function App(){
   const [stravaTokens,setStravaTokens]=useState(null);
   const [weightLog,setWeightLog]=useState([]);
   const saveWeightLog=async log=>{setWeightLog(log);try{await window.storage.set('nt_weightLog',JSON.stringify(log));}catch(e){}};
+  const [userRecipes,setUserRecipes]=useState([]);
+  const saveRecipes=async list=>{setUserRecipes(list);try{await window.storage.set('nt_recipes',JSON.stringify(list));}catch(e){}};
+  const [saveRecipeModal,setSaveRecipeModal]=useState(null); // {meal, items}
 
   useEffect(()=>{
     (async()=>{
@@ -2003,6 +2357,8 @@ export default function App(){
         if(st?.value){const v=JSON.parse(st.value);if(v)setStravaTokens(v);}
         const wl=await window.storage.get('nt_weightLog');
         if(wl?.value)setWeightLog(JSON.parse(wl.value));
+        const rr=await window.storage.get('nt_recipes');
+        if(rr?.value)setUserRecipes(JSON.parse(rr.value));
       }catch(e){}
     })();
   },[]);
@@ -2154,6 +2510,11 @@ export default function App(){
             Nutri Tracker
           </div>
         )}
+        {tab==='ricette'&&(
+          <div style={{fontSize:'12px',color:'var(--text2)'}}>
+            Ricettario
+          </div>
+        )}
         {tab==='dashboard'&&(
           <div style={{fontSize:'12px',color:'var(--text2)'}}>
             {weekDates[0].toLocaleDateString('it-IT',{day:'numeric',month:'short'})} – {weekDates[6].toLocaleDateString('it-IT',{day:'numeric',month:'short'})}
@@ -2169,7 +2530,11 @@ export default function App(){
           dailyLog={dailyLog} toggleLogItem={toggleLog} updateLogQty={updateQty}
           editQty={editQty} setEditQty={setEditQty} setSwapModal={setSwapModal}
           setAddModal={setAddModal} setExtraModal={setExtraModal} dayTypes={dayTypes}
-          changeDayType={changeDayType} removeFood={removeFood}/>}
+          changeDayType={changeDayType} removeFood={removeFood}
+          onSaveRecipe={(meal,items)=>setSaveRecipeModal({meal,items})}/>}
+        {tab==='ricette'&&<RecipesView userRecipes={userRecipes} saveRecipes={saveRecipes}
+          weekDates={weekDates} setTab={setTab} setSelectedDayIndex={setSelectedDayIndex}
+          setWeekStart={setWeekStart} setMealOverrides={setMealOverrides}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
           weekPlan={weekPlan} dailyLog={dailyLog} getDayConsumedKcal={getDayConsumedKcal} dayTypes={dayTypes}/>}
         {tab==='trainings'&&<TrainingsView stravaTokens={stravaTokens} setStravaTokens={setStravaTokens}
@@ -2179,7 +2544,7 @@ export default function App(){
 
       {/* Bottom nav */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'var(--surface)',borderTop:'1px solid var(--border)',display:'flex',zIndex:100,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'home',label:'Home'},{id:'trainings',label:'Sport'},{id:'peso',label:'Weight Tracker'},{id:'oggi',label:'Nutri Tracker'},{id:'dashboard',label:'Weekly food portions'}].map(t=>(
+        {[{id:'home',label:'Home'},{id:'trainings',label:'Sport'},{id:'ricette',label:'Ricette'},{id:'peso',label:'Weight Tracker'},{id:'oggi',label:'Nutri Tracker'},{id:'dashboard',label:'Weekly food portions'}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{flex:1,padding:'10px 0 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'}}>
             <NavGlyph id={t.id} active={tab===t.id}/>
@@ -2193,6 +2558,9 @@ export default function App(){
       {swapModal&&<SwapModal modal={swapModal} weekPlan={weekPlan} onSwap={swapFood} onClose={()=>setSwapModal(null)}/>}
       {addModal&&<AddFoodModal modal={addModal} onAdd={addFood} onClose={()=>setAddModal(null)}/>}
       {extraModal&&<ExtraFoodModal modal={extraModal} onAdd={addExtraFood} onClose={()=>setExtraModal(null)}/>}
+      {saveRecipeModal&&<SaveAsRecipeModal meal={saveRecipeModal.meal} items={saveRecipeModal.items}
+        onSave={(r)=>{saveRecipes([...userRecipes,r]);setSaveRecipeModal(null);}}
+        onClose={()=>setSaveRecipeModal(null)}/>}
     </div>
   );
 }
