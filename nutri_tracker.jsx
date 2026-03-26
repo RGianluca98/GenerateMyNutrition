@@ -602,7 +602,10 @@ function getDayItems(weekPlan, dayIndex, dateISO, dayTypes){
     const items=src.map((item,i)=>{
       const fd=getFD(item.context,item.name);
       const qty=item.qtyOverride!==undefined?item.qtyOverride:(fd?.qty?.[type]??fd?.qty?.Riposo??0);
-      return{key:`${meal}_${i}`,meal,context:item.context,name:item.name,qty,uom:fd?.uom??'g',kcal:fd?.kcal,limitKey:fd?.limitKey};
+      // kcal e uom: usa FOOD_DB se disponibile, altrimenti fallback dagli override (es. ricette)
+      const kcal=fd?.kcal??item.kcal??null;
+      const uom=fd?.uom??item.uom??'g';
+      return{key:`${meal}_${i}`,meal,context:item.context,name:item.name,qty,uom,kcal,limitKey:fd?.limitKey};
     }).filter(it=>it.qty>0);
     if(items.length>0)result[meal]=items;
   }
@@ -872,43 +875,6 @@ const RECIPE_CATEGORIES=[
   {id:'altre',label:'Altre',icon:'🥣'},
 ];
 
-const DEFAULT_RECIPES=[
-  {id:'def_1',name:'Colazione base',category:'colazione',isDefault:true,ingredients:[
-    {name:'Avena',qty:80,uom:'g',kcal:372},{name:'Latte parzialmente scremato',qty:200,uom:'ml',kcal:46},
-    {name:'Mela',qty:150,uom:'g',kcal:50},{name:'Yogurt Greco 0% Bianco',qty:170,uom:'g',kcal:53},
-  ]},
-  {id:'def_2',name:'Colazione weekend',category:'colazione',isDefault:true,ingredients:[
-    {name:'Fette biscottate',qty:40,uom:'g',kcal:403},{name:'Miele',qty:15,uom:'g',kcal:304},
-    {name:'Banana',qty:120,uom:'g',kcal:89},{name:'Latte parzialmente scremato',qty:200,uom:'ml',kcal:46},
-  ]},
-  {id:'def_3',name:'Pancake proteico',category:'dolci',isDefault:true,ingredients:[
-    {name:'Avena',qty:60,uom:'g',kcal:372},{name:'Uova',qty:120,uom:'g',kcal:143},
-    {name:'Banana',qty:100,uom:'g',kcal:89},{name:'Cacao amaro',qty:10,uom:'g',kcal:330},
-    {name:'Miele',qty:10,uom:'g',kcal:304},{name:'Cocco rapé',qty:10,uom:'g',kcal:604},
-  ]},
-  {id:'def_4',name:'Pasta con pollo',category:'pranzo',isDefault:true,ingredients:[
-    {name:'Pasta integrale',qty:80,uom:'g',kcal:356},{name:'Petto di pollo',qty:160,uom:'g',kcal:105},
-    {name:'Zucchine',qty:200,uom:'g',kcal:17},{name:'Olio EVO',qty:10,uom:'g',kcal:884},
-  ]},
-  {id:'def_5',name:'Riso e pesce',category:'pranzo',isDefault:true,ingredients:[
-    {name:'Riso',qty:80,uom:'g',kcal:360},{name:'Merluzzo',qty:150,uom:'g',kcal:71},
-    {name:'Broccoli',qty:200,uom:'g',kcal:34},{name:'Olio EVO',qty:10,uom:'g',kcal:884},
-  ]},
-  {id:'def_6',name:'Cena proteica',category:'cena',isDefault:true,ingredients:[
-    {name:'Petto di pollo',qty:160,uom:'g',kcal:105},{name:'Insalata mista',qty:150,uom:'g',kcal:15},
-    {name:'Pane integrale',qty:50,uom:'g',kcal:224},{name:'Olio EVO',qty:10,uom:'g',kcal:884},
-  ]},
-  {id:'def_7',name:'Cena leggera',category:'cena',isDefault:true,ingredients:[
-    {name:'Fiocchi di latte',qty:150,uom:'g',kcal:103},{name:'Pomodorini',qty:150,uom:'g',kcal:20},
-    {name:'Cetriolo',qty:150,uom:'g',kcal:12},{name:'Pane integrale',qty:30,uom:'g',kcal:224},
-  ]},
-  {id:'def_8',name:'Pre-workout',category:'altre',isDefault:true,ingredients:[
-    {name:'Banana',qty:120,uom:'g',kcal:89},{name:'Pane integrale',qty:50,uom:'g',kcal:224},
-  ]},
-  {id:'def_9',name:'Post-workout',category:'altre',isDefault:true,ingredients:[
-    {name:'Latte parzialmente scremato',qty:300,uom:'ml',kcal:46},{name:'Banana',qty:120,uom:'g',kcal:89},
-  ]},
-];
 
 function calcRecipeKcal(ingredients){
   return Math.round(ingredients.reduce((s,i)=>{
@@ -920,15 +886,12 @@ function calcRecipeKcal(ingredients){
 // ── RECIPES VIEW ──────────────────────────────────────────────
 function RecipesView({userRecipes,saveRecipes,weekDates,setTab,setSelectedDayIndex,setWeekStart,setMealOverrides}){
   const [catFilter,setCatFilter]=useState('tutte');
-  const [useModal,setUseModal]=useState(null); // {recipe}
+  const [useModal,setUseModal]=useState(null);
   const [createModal,setCreateModal]=useState(false);
-  const [saveFromMealModal,setSaveFromMealModal]=useState(null);
-  // useModal state
   const [useDayIdx,setUseDayIdx]=useState(0);
   const [useMeal,setUseMeal]=useState(MEAL_ORDER[0]);
 
-  const allRecipes=[...DEFAULT_RECIPES,...userRecipes];
-  const filtered=catFilter==='tutte'?allRecipes:allRecipes.filter(r=>r.category===catFilter);
+  const filtered=catFilter==='tutte'?userRecipes:userRecipes.filter(r=>r.category===catFilter);
 
   const deleteRecipe=(id)=>{
     saveRecipes(userRecipes.filter(r=>r.id!==id));
@@ -936,21 +899,16 @@ function RecipesView({userRecipes,saveRecipes,weekDates,setTab,setSelectedDayInd
 
   const applyRecipe=(recipe,dayIdx,meal)=>{
     const dateISO=toISO(weekDates[dayIdx]);
-    // Converti ingredienti in formato item compatibile con getMealSourceItems
     const items=recipe.ingredients.map(ing=>({
       context:'recipe',
       name:ing.name,
-      qty:ing.qty,
-      uom:ing.uom,
+      qtyOverride:ing.qty,
       kcal:ing.kcal,
-      key:`recipe_${ing.name}_${meal}_${dateISO}`,
+      uom:ing.uom,
     }));
     setMealOverrides(dateISO,meal,items);
     setUseModal(null);
     setSelectedDayIndex(dayIdx);
-    // Allinea weekStart se necessario
-    const d=weekDates[dayIdx];
-    setWeekStart(d);
     setTab('oggi');
   };
 
@@ -1010,13 +968,11 @@ function RecipesView({userRecipes,saveRecipes,weekDates,setTab,setSelectedDayInd
                   color:'var(--accent)',fontSize:'12px',fontWeight:600,cursor:'pointer'}}>
                 Usa nel pasto
               </button>
-              {!recipe.isDefault&&(
-                <button onClick={()=>deleteRecipe(recipe.id)}
-                  style={{padding:'8px 12px',borderRadius:'8px',background:'var(--surface)',border:'1px solid var(--border)',
-                    color:'var(--text3)',fontSize:'12px',cursor:'pointer'}}>
-                  Elimina
-                </button>
-              )}
+              <button onClick={()=>deleteRecipe(recipe.id)}
+                style={{padding:'8px 12px',borderRadius:'8px',background:'var(--surface)',border:'1px solid var(--border)',
+                  color:'var(--text3)',fontSize:'12px',cursor:'pointer'}}>
+                Elimina
+              </button>
             </div>
           </div>
         );
@@ -1131,7 +1087,10 @@ function CreateRecipeModal({onSave,onClose}){
               style={{width:'100%',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 10px',
                 color:'var(--text)',fontSize:'13px',marginBottom:'6px'}}/>
             <div style={{maxHeight:'200px',overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px',background:'var(--card)'}}>
-              <AllFoodList type="Riposo" search={search} onSelect={(item)=>addIngredient(item)}/>
+              <AllFoodList type="Riposo" search={search} onSelect={(ctx,name)=>{
+                const fd=getFD(ctx,name);
+                if(fd)addIngredient({...fd,ctx});
+              }}/>
             </div>
           </div>
         )}
