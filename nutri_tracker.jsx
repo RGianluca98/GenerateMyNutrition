@@ -2179,7 +2179,7 @@ export default function App(){
 
       {/* Bottom nav */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'var(--surface)',borderTop:'1px solid var(--border)',display:'flex',zIndex:100,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'home',label:'Home'},{id:'trainings',label:'Sport'},{id:'peso',label:'Peso'},{id:'oggi',label:'Nutri Tracker'},{id:'dashboard',label:'Weekly food portions'}].map(t=>(
+        {[{id:'home',label:'Home'},{id:'trainings',label:'Sport'},{id:'peso',label:'Weight Tracker'},{id:'oggi',label:'Nutri Tracker'},{id:'dashboard',label:'Weekly food portions'}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{flex:1,padding:'10px 0 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'}}>
             <NavGlyph id={t.id} active={tab===t.id}/>
