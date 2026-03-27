@@ -324,7 +324,12 @@ FOOD_DB.speciali_farine = [
   {name:'Farina di mais',     qty:Q(20,20), uom:'g', kcal:362, limitKey:'flour_special'},
   {name:'Farina di cocco',    qty:Q(15,15), uom:'g', kcal:604, limitKey:'flour_special'},
   {name:'Farina di mandorla', qty:Q(20,20), uom:'g', kcal:571, limitKey:'flour_special'},
+  {name:'Farina di riso',     qty:Q(20,20), uom:'g', kcal:362, limitKey:'flour_special'},
   {name:"Sciroppo d'amaro",   qty:Q(5,5),   uom:'g', kcal:0,   limitKey:'syrup_special'},
+];
+FOOD_DB.condimenti = [
+  {name:'Salsa di soia',      qty:Q(15,15), uom:'ml', kcal:63, limitKey:null},
+  {name:'Gamberetti',         qty:Q(100,120), uom:'g', kcal:71, limitKey:'fish_fresh'},
 ];
 // Nuovi gruppi per i template feriali personalizzati
 FOOD_DB.feta_portion = [
