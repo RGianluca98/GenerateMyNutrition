@@ -44,6 +44,7 @@ const Q = (r,c) => ({Riposo:r, Corsa:c, Calcio:c});
 const FOOD_DB = {
   protein_equiv_chicken:[
     {name:'Petto di pollo',        qty:Q(160,180), uom:'g', kcal:105, limitKey:'white_meat_fresh'},
+    {name:'Sovracosce di pollo',   qty:Q(150,180), uom:'g', kcal:206, limitKey:'white_meat_fresh'},
     {name:'Merluzzo',              qty:Q(150,180), uom:'g', kcal:71,  limitKey:'fish_fresh'},
     {name:'Salmone',               qty:Q(160,180), uom:'g', kcal:195, limitKey:'fish_fresh'},
     {name:'Orata',                 qty:Q(160,180), uom:'g', kcal:121, limitKey:'fish_fresh'},
@@ -114,6 +115,7 @@ const FOOD_DB = {
     {name:'Crackers integrali',qty:Q(40,50),  uom:'g', kcal:412, limitKey:'crackers_family'},
     {name:'Grissini integrali',qty:Q(40,50),  uom:'g', kcal:380, limitKey:'grissini_family'},
     {name:'Gallette di mais',  qty:Q(8.75,8.75),uom:'pz',kcal:38,limitKey:'gallette_family'},
+    {name:'Wasa',              qty:Q(40,50),  uom:'g', kcal:357, limitKey:'crackers_family'},
   ],
   oats_breakfast:[
     {name:'Avena',                     qty:Q(60,60), uom:'g',  kcal:379, limitKey:'oats_family'},
@@ -330,6 +332,7 @@ FOOD_DB.speciali_farine = [
 FOOD_DB.condimenti = [
   {name:'Salsa di soia',      qty:Q(15,15), uom:'ml', kcal:63, limitKey:null},
   {name:'Gamberetti',         qty:Q(100,120), uom:'g', kcal:71, limitKey:'fish_fresh'},
+  {name:'Pangrattato',        qty:Q(15,20), uom:'g', kcal:354, limitKey:null},
 ];
 // Nuovi gruppi per i template feriali personalizzati
 FOOD_DB.feta_portion = [
