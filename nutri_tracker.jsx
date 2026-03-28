@@ -2340,6 +2340,18 @@ export default function App(){
     })();
   },[]);
 
+  // Carica automaticamente le attività Strava al boot (non richiede di visitare la tab Sport)
+  useEffect(()=>{
+    if(!stravaTokens?.access_token)return;
+    const expired=stravaTokens.expires_at&&(stravaTokens.expires_at*1000)<Date.now();
+    if(expired)return; // il refresh avviene dentro TrainingsView
+    fetch('/.netlify/functions/strava-activities?per_page=30',{
+      headers:{Authorization:`Bearer ${stravaTokens.access_token}`}
+    }).then(r=>r.json()).then(data=>{
+      if(Array.isArray(data))setStravaActivities(data);
+    }).catch(()=>{});
+  },[stravaTokens?.access_token]);
+
   if(!unlocked){
     return(
       <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'28px',padding:'24px'}}>
