@@ -1418,7 +1418,7 @@ function PlannerView({weekDates,weekPlan,dailyLog,changeDayType,setSwapModal,exp
 function OggiView({
   weekPlan,weekDates,todayISO,selectedDayIndex,setSelectedDayIndex,dailyLog,
   toggleLogItem,updateLogQty,editQty,setEditQty,setSwapModal,setAddModal,
-  setExtraModal,dayTypes,changeDayType,removeFood,onSaveRecipe
+  setExtraModal,dayTypes,changeDayType,removeFood,onSaveRecipe,stravaKcalForDay
 }){
   const di=selectedDayIndex>=0&&selectedDayIndex<7?selectedDayIndex:0;
   const selectedISO=toISO(weekDates[di]);
@@ -1488,6 +1488,16 @@ function OggiView({
           <div style={{fontSize:'13px',color:'var(--accent)',fontWeight:600}}>
             {consumedKcal.toLocaleString('it-IT')} / {((type==='Corsa'||type==='Calcio')?2300:2100).toLocaleString('it-IT')} kcal
           </div>
+          {stravaKcalForDay>0&&(
+            <div style={{marginTop:'6px',display:'flex',gap:'12px',flexWrap:'wrap'}}>
+              <span style={{fontSize:'12px',color:'var(--accent2)',fontWeight:600}}>
+                🔥 Bruciate: {stravaKcalForDay.toLocaleString('it-IT')} kcal
+              </span>
+              <span style={{fontSize:'12px',color:(consumedKcal-stravaKcalForDay)<0?'var(--accent2)':'var(--text2)',fontWeight:600}}>
+                Bilancio: {(consumedKcal-stravaKcalForDay).toLocaleString('it-IT')} kcal
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1626,11 +1636,9 @@ const STRAVA_CLIENT_ID_PLACEHOLDER='YOUR_CLIENT_ID'; // sostituito da Netlify en
 const STRAVA_SCOPE='activity:read_all';
 const STRAVA_REDIRECT=typeof window!=='undefined'?`${window.location.origin}/strava-callback`:'';
 
-function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}){
-  const [activities,setActivities]=useState([]);
+function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails}){
   const [loadingAct,setLoadingAct]=useState(false);
   const [expandedActivity,setExpandedActivity]=useState(null);
-  const [activityDetails,setActivityDetails]=useState({});
   const [loadingDetail,setLoadingDetail]=useState(null);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState('');
@@ -1696,7 +1704,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
         headers:{Authorization:`Bearer ${token}`}
       });
       const data=await res.json();
-      if(Array.isArray(data))setActivities(data);
+      if(Array.isArray(data))setStravaActivities(data);
       else setError('Errore caricamento attività');
     }catch(e){setError('Errore: '+e.message);}
     setLoadingAct(false);
@@ -1735,7 +1743,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
   };
 
   const disconnect=async()=>{
-    setStravaTokens(null);setActivities([]);setChatMessages([]);
+    setStravaTokens(null);setStravaActivities([]);setActivityDetails({});setChatMessages([]);
     try{await window.storage.set('nt_stravaTokens','null');}catch(e){}
   };
 
@@ -1762,7 +1770,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
     try{
       const res=await fetch('/.netlify/functions/ai-chat',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({messages:newMessages,activities})
+        body:JSON.stringify({messages:newMessages,activities:stravaActivities})
       });
       const rawText=await res.text();
       let data;try{data=JSON.parse(rawText);}catch(e){setError('Risposta non JSON: '+rawText.slice(0,200));setChatLoading(false);return;}
@@ -1812,8 +1820,8 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes}
             </button>
           </div>
           {loadingAct&&<div style={{textAlign:'center',padding:'20px',color:'var(--text3)',fontSize:'13px'}}>Caricamento...</div>}
-          {!loadingAct&&activities.length===0&&<div style={{textAlign:'center',padding:'20px',color:'var(--text3)',fontSize:'13px'}}>Nessuna attività trovata</div>}
-          {activities.map(a=>{
+          {!loadingAct&&stravaActivities.length===0&&<div style={{textAlign:'center',padding:'20px',color:'var(--text3)',fontSize:'13px'}}>Nessuna attività trovata</div>}
+          {stravaActivities.map(a=>{
             const date=new Date(a.start_date).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'});
             const time=new Date(a.start_date).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
             const dist=a.distance?(a.distance/1000).toFixed(2)+' km':'';
@@ -2294,6 +2302,8 @@ export default function App(){
   const [selectedDayIndex,setSelectedDayIndex]=useState(()=>{const g=new Date().getDay();return g===0?6:g-1;});
   const [dayTypes,setDayTypes]=useState({});
   const [stravaTokens,setStravaTokens]=useState(null);
+  const [stravaActivities,setStravaActivities]=useState([]);
+  const [activityDetails,setActivityDetails]=useState({});
   const [weightLog,setWeightLog]=useState([]);
   const saveWeightLog=async log=>{setWeightLog(log);try{await window.storage.set('nt_weightLog',JSON.stringify(log));}catch(e){}};
   const [userRecipes,setUserRecipes]=useState([]);
@@ -2457,6 +2467,15 @@ export default function App(){
     },0);
   };
 
+  const getStravaKcalForDay=(isoDate)=>{
+    return stravaActivities
+      .filter(a=>a.start_date_local?.slice(0,10)===isoDate)
+      .reduce((sum,a)=>{
+        const kcal=activityDetails[a.id]?.calories??a.calories??0;
+        return sum+Math.round(kcal);
+      },0);
+  };
+
   const weeklyTotals=getWeeklyTotals();
 
   return(
@@ -2498,14 +2517,17 @@ export default function App(){
           editQty={editQty} setEditQty={setEditQty} setSwapModal={setSwapModal}
           setAddModal={setAddModal} setExtraModal={setExtraModal} dayTypes={dayTypes}
           changeDayType={changeDayType} removeFood={removeFood}
-          onSaveRecipe={(meal,items)=>setSaveRecipeModal({meal,items})}/>}
+          onSaveRecipe={(meal,items)=>setSaveRecipeModal({meal,items})}
+          stravaKcalForDay={getStravaKcalForDay(toISO(weekDates[selectedDayIndex>=0&&selectedDayIndex<7?selectedDayIndex:0]))}/>}
         {tab==='ricette'&&<RecipesView userRecipes={userRecipes} saveRecipes={saveRecipes}
           weekDates={weekDates} setTab={setTab} setSelectedDayIndex={setSelectedDayIndex}
           setWeekStart={setWeekStart} setMealOverrides={setMealOverrides}/>}
         {tab==='dashboard'&&<DashboardView weeklyTotals={weeklyTotals} weekDates={weekDates}
           weekPlan={weekPlan} dailyLog={dailyLog} getDayConsumedKcal={getDayConsumedKcal} dayTypes={dayTypes}/>}
         {tab==='trainings'&&<TrainingsView stravaTokens={stravaTokens} setStravaTokens={setStravaTokens}
-          dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}/>}
+          dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}
+          stravaActivities={stravaActivities} setStravaActivities={setStravaActivities}
+          activityDetails={activityDetails} setActivityDetails={setActivityDetails}/>}
         {tab==='peso'&&<PesoView weightLog={weightLog} saveWeightLog={saveWeightLog}/>}
       </div>
 
