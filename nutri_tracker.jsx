@@ -1070,35 +1070,96 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
   const easyKm    = Math.round(baseVol * 0.25);
   const recoverKm = Math.max(6, Math.round(baseVol * 0.08));
 
-  // ── Piano settimanale fisso Lun-Dom con tipi adattivi ──
-  // Struttura base: Lun easy, Mar qualità, Mer facile, Gio facile, Ven riposo, Sab lungo, Dom recovery
-  // Adattamenti: se già fatto lungo/qualità questa settimana → sostituisce con easy
-  // Se ieri era hard e domani è il giorno successivo → forza easy/recovery
+  // ── Numero sessioni target basato sui dati reali ──
+  // Usa la media delle ultime 4 settimane come riferimento, clamp 3-6
+  const runsLast28 = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - 28*86400000));
+  const avgPerWeek = runsLast28.length / 4;
+  // Arrotonda all'intero più vicino, ma mai meno di 3 né più di 6
+  const targetSessions = Math.min(6, Math.max(3, Math.round(avgPerWeek)));
 
-  // Giorni fissi della settimana (0=Dom, 1=Lun, ..., 6=Sab)
-  const weekPlan = [
-    { dow: 1, defaultType: 'easy' },                                          // Lunedì
-    { dow: 2, defaultType: !hadQuality ? (qualityCount14 === 0 ? 'interval' : 'tempo') : 'easy' }, // Martedì
-    { dow: 3, defaultType: 'easy' },                                          // Mercoledì
-    { dow: 4, defaultType: 'easy' },                                          // Giovedì
-    { dow: 6, defaultType: !hadLong ? 'long_run' : 'easy' },                  // Sabato
-    { dow: 0, defaultType: 'recovery' },                                      // Domenica
-  ];
+  // ── Slot disponibili nella settimana da assegnare ──
+  // Candidati: tutti i giorni dei prossimi 7, escluso oggi
+  // Regola: mai 2 hard (qualità/lungo) consecutivi
+  // Struttura obbligatoria: 1 lungo (Sab preferito), 1 qualità (Mer/Gio), resto easy/recovery
 
-  // Calcola daysFromNow per ogni giorno della settimana
-  const todayDow = now.getDay();
-  const sequence = weekPlan.map(({ dow, defaultType }) => {
-    let diff = dow - todayDow;
-    if (diff <= 0) diff += 7; // sempre nel futuro
-    const daysFromNow = diff;
+  const todayDow = now.getDay(); // 0=Dom
 
-    // Se domani (daysFromNow===1) e ieri/oggi era hard → forza easy o recovery
-    let type = defaultType;
-    if (daysFromNow === 1 && lastRunWasHard && daysSinceLastRun <= 1) {
-      type = defaultType === 'long_run' ? 'recovery' : 'easy';
+  // Slot preferenziali per ogni tipo (ordine di preferenza)
+  // dow = giorno della settimana (0=Dom, 1=Lun, ..., 6=Sab)
+  const slotPrefs = {
+    long_run: [6, 0, 5],          // Sab > Dom > Ven
+    quality:  [3, 2, 4],          // Mer > Mar > Gio
+    easy:     [1, 2, 3, 4, 5],    // Lun, Mar, Mer, Gio, Ven
+    recovery: [0, 1],             // Dom > Lun
+  };
+
+  // Calcola daysFromNow per un dato dow
+  const toDaysFromNow = (dow) => {
+    let d = dow - todayDow;
+    if (d <= 0) d += 7;
+    return d;
+  };
+
+  // Assegna slot: prima lungo (se necessario), poi qualità (se necessario), poi easy fino a targetSessions
+  const assigned = new Map(); // dow → type
+
+  // 1. Lungo
+  if (!hadLong) {
+    for (const dow of slotPrefs.long_run) {
+      if (!assigned.has(dow)) { assigned.set(dow, 'long_run'); break; }
     }
-    return { daysFromNow, type };
-  }).sort((a, b) => a.daysFromNow - b.daysFromNow);
+  }
+
+  // 2. Qualità (solo se non già fatto questa settimana e non più di 2 nelle ultime 2 settimane)
+  if (!hadQuality && qualityCount14 < 2) {
+    const longDow = [...assigned.entries()].find(([,t])=>t==='long_run')?.[0];
+    for (const dow of slotPrefs.quality) {
+      const diff = Math.abs(toDaysFromNow(dow) - (longDow != null ? toDaysFromNow(longDow) : 99));
+      if (!assigned.has(dow) && diff > 1) {
+        assigned.set(dow, qualityCount14 === 0 ? 'interval' : 'tempo');
+        break;
+      }
+    }
+  }
+
+  // 3. Riempi con easy fino a targetSessions, evitando adiacenza con hard
+  const hardDows = [...assigned.entries()].filter(([,t])=>['long_run','interval','tempo'].includes(t)).map(([d])=>d);
+  for (const dow of slotPrefs.easy) {
+    if (assigned.size >= targetSessions) break;
+    if (assigned.has(dow)) continue;
+    // Evita giorno adiacente a un hard
+    const adjToHard = hardDows.some(hd => Math.abs(toDaysFromNow(dow) - toDaysFromNow(hd)) === 1);
+    if (adjToHard) continue;
+    assigned.set(dow, 'easy');
+  }
+
+  // 4. Se ancora sotto target, aggiungi easy anche in giorni adiacenti (meglio easy che niente)
+  for (const dow of slotPrefs.easy) {
+    if (assigned.size >= targetSessions) break;
+    if (!assigned.has(dow)) assigned.set(dow, 'easy');
+  }
+
+  // 5. Recovery dopo il lungo (giorno +1), se non già occupato
+  const longEntry = [...assigned.entries()].find(([,t])=>t==='long_run');
+  if (longEntry) {
+    const nextDow = (longEntry[0] + 1) % 7;
+    if (!assigned.has(nextDow) && assigned.size < targetSessions + 1) {
+      assigned.set(nextDow, 'recovery');
+    }
+  }
+
+  // Costruisce la sequenza ordinata per daysFromNow
+  let sequence = [...assigned.entries()]
+    .map(([dow, type]) => {
+      const daysFromNow = toDaysFromNow(dow);
+      // Se domani (daysFromNow===1) era hard ieri → forza easy
+      let t = type;
+      if (daysFromNow === 1 && lastRunWasHard && daysSinceLastRun <= 1) {
+        t = (type === 'long_run' || type === 'interval' || type === 'tempo') ? 'easy' : type;
+      }
+      return { daysFromNow, type: t };
+    })
+    .sort((a, b) => a.daysFromNow - b.daysFromNow);
 
   // ── Crea le sessioni dettagliate dalla sequenza ──
   const sessions = sequence.map(({ daysFromNow, type }) => {
