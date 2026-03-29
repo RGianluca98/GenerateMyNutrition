@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 // === INJECT FONTS + BASE CSS ===
 (() => {
@@ -630,6 +630,407 @@ const S={
   card:(extra={})=>({background:'var(--card)',borderRadius:'14px',boxShadow:'var(--shadow)',...extra}),
   btn:(color='var(--text2)',extra={})=>({background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',color,padding:'6px 14px',fontSize:'12px',fontWeight:500,...extra}),
 };
+
+// ── RUNNING ANALYTICS ─────────────────────────────────────────
+
+/** Normalizza un'attività Strava Run in un modello dati uniforme.
+ *  Restituisce null se l'attività non è una corsa o non ha distanza. */
+function normalizeRun(activity, detail) {
+  if (activity.type !== 'Run' || !activity.distance) return null;
+  const distanceKm = activity.distance / 1000;
+  const movingTimeMin = activity.moving_time / 60;
+  const elapsedTimeMin = activity.elapsed_time / 60;
+  const avgPaceMinKm = movingTimeMin / distanceKm; // min/km come float
+  return {
+    id: activity.id,
+    date: activity.start_date_local?.slice(0, 10) ?? activity.start_date?.slice(0, 10) ?? '',
+    title: activity.name ?? 'Corsa',
+    distanceKm,
+    movingTimeMin,
+    elapsedTimeMin,
+    avgPaceMinKm,
+    avgSpeedKmh: (activity.average_speed ?? 0) * 3.6,
+    maxSpeedKmh: (detail?.max_speed ?? activity.max_speed ?? 0) * 3.6,
+    avgHeartRate: detail?.average_heartrate ?? activity.average_heartrate ?? null,
+    maxHeartRate: detail?.max_heartrate ?? activity.max_heartrate ?? null,
+    elevationGain: detail?.total_elevation_gain ?? activity.total_elevation_gain ?? 0,
+    splits: detail?.splits_metric ?? [],
+    laps: detail?.laps ?? [],
+    calories: detail?.calories ?? activity.calories ?? null,
+    source: 'strava',
+    raw: { activity, detail },
+  };
+}
+
+/** Converte minuti decimali in stringa "M:SS" per la visualizzazione del passo. */
+function _paceStr(minKm) {
+  if (!minKm || !isFinite(minKm)) return '--';
+  const m = Math.floor(minKm);
+  const s = Math.round((minKm - m) * 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Converte minuti totali in stringa "H:MM:SS". */
+function _timeStr(totalMin) {
+  if (!totalMin || !isFinite(totalMin)) return '--';
+  const h = Math.floor(totalMin / 60);
+  const m = Math.floor(totalMin % 60);
+  const s = Math.round((totalMin - Math.floor(totalMin)) * 60);
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Calcola la varianza del passo (min/km) sui km-split di un'attività.
+ *  Usata come indicatore di uniformità/irregolarità dello sforzo. */
+function _splitVariance(run) {
+  const validSplits = run.splits.filter(s => s.distance > 500);
+  if (validSplits.length < 3) return 0;
+  const paces = validSplits.map(s => (s.elapsed_time / 60) / (s.distance / 1000));
+  const mean = paces.reduce((a, b) => a + b, 0) / paces.length;
+  return paces.reduce((acc, p) => acc + Math.pow(p - mean, 2), 0) / paces.length;
+}
+
+/** Rileva progressione: slope lineare negativo sui split indica accelerazione. */
+function _isProgression(run) {
+  const validSplits = run.splits.filter(s => s.distance > 500);
+  if (validSplits.length < 4) return false;
+  const paces = validSplits.map(s => (s.elapsed_time / 60) / (s.distance / 1000));
+  const n = paces.length;
+  const sumX = (n * (n - 1)) / 2;
+  const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
+  const sumY = paces.reduce((a, b) => a + b, 0);
+  const sumXY = paces.reduce((acc, p, i) => acc + i * p, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  // Slope < -0.08 min/km per split = si accelera chiaramente
+  if (slope >= -0.08) return false;
+  // Verifica extra: ultimi 3 split mediamente più veloci dei primi 3
+  const firstAvg = (paces[0] + paces[1] + paces[2]) / 3;
+  const lastAvg = (paces[n - 3] + paces[n - 2] + paces[n - 1]) / 3;
+  return firstAvg - lastAvg > 0.2;
+}
+
+/** Classifica un'attività normalizzata in un tipo di allenamento.
+ *  Restituisce { workoutType, confidence, notes }. */
+function classifyRun(run) {
+  const titleLow = (run.title ?? '').toLowerCase();
+  const notes = [];
+
+  // Priorità 1: keyword nel titolo (più affidabile dell'euristica)
+  const titleMap = [
+    [/gara|race|competizione/i, 'race_pace'],
+    [/interval|ripetute|fartlek/i, 'interval'],
+    [/recupero|recovery/i, 'recovery'],
+    [/lungo|long.?run/i, 'long_run'],
+    [/tempo|soglia|threshold/i, 'tempo'],
+    [/progress/i, 'progression'],
+  ];
+  for (const [re, type] of titleMap) {
+    if (re.test(titleLow)) {
+      notes.push(`Titolo contiene keyword "${re.source}"`);
+      return { workoutType: type, confidence: 0.85, notes };
+    }
+  }
+
+  const variance = _splitVariance(run);
+  const pace = run.avgPaceMinKm;
+  const dist = run.distanceKm;
+  const hr = run.avgHeartRate;
+
+  notes.push(`Distanza ${dist.toFixed(1)}km, passo ${_paceStr(pace)}/km`);
+  if (hr) notes.push(`FC media ${hr} bpm`);
+  if (run.splits.length >= 3) notes.push(`Varianza split ${variance.toFixed(2)}`);
+
+  // Calcola score per ogni tipo
+  const scores = {};
+
+  // Progressione (alta priorità se rilevata)
+  if (_isProgression(run)) {
+    scores['progression'] = 0.78;
+    notes.push('Accelerazione progressiva rilevata');
+  }
+
+  // Interval: varianza split alta
+  if (variance > 0.50) {
+    scores['interval'] = 0.60 + (variance > 1.0 ? 0.20 : 0) + (run.maxHeartRate > 175 ? 0.10 : 0);
+  }
+
+  // Recovery: corto e lento
+  if (dist < 8 && pace > 6.0) {
+    scores['recovery'] = 0.60 + (hr && hr < 135 ? 0.15 : 0) + (dist < 5 ? 0.10 : 0);
+  }
+
+  // Long run: distanza > 15km
+  if (dist >= 15) {
+    scores['long_run'] = 0.60 + (dist >= 20 ? 0.20 : 0) + (pace > 5.8 ? 0.10 : 0) - (pace < 5.0 ? 0.10 : 0);
+  }
+
+  // Threshold: corto e veloce
+  if (dist >= 3 && dist < 8 && pace < 5.0) {
+    scores['threshold'] = 0.60 + (variance < 0.15 ? 0.10 : 0) + (hr && hr >= 155 ? 0.10 : 0);
+  }
+
+  // Tempo: distanza media e passo sostenuto
+  if (dist >= 5 && dist <= 15 && pace >= 4.5 && pace < 5.5) {
+    scores['tempo'] = 0.60 + (variance < 0.10 ? 0.15 : 0) + (hr && hr >= 160 ? 0.10 : 0) - (variance > 0.40 ? 0.10 : 0);
+  }
+
+  // Race pace: veloce su distanza significativa
+  if (pace < 5.0 && dist >= 10) {
+    scores['race_pace'] = 0.60 + (dist >= 20 ? 0.15 : 0) + (variance < 0.15 ? 0.10 : 0);
+  }
+
+  // Easy: ritmo moderato, distanza media
+  if (dist >= 5 && dist < 15 && pace >= 5.5 && pace < 6.5) {
+    scores['easy'] = 0.60
+      + (hr && hr >= 135 && hr <= 155 ? 0.15 : 0)
+      + (variance < 0.15 ? 0.10 : 0)
+      - (variance > 0.50 ? 0.10 : 0);
+  }
+
+  // Vince il tipo con score più alto
+  const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+  if (best && best[1] >= 0.50) {
+    return { workoutType: best[0], confidence: Math.min(1, best[1]), notes };
+  }
+
+  // Fallback: classifica generica per distanza/passo
+  if (dist >= 15) return { workoutType: 'long_run', confidence: 0.45, notes };
+  if (pace > 6.0) return { workoutType: 'recovery', confidence: 0.40, notes };
+  if (pace < 5.5) return { workoutType: 'easy', confidence: 0.35, notes };
+  return { workoutType: 'unknown', confidence: 0.20, notes };
+}
+
+/** Calcola metriche aggregate su un array di run classificati.
+ *  Richiede che ogni run abbia un campo `classification.workoutType`. */
+function calcTrainingMetrics(classifiedRuns) {
+  const now = new Date();
+  const ms7  = 7  * 86400000;
+  const ms14 = 14 * 86400000;
+  const ms30 = 30 * 86400000;
+  const ms60 = 60 * 86400000;
+  const ms90 = 90 * 86400000;
+
+  const inWindow = (run, msAgo) => new Date(run.date) >= new Date(now - msAgo);
+  const between  = (run, msFrom, msTo) => {
+    const d = new Date(run.date);
+    return d >= new Date(now - msFrom) && d < new Date(now - msTo);
+  };
+
+  const runs7  = classifiedRuns.filter(r => inWindow(r, ms7));
+  const runs30 = classifiedRuns.filter(r => inWindow(r, ms30));
+  const runs60 = classifiedRuns.filter(r => inWindow(r, ms60));
+  const runs7prev = classifiedRuns.filter(r => between(r, ms14, ms7));
+
+  const sumDist = arr => arr.reduce((s, r) => s + r.distanceKm, 0);
+  const avgPaceOf = (arr, types) => {
+    const filtered = arr.filter(r => types.includes(r.classification?.workoutType));
+    if (!filtered.length) return null;
+    return filtered.reduce((s, r) => s + r.avgPaceMinKm, 0) / filtered.length;
+  };
+
+  const weeklyVolumeKm  = Math.round(sumDist(runs7) * 10) / 10;
+  const monthlyVolumeKm = Math.round(sumDist(runs30) * 10) / 10;
+  const prevWeekVol     = sumDist(runs7prev);
+
+  // Consistency: quante delle ultime 8 settimane hanno almeno 1 run
+  const weeksWithRun = new Set();
+  classifiedRuns.filter(r => inWindow(r, 8 * 7 * 86400000)).forEach(r => {
+    const d = new Date(r.date);
+    const startOfYear = new Date(d.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+    weeksWithRun.add(`${d.getFullYear()}-W${weekNum}`);
+  });
+  const consistencyScore = Math.min(10, Math.round((weeksWithRun.size / 8) * 10));
+
+  // Fatigue trend
+  let fatigueTrend = 'stable';
+  if (prevWeekVol > 0) {
+    const ratio = weeklyVolumeKm / prevWeekVol;
+    if (ratio < 0.80) fatigueTrend = 'improving';
+    else if (ratio > 1.30) fatigueTrend = 'declining';
+  }
+
+  // Pace medie per tipo
+  const avgEasyPace      = avgPaceOf(runs30, ['easy']);
+  const avgLongRunPace   = avgPaceOf(runs60, ['long_run']);
+  const avgRacePaceWorkout = avgPaceOf(runs30, ['tempo', 'threshold', 'race_pace']);
+
+  // Recent progress: confronto easy pace ultimi 30gg vs 31-90gg
+  const easyOld = avgPaceOf(classifiedRuns.filter(r => between(r, ms90, ms30)), ['easy']);
+  let recentProgress = null;
+  if (avgEasyPace && easyOld) {
+    const deltaSec = Math.round((easyOld - avgEasyPace) * 60);
+    if (deltaSec > 5)  recentProgress = `Migliorato di ${deltaSec}s/km rispetto ai mesi precedenti`;
+    else if (deltaSec < -5) recentProgress = `Ritmo facile rallentato di ${Math.abs(deltaSec)}s/km recentemente`;
+  }
+
+  // Stime performance con formula di Riegel: T2 = T1 * (D2/D1)^1.06
+  let estimated10kTime = null;
+  let estimatedHalfMarathonPace = null;
+  let estimatedHalfMarathonTime = null;
+
+  const qualityRuns = runs60.filter(r =>
+    ['tempo', 'threshold', 'race_pace', 'interval'].includes(r.classification?.workoutType)
+    && r.distanceKm >= 3
+  );
+  if (qualityRuns.length > 0) {
+    // Prendi il run con il miglior "effort score" = dist / pace (più km a passo più veloce)
+    const best = qualityRuns.sort((a, b) => (b.distanceKm / b.avgPaceMinKm) - (a.distanceKm / a.avgPaceMinKm))[0];
+    const t1 = best.movingTimeMin;
+    const d1 = best.distanceKm;
+    const riegelFn = (d2) => t1 * Math.pow(d2 / d1, 1.06);
+    estimated10kTime           = riegelFn(10);
+    estimatedHalfMarathonTime  = riegelFn(21.0975);
+    estimatedHalfMarathonPace  = estimatedHalfMarathonTime / 21.0975;
+  }
+
+  return {
+    weeklyVolumeKm,
+    monthlyVolumeKm,
+    runsLast7Days:  runs7.length,
+    runsLast30Days: runs30.length,
+    avgEasyPace,
+    avgLongRunPace,
+    avgRacePaceWorkout,
+    consistencyScore,
+    fatigueTrend,
+    recentProgress,
+    estimated10kTime,
+    estimatedHalfMarathonPace,
+    estimatedHalfMarathonTime,
+  };
+}
+
+/** Genera insight di coaching basati su run classificati e metriche aggregate. */
+function generateCoachingInsights(classifiedRuns, metrics) {
+  const {
+    monthlyVolumeKm, weeklyVolumeKm, runsLast7Days, consistencyScore,
+    fatigueTrend, avgEasyPace, avgLongRunPace, avgRacePaceWorkout,
+    estimated10kTime, estimatedHalfMarathonTime, estimatedHalfMarathonPace
+  } = metrics;
+
+  const now = new Date();
+  const ms30 = 30 * 86400000;
+  const inLast30 = r => new Date(r.date) >= new Date(now - ms30);
+
+  const recentRuns = classifiedRuns.filter(inLast30);
+  const hasQuality = recentRuns.some(r => ['tempo','threshold','interval','race_pace'].includes(r.classification?.workoutType));
+  const hasLongRun = recentRuns.some(r => r.classification?.workoutType === 'long_run');
+
+  // Punti di forza
+  const strengths = [];
+  if (monthlyVolumeKm >= 80)     strengths.push(`Volume mensile solido (${monthlyVolumeKm} km)`);
+  if (consistencyScore >= 7)     strengths.push(`Allenamento costante (${consistencyScore}/10 su 8 settimane)`);
+  if (hasLongRun)                strengths.push('Uscite lunghe regolari nel mese');
+  if (runsLast7Days >= 3)        strengths.push(`Alta frequenza settimanale (${runsLast7Days} uscite)`);
+  if (avgEasyPace && avgEasyPace < 6.0) strengths.push(`Ritmo base efficiente (${_paceStr(avgEasyPace)}/km)`);
+  if (hasQuality)                strengths.push('Presenza di lavoro di qualità (tempo/ripetute)');
+
+  // Aree di miglioramento
+  const weaknesses = [];
+  if (consistencyScore < 5)  weaknesses.push('Frequenza di allenamento irregolare nelle ultime 8 settimane');
+  if (monthlyVolumeKm < 30)  weaknesses.push('Volume mensile basso (< 30 km)');
+  if (!hasQuality)           weaknesses.push('Nessun allenamento di qualità (tempo/ripetute) negli ultimi 30 giorni');
+  if (!hasLongRun)           weaknesses.push('Nessuna uscita lunga (>15 km) negli ultimi 30 giorni');
+  if (fatigueTrend === 'declining') weaknesses.push('Volume in forte aumento rispetto alla settimana scorsa — attenzione al recupero');
+
+  // Osservazioni
+  const observations = [];
+  if (metrics.recentProgress) observations.push(metrics.recentProgress);
+  if (estimatedHalfMarathonTime) {
+    observations.push(`Stima mezza maratona: ${_timeStr(estimatedHalfMarathonTime)} (ritmo ${_paceStr(estimatedHalfMarathonPace)}/km)`);
+  }
+  if (fatigueTrend === 'improving') observations.push('Questa settimana hai ridotto il carico: buona scelta per il recupero');
+  else if (fatigueTrend === 'declining') observations.push('Carico settimanale in forte crescita rispetto alla settimana precedente');
+  const typeCounts = {};
+  classifiedRuns.filter(inLast30).forEach(r => {
+    const t = r.classification?.workoutType ?? 'unknown';
+    typeCounts[t] = (typeCounts[t] ?? 0) + 1;
+  });
+  const dominantType = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  if (dominantType && dominantType !== 'unknown') {
+    observations.push(`Tipo di allenamento prevalente nell'ultimo mese: ${dominantType.replace('_', ' ')}`);
+  }
+
+  // Messaggio coach
+  let coachMessage = '';
+  if (weaknesses.length === 0 && strengths.length >= 2) {
+    coachMessage = `Ottimo lavoro! Stai mantenendo costanza e volume. Considera di aumentare il volume del 10% nella prossima settimana.`;
+  } else if (!hasQuality && avgEasyPace) {
+    coachMessage = `Corri principalmente a ritmo facile. Inserisci un allenamento di qualità questa settimana: un tempo run di 6-8 km a ${_paceStr(avgEasyPace - 0.7)}-${_paceStr(avgEasyPace - 0.5)}/km.`;
+  } else if (!hasLongRun) {
+    const target = avgEasyPace ? `a ${_paceStr(avgEasyPace)}/km` : 'a ritmo confortevole';
+    coachMessage = `Ti manca un'uscita lunga. Pianifica una corsa di 18-22 km ${target} nel weekend.`;
+  } else if (fatigueTrend === 'declining') {
+    coachMessage = `Il volume è aumentato molto rapidamente. Questa settimana mantieni il ritmo ma riduci i km del 20% per assorbire il carico.`;
+  } else if (consistencyScore < 5) {
+    coachMessage = `La costanza è la base di tutto. Cerca di uscire almeno 3 volte a settimana, anche solo per 30-40 minuti. Ogni uscita conta.`;
+  } else {
+    coachMessage = `Continua così. Alterna uscite facili con almeno un allenamento di qualità a settimana per progredire.`;
+  }
+
+  // Prossimi allenamenti suggeriti
+  const suggestedNextWorkouts = [];
+  if (!hasLongRun) {
+    suggestedNextWorkouts.push({
+      type: 'long_run',
+      description: 'Uscita lunga 18-22 km controllata',
+      targetPace: avgEasyPace ? `${_paceStr(avgEasyPace)}/km` : 'ritmo facile',
+    });
+  }
+  if (!hasQuality) {
+    const tPace = avgRacePaceWorkout ?? (avgEasyPace ? avgEasyPace - 0.6 : null);
+    suggestedNextWorkouts.push({
+      type: 'tempo',
+      description: 'Tempo run 6-8 km a ritmo soglia',
+      targetPace: tPace ? `${_paceStr(tPace)}/km` : 'ritmo sostenuto',
+    });
+  }
+  // Sempre: uscita facile di recupero
+  suggestedNextWorkouts.push({
+    type: 'easy',
+    description: 'Corsa facile rigenerativa 8-10 km',
+    targetPace: avgEasyPace ? `${_paceStr(avgEasyPace + 0.3)}/km` : 'ritmo facile',
+  });
+
+  return {
+    strengths: strengths.slice(0, 3),
+    weaknesses: weaknesses.slice(0, 3),
+    observations: observations.slice(0, 4),
+    coachMessage,
+    suggestedNextWorkouts: suggestedNextWorkouts.slice(0, 3),
+  };
+}
+
+/** Costruisce una stringa di contesto sintetica da passare al system prompt di Claude. */
+function buildRunningContext(classifiedRuns, metrics, insights) {
+  const {
+    weeklyVolumeKm, monthlyVolumeKm, runsLast7Days, runsLast30Days,
+    consistencyScore, fatigueTrend, estimated10kTime,
+    estimatedHalfMarathonTime, estimatedHalfMarathonPace
+  } = metrics;
+
+  const recentLabels = classifiedRuns.slice(0, 5).map(r => {
+    const type = r.classification?.workoutType ?? 'unknown';
+    return `- ${r.date} "${r.title}": ${type} ${r.distanceKm.toFixed(1)}km @${_paceStr(r.avgPaceMinKm)}/km`;
+  }).join('\n');
+
+  const stime = estimated10kTime
+    ? `10km: ${_timeStr(estimated10kTime)} | Mezza: ${_timeStr(estimatedHalfMarathonTime)} @${_paceStr(estimatedHalfMarathonPace)}/km`
+    : 'Dati insufficienti per stime di gara';
+
+  return `=== ANALISI CORSA ===
+Volume: ${weeklyVolumeKm}km/sett | ${monthlyVolumeKm}km/mese | Uscite: ${runsLast7Days}(7gg) ${runsLast30Days}(30gg) | Costanza: ${consistencyScore}/10 | Trend carico: ${fatigueTrend}
+
+ULTIME 5 CORSE:
+${recentLabels}
+
+FORZE: ${insights.strengths.join(' | ') || 'nessuna identificata'}
+AREE DI MIGLIORAMENTO: ${insights.weaknesses.join(' | ') || 'nessuna'}
+STIME PERFORMANCE: ${stime}
+PROSSIMI ALLENAMENTI: ${insights.suggestedNextWorkouts.map(w => `${w.type} (${w.targetPace})`).join(', ')}`.slice(0, 900);
+}
 
 // ── PESO VIEW ─────────────────────────────────────────────────
 function PesoView({weightLog,saveWeightLog}){
@@ -1631,6 +2032,168 @@ function QtyEditor({value,uom,onSave,onCancel}){
   );
 }
 
+// ── RUNNING INSIGHTS PANEL ─────────────────────────────────────
+const WORKOUT_COLORS = {
+  easy:'#00C49A', recovery:'#5A6888', long_run:'#FBA828',
+  tempo:'#e05c5c', threshold:'#c44c9a', interval:'#4c8cde',
+  race_pace:'#FF6B35', progression:'#9b59b6', unknown:'#5A6888',
+};
+const WORKOUT_LABELS = {
+  easy:'Easy', recovery:'Recovery', long_run:'Lungo',
+  tempo:'Tempo', threshold:'Soglia', interval:'Interval',
+  race_pace:'Gara', progression:'Progressione', unknown:'?',
+};
+
+function RunningInsightsPanel({ runs, metrics, insights }) {
+  const {
+    weeklyVolumeKm, monthlyVolumeKm, runsLast7Days,
+    consistencyScore, estimatedHalfMarathonTime, estimatedHalfMarathonPace,
+    estimated10kTime, fatigueTrend,
+  } = metrics;
+
+  const cardStyle = {
+    background:'var(--card)', borderRadius:'16px',
+    border:'1px solid var(--border)', padding:'14px',
+  };
+  const chipStyle = (bg) => ({
+    background: bg ?? 'var(--surface)',
+    borderRadius:'10px', padding:'8px 12px',
+    display:'flex', flexDirection:'column', alignItems:'center', gap:'2px',
+    flex:1, minWidth:0,
+  });
+  const badgeStyle = (type) => ({
+    background: WORKOUT_COLORS[type] ?? '#5A6888',
+    color:'#fff', fontSize:'10px', fontWeight:700,
+    borderRadius:'6px', padding:'2px 6px', letterSpacing:'0.5px',
+    whiteSpace:'nowrap',
+  });
+  const fatigueLabelMap = { improving:'↓ In recupero', stable:'→ Stabile', declining:'↑ In crescita' };
+  const fatigueColorMap = { improving:'var(--accent)', stable:'var(--text2)', declining:'#e05c5c' };
+
+  return (
+    <details open style={{display:'flex',flexDirection:'column',gap:'0'}}>
+      <summary style={{
+        listStyle:'none', cursor:'pointer',
+        fontSize:'11px', fontWeight:700, color:'var(--text2)',
+        letterSpacing:'0.8px', padding:'4px 2px 10px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+      }}>
+        <span>ANALISI CORSA 🏃</span>
+        <span style={{fontSize:'10px', color:'var(--text3)', fontWeight:500}}>tocca per espandere/comprimere</span>
+      </summary>
+
+      <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+        {/* Stats row */}
+        <div style={{display:'flex',gap:'8px'}}>
+          <div style={chipStyle('var(--surface)')}>
+            <div style={{fontSize:'16px',fontWeight:800,color:'var(--accent)'}}>{weeklyVolumeKm}</div>
+            <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:500}}>km/settimana</div>
+          </div>
+          <div style={chipStyle('var(--surface)')}>
+            <div style={{fontSize:'16px',fontWeight:800,color:'var(--text)'}}>{monthlyVolumeKm}</div>
+            <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:500}}>km/mese</div>
+          </div>
+          <div style={chipStyle('var(--surface)')}>
+            <div style={{fontSize:'16px',fontWeight:800,color:'var(--text)'}}>{runsLast7Days}</div>
+            <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:500}}>uscite 7gg</div>
+          </div>
+          <div style={chipStyle('var(--surface)')}>
+            <div style={{fontSize:'14px',fontWeight:800,color:fatigueColorMap[fatigueTrend]??'var(--text2)'}}>
+              {fatigueLabelMap[fatigueTrend]??'–'}
+            </div>
+            <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:500}}>carico</div>
+          </div>
+        </div>
+
+        {/* Stima mezza maratona */}
+        {estimatedHalfMarathonTime && (
+          <div style={{...cardStyle, background:'var(--accent-soft)', border:'1px solid var(--accent)'}}>
+            <div style={{fontSize:'10px',fontWeight:700,color:'var(--accent)',letterSpacing:'0.8px',marginBottom:'6px'}}>STIMA PRESTAZIONE</div>
+            <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
+              <div>
+                <div style={{fontSize:'11px',color:'var(--text3)'}}>Mezza Maratona</div>
+                <div style={{fontSize:'20px',fontWeight:800,color:'var(--text)'}}>{_timeStr(estimatedHalfMarathonTime)}</div>
+                <div style={{fontSize:'11px',color:'var(--text2)'}}>@ {_paceStr(estimatedHalfMarathonPace)}/km</div>
+              </div>
+              {estimated10kTime && (
+                <div>
+                  <div style={{fontSize:'11px',color:'var(--text3)'}}>10 km</div>
+                  <div style={{fontSize:'20px',fontWeight:800,color:'var(--text)'}}>{_timeStr(estimated10kTime)}</div>
+                </div>
+              )}
+            </div>
+            <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px'}}>Stima tramite formula di Riegel — indicativa</div>
+          </div>
+        )}
+
+        {/* Ultime 5 corse classificate */}
+        <div style={cardStyle}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'8px'}}>ULTIME CORSE</div>
+          <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+            {runs.slice(0, 5).map(r => {
+              const type = r.classification?.workoutType ?? 'unknown';
+              return (
+                <div key={r.id} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                  <span style={badgeStyle(type)}>{WORKOUT_LABELS[type]??type}</span>
+                  <span style={{fontSize:'12px',color:'var(--text)',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.title}</span>
+                  <span style={{fontSize:'11px',color:'var(--text2)',whiteSpace:'nowrap'}}>{r.distanceKm.toFixed(1)}km</span>
+                  <span style={{fontSize:'11px',color:'var(--text3)',whiteSpace:'nowrap'}}>{_paceStr(r.avgPaceMinKm)}/km</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Forze e debolezze */}
+        {(insights.strengths.length > 0 || insights.weaknesses.length > 0) && (
+          <div style={{display:'flex',gap:'8px'}}>
+            {insights.strengths.length > 0 && (
+              <div style={{...cardStyle,flex:1,minWidth:0}}>
+                <div style={{fontSize:'10px',fontWeight:700,color:'#00C49A',letterSpacing:'0.8px',marginBottom:'6px'}}>PUNTI DI FORZA</div>
+                {insights.strengths.map((s,i) => (
+                  <div key={i} style={{fontSize:'11px',color:'var(--text)',lineHeight:'1.5',marginBottom:'3px'}}>✓ {s}</div>
+                ))}
+              </div>
+            )}
+            {insights.weaknesses.length > 0 && (
+              <div style={{...cardStyle,flex:1,minWidth:0}}>
+                <div style={{fontSize:'10px',fontWeight:700,color:'#e05c5c',letterSpacing:'0.8px',marginBottom:'6px'}}>AREE DI LAVORO</div>
+                {insights.weaknesses.map((w,i) => (
+                  <div key={i} style={{fontSize:'11px',color:'var(--text)',lineHeight:'1.5',marginBottom:'3px'}}>△ {w}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Messaggio coach */}
+        {insights.coachMessage && (
+          <div style={{...cardStyle, borderLeft:'3px solid var(--accent)'}}>
+            <div style={{fontSize:'10px',fontWeight:700,color:'var(--accent)',letterSpacing:'0.8px',marginBottom:'6px'}}>CONSIGLIO COACH</div>
+            <div style={{fontSize:'12px',color:'var(--text)',lineHeight:'1.6'}}>{insights.coachMessage}</div>
+          </div>
+        )}
+
+        {/* Prossimi allenamenti */}
+        {insights.suggestedNextWorkouts.length > 0 && (
+          <div style={cardStyle}>
+            <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'8px'}}>PROSSIMI ALLENAMENTI</div>
+            <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+              {insights.suggestedNextWorkouts.map((w,i) => (
+                <div key={i} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                  <span style={badgeStyle(w.type)}>{WORKOUT_LABELS[w.type]??w.type}</span>
+                  <span style={{fontSize:'12px',color:'var(--text)',flex:1}}>{w.description}</span>
+                  <span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600,whiteSpace:'nowrap'}}>{w.targetPace}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
 // ── TRAININGS VIEW ─────────────────────────────────────────────
 const STRAVA_CLIENT_ID_PLACEHOLDER='YOUR_CLIENT_ID'; // sostituito da Netlify env
 const STRAVA_SCOPE='activity:read_all';
@@ -1644,6 +2207,27 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
   const [chatInput,setChatInput]=useState('');
   const [chatLoading,setChatLoading]=useState(false);
   const [error,setError]=useState('');
+
+  // ── Analisi corsa (reattiva ai dati Strava) ──
+  const normalizedRuns = useMemo(() =>
+    stravaActivities
+      .filter(a => a.type === 'Run')
+      .map(a => normalizeRun(a, activityDetails[a.id] || null))
+      .filter(Boolean)
+      .sort((a, b) => b.date.localeCompare(a.date)),
+    [stravaActivities, activityDetails]);
+
+  const classifiedRuns = useMemo(() =>
+    normalizedRuns.map(r => ({ ...r, classification: classifyRun(r) })),
+    [normalizedRuns]);
+
+  const trainingMetrics = useMemo(() =>
+    classifiedRuns.length >= 1 ? calcTrainingMetrics(classifiedRuns) : null,
+    [classifiedRuns]);
+
+  const coachingInsights = useMemo(() =>
+    trainingMetrics ? generateCoachingInsights(classifiedRuns, trainingMetrics) : null,
+    [classifiedRuns, trainingMetrics]);
 
   // Legge il ?code= dall'URL dopo il redirect OAuth Strava
   useEffect(()=>{
@@ -1700,7 +2284,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
   const fetchActivities=async(token)=>{
     setLoadingAct(true);setError('');
     try{
-      const res=await fetch('/.netlify/functions/strava-activities?per_page=20',{
+      const res=await fetch('/.netlify/functions/strava-activities?per_page=50',{
         headers:{Authorization:`Bearer ${token}`}
       });
       const data=await res.json();
@@ -1768,9 +2352,11 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
     const newMessages=[...chatMessages,userMsg];
     setChatMessages(newMessages);setChatInput('');setChatLoading(true);setError('');
     try{
+      const runningContext = classifiedRuns.length>=3 && trainingMetrics && coachingInsights
+        ? buildRunningContext(classifiedRuns, trainingMetrics, coachingInsights) : null;
       const res=await fetch('/.netlify/functions/ai-chat',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({messages:newMessages,activities:stravaActivities})
+        body:JSON.stringify({messages:newMessages,activities:stravaActivities,runningContext})
       });
       const rawText=await res.text();
       let data;try{data=JSON.parse(rawText);}catch(e){setError('Risposta non JSON: '+rawText.slice(0,200));setChatLoading(false);return;}
@@ -1909,6 +2495,11 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
             );
           })}
         </div>
+      )}
+
+      {/* Running Insights Panel */}
+      {isConnected && classifiedRuns.length >= 3 && trainingMetrics && coachingInsights && (
+        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights}/>
       )}
 
       {/* Chat AI */}
@@ -2345,7 +2936,7 @@ export default function App(){
     if(!stravaTokens?.access_token)return;
     const expired=stravaTokens.expires_at&&(stravaTokens.expires_at*1000)<Date.now();
     if(expired)return; // il refresh avviene dentro TrainingsView
-    fetch('/.netlify/functions/strava-activities?per_page=30',{
+    fetch('/.netlify/functions/strava-activities?per_page=50',{
       headers:{Authorization:`Bearer ${stravaTokens.access_token}`}
     }).then(r=>r.json()).then(data=>{
       if(Array.isArray(data))setStravaActivities(data);

@@ -14,7 +14,7 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY non configurata' }) };
   }
 
-  const { messages, activities } = JSON.parse(event.body || '{}');
+  const { messages, activities, runningContext } = JSON.parse(event.body || '{}');
 
   const activitySummary = activities?.length
     ? activities.slice(0, 10).map(a => {
@@ -26,12 +26,12 @@ exports.handler = async (event) => {
       }).join('\n')
     : 'Nessuna attività disponibile';
 
-  const systemPrompt = `Sei un coach sportivo personale. Aiuti l'utente a pianificare gli allenamenti in base alla sua storia sportiva su Strava.
+  const systemPrompt = `Sei un coach sportivo personale esperto di corsa su strada. Aiuti l'utente a pianificare gli allenamenti in base alla sua storia sportiva su Strava.
 
 Ultime attività Strava:
 ${activitySummary}
-
-Rispondi in italiano, in modo conciso e pratico. Suggerisci allenamenti con distanze, tempi e intensità specifiche.`;
+${runningContext ? '\n' + runningContext : ''}
+Rispondi in italiano, in modo conciso e pratico. Suggerisci allenamenti con distanze, tempi e intensità specifiche. Quando l'utente chiede stime di gara, usa i dati forniti nell'analisi corsa se disponibili.`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
