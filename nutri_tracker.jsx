@@ -872,17 +872,19 @@ function calcTrainingMetrics(classifiedRuns) {
 
   const qualityRuns = runs60.filter(r =>
     ['tempo', 'threshold', 'race_pace', 'interval'].includes(r.classification?.workoutType)
-    && r.distanceKm >= 3
+    && r.distanceKm >= 5  // soglia minima: proiettare da < 5km a 21km è troppo speculativo
   );
   if (qualityRuns.length > 0) {
     // Prendi il run con il miglior "effort score" = dist / pace (più km a passo più veloce)
     const best = qualityRuns.sort((a, b) => (b.distanceKm / b.avgPaceMinKm) - (a.distanceKm / a.avgPaceMinKm))[0];
     const t1 = best.movingTimeMin;
     const d1 = best.distanceKm;
+    // Riegel proietta in avanti: usare solo se d2 > d1
     const riegelFn = (d2) => t1 * Math.pow(d2 / d1, 1.06);
-    estimated10kTime           = riegelFn(10);
-    estimatedHalfMarathonTime  = riegelFn(21.0975);
-    estimatedHalfMarathonPace  = estimatedHalfMarathonTime / 21.0975;
+    estimated10kTime          = d1 < 10 ? riegelFn(10) : null;
+    // Se l'utente ha già corso una mezza, usa il suo tempo reale (più preciso di Riegel)
+    estimatedHalfMarathonTime = d1 < 21.0975 ? riegelFn(21.0975) : best.movingTimeMin;
+    estimatedHalfMarathonPace = estimatedHalfMarathonTime / 21.0975;
   }
 
   return {
@@ -2111,7 +2113,7 @@ function RunningInsightsPanel({ runs, metrics, insights }) {
             <div style={{fontSize:'10px',fontWeight:700,color:'var(--accent)',letterSpacing:'0.8px',marginBottom:'6px'}}>STIMA PRESTAZIONE</div>
             <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
               <div>
-                <div style={{fontSize:'11px',color:'var(--text3)'}}>Mezza Maratona</div>
+                <div style={{fontSize:'11px',color:'var(--text3)'}}>Mezza Maratona (21,1 km)</div>
                 <div style={{fontSize:'20px',fontWeight:800,color:'var(--text)'}}>{_timeStr(estimatedHalfMarathonTime)}</div>
                 <div style={{fontSize:'11px',color:'var(--text2)'}}>@ {_paceStr(estimatedHalfMarathonPace)}/km</div>
               </div>
