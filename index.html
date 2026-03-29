@@ -46,7 +46,7 @@
       async function boot() {
         const source = await fetch("./nutri_tracker.jsx").then((r) => r.text());
         const transformedSource = source
-          .replace('import { useState, useEffect, useRef } from "react";', "const { useState, useEffect, useRef } = React;")
+          .replace('import { useState, useEffect, useRef, useMemo } from "react";', "const { useState, useEffect, useRef, useMemo } = React;")
           .replace("export default function App()", "function App()");
 
         const wrapped = `
