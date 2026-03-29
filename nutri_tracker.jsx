@@ -1016,11 +1016,20 @@ function calcPaceZones(metrics) {
   };
 }
 
-/** Genera un piano di allenamento settimanale dettagliato con struttura per Garmin.
- *  Adatta volume e intensità a metriche reali e obiettivo mezza maratona. */
+/** Piano di allenamento periodizzato verso la Mezza Maratona di Genova (19 aprile).
+ *
+ *  Logica da coach:
+ *  - Calcola in quale fase siamo rispetto alla gara (carico / tapering / gara)
+ *  - Fase CARICO (> 14gg): 1 lungo + 1 qualità + easy/recovery
+ *  - Fase TAPERING (7-14gg): niente sessioni dure, solo easy + 1 medio a ritmo mezza
+ *  - Fase GARA (< 7gg): solo 2-3 uscite brevi e leggere, gambe fresche
+ *  - Numero sessioni = media reale ultime 4 settimane (clamp 3-5)
+ *  - Ogni sessione parte dal giorno successivo all'ultima corsa fatta
+ *  - Mai 2 sessioni dure consecutive
+ */
 function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
   if (!paceZones) return null;
-  const { weeklyVolumeKm, consistencyScore, fatigueTrend, avgEasyPace } = metrics;
+  const { weeklyVolumeKm, consistencyScore, fatigueTrend } = metrics;
   const { paceMin: eMin, paceMax: eMax } = paceZones.easy;
   const { paceMin: rMin, paceMax: rMax } = paceZones.recovery;
   const { paceMin: lMin, paceMax: lMax } = paceZones.longRun;
@@ -1028,239 +1037,258 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
   const { paceMin: iMin, paceMax: iMax } = paceZones.interval;
   const { paceMin: hmMin, paceMax: hmMax } = paceZones.halfMarathon;
 
-  // Helper: passo medio di una zona
-  const midPace = (min, max) => (min + max) / 2;
-  const fmtZ = (p) => `${_paceStr(p)}/km`;
-  const fmtSpd = (p) => `${(60/p).toFixed(1)} km/h`;
-  const fmtRange = (min, max) => `${_paceStr(min)}–${_paceStr(max)}/km (${fmtSpd(max)}–${fmtSpd(min)})`;
+  const midPace  = (a, b) => (a + b) / 2;
+  const fmtZ     = (p) => `${_paceStr(p)}/km`;
+  const fmtSpd   = (p) => `${(60/p).toFixed(1)} km/h`;
+  const fmtRange = (a, b) => `${_paceStr(a)}–${_paceStr(b)}/km (${fmtSpd(b)}–${fmtSpd(a)})`;
 
-  // Calcola volume target settimana
-  let baseVol = Math.max(weeklyVolumeKm, 20); // minimo 20km/sett
-  if (fatigueTrend === 'declining') baseVol = Math.round(baseVol * 0.85);
-  else if (fatigueTrend === 'improving') baseVol = Math.round(baseVol * 1.05);
-  else baseVol = Math.round(baseVol * 1.02);
+  // ── Fase periodizzazione ──
+  const now      = new Date();
+  const RACE_DATE = new Date('2025-04-19');
+  const daysToRace = Math.round((RACE_DATE - now) / 86400000);
+  const phase = daysToRace > 14 ? 'load' : daysToRace > 7 ? 'taper' : daysToRace > 0 ? 'race_week' : 'post_race';
 
-  // ── Analisi storico ──
-  const now = new Date();
-  const ms7  = 7  * 86400000;
-  const ms14 = 14 * 86400000;
   const dayNames = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 
-  // Ultima corsa fatta
-  const lastRun = classifiedRuns[0];
-  const lastRunDate = lastRun ? new Date(lastRun.date) : null;
-  const daysSinceLastRun = lastRunDate ? Math.round((now - lastRunDate) / 86400000) : 99;
-  const lastRunType = lastRun?.classification?.workoutType ?? null;
-  const lastRunWasHard = ['tempo','threshold','interval','race_pace','long_run'].includes(lastRunType);
+  // ── Contesto ultimo allenamento ──
+  const lastRun        = classifiedRuns[0];
+  const lastRunDate    = lastRun ? new Date(lastRun.date) : null;
+  const daysSinceLast  = lastRunDate ? Math.round((now - lastRunDate) / 86400000) : 99;
+  const lastType       = lastRun?.classification?.workoutType ?? null;
+  const lastWasHard    = ['tempo','threshold','interval','race_pace','long_run'].includes(lastType);
 
-  // Tipi fatti di recente
-  const recentTypes = classifiedRuns
+  // Ultimi 7 e 14 giorni
+  const ms7 = 7 * 86400000, ms14 = 14 * 86400000;
+  const last7Types = classifiedRuns
     .filter(r => new Date(r.date) >= new Date(now - ms7))
     .map(r => r.classification?.workoutType);
-  const hadLong    = recentTypes.includes('long_run');
-  const hadQuality = recentTypes.some(t => ['tempo','threshold','interval','race_pace'].includes(t));
-  const qualityCount14 = classifiedRuns
+  const hadLong7    = last7Types.includes('long_run');
+  const hadQuality7 = last7Types.some(t => ['tempo','threshold','interval','race_pace'].includes(t));
+  const qualityLast14 = classifiedRuns
     .filter(r => new Date(r.date) >= new Date(now - ms14))
-    .filter(r => ['tempo','threshold','interval','race_pace'].includes(r.classification?.workoutType))
-    .length;
+    .filter(r => ['tempo','threshold','interval','race_pace'].includes(r.classification?.workoutType)).length;
 
-  // Distribuzione volume
-  const longKm    = Math.round(baseVol * 0.30);
+  // ── Volume target ──
+  let baseVol = Math.max(weeklyVolumeKm, 20);
+  if (phase === 'taper')     baseVol = Math.round(baseVol * 0.70);
+  else if (phase === 'race_week') baseVol = Math.round(baseVol * 0.40);
+  else if (fatigueTrend === 'declining') baseVol = Math.round(baseVol * 0.85);
+  else baseVol = Math.round(baseVol * 1.02);
+
+  const longKm    = Math.max(16, Math.round(baseVol * 0.32));
   const qualityKm = Math.round(baseVol * 0.20);
-  const easyKm    = Math.round(baseVol * 0.25);
-  const recoverKm = Math.max(6, Math.round(baseVol * 0.08));
+  const easyKm    = Math.max(8, Math.round(baseVol * 0.22));
+  const recoverKm = Math.max(5, Math.round(baseVol * 0.08));
 
-  // ── Numero sessioni target basato sui dati reali ──
-  // Usa la media delle ultime 4 settimane come riferimento, clamp 3-6
+  // ── Numero sessioni basato su storico reale ──
   const runsLast28 = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - 28*86400000));
   const avgPerWeek = runsLast28.length / 4;
-  // Arrotonda all'intero più vicino, ma mai meno di 3 né più di 6
-  const targetSessions = Math.min(6, Math.max(3, Math.round(avgPerWeek)));
+  let targetSessions = Math.min(5, Math.max(3, Math.round(avgPerWeek)));
+  if (phase === 'race_week') targetSessions = Math.min(3, targetSessions);
+  if (phase === 'taper')     targetSessions = Math.min(4, targetSessions);
 
-  // ── Slot disponibili nella settimana da assegnare ──
-  // Candidati: tutti i giorni dei prossimi 7, escluso oggi
-  // Regola: mai 2 hard (qualità/lungo) consecutivi
-  // Struttura obbligatoria: 1 lungo (Sab preferito), 1 qualità (Mer/Gio), resto easy/recovery
+  // ── Template sessioni per fase ──
+  // Ogni template descrive: tipo, priorità (1=prima da piazzare), vincoli
+  let templates = [];
 
-  const todayDow = now.getDay(); // 0=Dom
+  if (phase === 'load') {
+    // Settimana di carico: lungo + qualità + easy/recovery
+    if (!hadLong7)    templates.push({ type: 'long_run',  priority: 1, preferLate: true });
+    if (!hadQuality7 && qualityLast14 < 2)
+                      templates.push({ type: qualityLast14 === 0 ? 'interval' : 'tempo', priority: 2, preferLate: false });
+    // Riempi con easy fino a targetSessions
+    while (templates.length < targetSessions)
+      templates.push({ type: 'easy', priority: 3, preferLate: false });
+    // Aggiungi recovery dopo lungo (non conta nel targetSessions)
+    if (!hadLong7) templates.push({ type: 'recovery', priority: 4, afterLong: true });
 
-  // Slot preferenziali per ogni tipo (ordine di preferenza)
-  // dow = giorno della settimana (0=Dom, 1=Lun, ..., 6=Sab)
-  const slotPrefs = {
-    long_run: [6, 0, 5],          // Sab > Dom > Ven
-    quality:  [3, 2, 4],          // Mer > Mar > Gio
-    easy:     [1, 2, 3, 4, 5],    // Lun, Mar, Mer, Gio, Ven
-    recovery: [0, 1],             // Dom > Lun
-  };
+  } else if (phase === 'taper') {
+    // Tapering: niente lungo né ripetute. 1 medio a ritmo mezza, resto easy/recovery
+    templates.push({ type: 'half_marathon_pace', priority: 1, preferLate: false });
+    while (templates.length < targetSessions)
+      templates.push({ type: templates.length === targetSessions - 1 ? 'recovery' : 'easy', priority: 2, preferLate: false });
 
-  // Calcola daysFromNow per un dato dow
-  const toDaysFromNow = (dow) => {
-    let d = dow - todayDow;
-    if (d <= 0) d += 7;
-    return d;
-  };
+  } else if (phase === 'race_week') {
+    // Settimana gara: solo uscite brevi e leggere
+    templates = [
+      { type: 'easy',     priority: 1, preferLate: false },
+      { type: 'recovery', priority: 2, preferLate: false },
+      { type: 'easy',     priority: 3, preferLate: false },
+    ].slice(0, targetSessions);
 
-  // Assegna slot: prima lungo (se necessario), poi qualità (se necessario), poi easy fino a targetSessions
-  const assigned = new Map(); // dow → type
-
-  // 1. Lungo
-  if (!hadLong) {
-    for (const dow of slotPrefs.long_run) {
-      if (!assigned.has(dow)) { assigned.set(dow, 'long_run'); break; }
-    }
+  } else {
+    // Post gara: recupero totale
+    templates = [{ type: 'recovery', priority: 1 }, { type: 'easy', priority: 2 }];
   }
 
-  // 2. Qualità (solo se non già fatto questa settimana e non più di 2 nelle ultime 2 settimane)
-  if (!hadQuality && qualityCount14 < 2) {
-    const longDow = [...assigned.entries()].find(([,t])=>t==='long_run')?.[0];
-    for (const dow of slotPrefs.quality) {
-      const diff = Math.abs(toDaysFromNow(dow) - (longDow != null ? toDaysFromNow(longDow) : 99));
-      if (!assigned.has(dow) && diff > 1) {
-        assigned.set(dow, qualityCount14 === 0 ? 'interval' : 'tempo');
-        break;
+  // ── Piazza le sessioni nei giorni ──
+  // Parte dal primo giorno libero dopo l'ultima corsa,
+  // rispettando: mai hard consecutive, recovery dopo hard se < 2gg.
+
+  // Giorno di partenza = max(domani, giorno dopo ultima corsa)
+  const startOffset = Math.max(1, daysSinceLast >= 1 ? 1 : 2);
+
+  // Ordina: prima le sessioni a priorità bassa (long_run/quality prima per avere spazio)
+  const ordered = [...templates].sort((a,b) => a.priority - b.priority);
+
+  const placed = []; // { daysFromNow, type }
+  let cursor = startOffset;
+
+  for (const tmpl of ordered) {
+    // Recovery dopo lungo: va il giorno successivo al lungo
+    if (tmpl.afterLong) {
+      const longPlaced = placed.find(p => p.type === 'long_run');
+      if (longPlaced) {
+        placed.push({ daysFromNow: longPlaced.daysFromNow + 1, type: 'recovery' });
       }
+      continue;
     }
+
+    // Trova il primo giorno disponibile a partire da cursor
+    let day = tmpl.preferLate
+      ? Math.max(cursor, startOffset + Math.floor(targetSessions * 0.5))  // lungo nella seconda metà
+      : cursor;
+
+    // Salta giorni già occupati o adiacenti a hard (per sessioni hard)
+    const isHard = ['long_run','interval','tempo','half_marathon_pace'].includes(tmpl.type);
+    let attempts = 0;
+    while (attempts < 10) {
+      const alreadyTaken = placed.some(p => p.daysFromNow === day);
+      const adjHard = isHard && placed.some(p =>
+        ['long_run','interval','tempo','half_marathon_pace'].includes(p.type) &&
+        Math.abs(p.daysFromNow - day) <= 1
+      );
+      // Se domani era un hard → non possiamo mettere hard domani
+      const tooSoonAfterHard = isHard && lastWasHard && daysSinceLast <= 1 && day === 1;
+      if (!alreadyTaken && !adjHard && !tooSoonAfterHard) break;
+      day++;
+      attempts++;
+    }
+
+    placed.push({ daysFromNow: day, type: tmpl.type });
+    cursor = day + 1;
   }
 
-  // 3. Riempi con easy fino a targetSessions, evitando adiacenza con hard
-  const hardDows = [...assigned.entries()].filter(([,t])=>['long_run','interval','tempo'].includes(t)).map(([d])=>d);
-  for (const dow of slotPrefs.easy) {
-    if (assigned.size >= targetSessions) break;
-    if (assigned.has(dow)) continue;
-    // Evita giorno adiacente a un hard
-    const adjToHard = hardDows.some(hd => Math.abs(toDaysFromNow(dow) - toDaysFromNow(hd)) === 1);
-    if (adjToHard) continue;
-    assigned.set(dow, 'easy');
-  }
+  // Ordina per data
+  placed.sort((a, b) => a.daysFromNow - b.daysFromNow);
 
-  // 4. Se ancora sotto target, aggiungi easy anche in giorni adiacenti (meglio easy che niente)
-  for (const dow of slotPrefs.easy) {
-    if (assigned.size >= targetSessions) break;
-    if (!assigned.has(dow)) assigned.set(dow, 'easy');
-  }
+  // ── Crea oggetti sessione dettagliati ──
+  const sessions = placed.map(({ daysFromNow, type }) => {
+    const date    = new Date(now.getTime() + daysFromNow * 86400000);
+    const dayLabel = dayNames[date.getDay()];
 
-  // 5. Recovery dopo il lungo (giorno +1), se non già occupato
-  const longEntry = [...assigned.entries()].find(([,t])=>t==='long_run');
-  if (longEntry) {
-    const nextDow = (longEntry[0] + 1) % 7;
-    if (!assigned.has(nextDow) && assigned.size < targetSessions + 1) {
-      assigned.set(nextDow, 'recovery');
-    }
-  }
-
-  // Costruisce la sequenza ordinata per daysFromNow
-  let sequence = [...assigned.entries()]
-    .map(([dow, type]) => {
-      const daysFromNow = toDaysFromNow(dow);
-      // Se domani (daysFromNow===1) era hard ieri → forza easy
-      let t = type;
-      if (daysFromNow === 1 && lastRunWasHard && daysSinceLastRun <= 1) {
-        t = (type === 'long_run' || type === 'interval' || type === 'tempo') ? 'easy' : type;
-      }
-      return { daysFromNow, type: t };
-    })
-    .sort((a, b) => a.daysFromNow - b.daysFromNow);
-
-  // ── Crea le sessioni dettagliate dalla sequenza ──
-  const sessions = sequence.map(({ daysFromNow, type }) => {
-    const targetDate = new Date(now.getTime() + daysFromNow * 86400000);
-    const dow = targetDate.getDay();
-    const dayLabel = dayNames[dow];
-
-    if (type === 'interval') {
-      const repKm = Math.min(qualityKm, 12);
-      const wuKm = 2, cdKm = 2, mainKm = Math.max(2, repKm - wuKm - cdKm);
-      const nReps = Math.max(4, Math.round(mainKm));
-      return {
-        day: dayLabel, daysFromNow, type, title: 'Ripetute 1000m', totalKm: repKm,
-        structure: [
-          { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
-          { phase: `${nReps}×1000m`, km: nReps, pace: fmtRange(iMin,iMax), speed: `${fmtSpd(iMax)}–${fmtSpd(iMin)}`,
-            recovery: `200m a ${_paceStr(midPace(rMin,rMax))}/km o 90s cammino` },
-          { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
-        ],
-        garminNote: `Interval Workout: ${nReps}×1000m. Rec: 200m lento o 90s cammino. FC: zona 4-5.`,
-        rationale: `Sviluppo VO2max. Passo target: ${fmtRange(iMin,iMax)}.`,
-      };
-    }
-    if (type === 'tempo') {
-      const tempoKm = Math.min(qualityKm, 10);
-      const wuKm = 1.5, cdKm = 1.5, mainKm = Math.max(3, tempoKm - wuKm - cdKm);
-      return {
-        day: dayLabel, daysFromNow, type, title: 'Tempo run', totalKm: tempoKm,
-        structure: [
-          { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
-          { phase: `Soglia ${mainKm.toFixed(1)}km`, km: mainKm, pace: fmtRange(tMin,tMax), speed: `${fmtSpd(tMax)}–${fmtSpd(tMin)}` },
-          { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
-        ],
-        garminNote: `Tempo run: ${mainKm.toFixed(1)}km a ritmo soglia. FC: zona 3-4 (165-175 bpm).`,
-        rationale: `Soglia del lattato. Passo: ${fmtRange(tMin,tMax)}.`,
-      };
-    }
     if (type === 'long_run') {
-      const lKm = Math.max(longKm, 16);
-      const progKm = Math.round(lKm * 0.3);
+      const lKm    = phase === 'taper' ? Math.min(longKm, 16) : longKm;
+      const progKm = Math.round(lKm * 0.25);
       return {
         day: dayLabel, daysFromNow, type, title: 'Lungo progressivo', totalKm: lKm,
         structure: [
-          { phase: `Facile (${lKm-progKm}km)`, km: lKm-progKm, pace: fmtRange(lMin,lMax), speed: `${fmtSpd(lMax)}–${fmtSpd(lMin)}` },
+          { phase: `Prima parte facile (${lKm - progKm}km)`, km: lKm - progKm,
+            pace: fmtRange(lMin, lMax), speed: `${fmtSpd(lMax)}–${fmtSpd(lMin)}` },
           { phase: `Progressione finale (${progKm}km)`, km: progKm,
             pace: fmtRange(paceZones.marathon.paceMin, paceZones.marathon.paceMax),
             speed: `${fmtSpd(paceZones.marathon.paceMax)}–${fmtSpd(paceZones.marathon.paceMin)}` },
         ],
-        garminNote: `Long run ${lKm}km. Primi ${lKm-progKm}km lento, ultimi ${progKm}km a ritmo maratona.`,
-        rationale: `Resistenza aerobica. ${lKm}km totali.`,
+        garminNote: `Long run ${lKm}km. Primi ${lKm - progKm}km a passo lungo, ultimi ${progKm}km a ritmo maratona. Idratazione ogni 5km.`,
+        rationale: `Resistenza aerobica. Con la gara tra ${daysToRace} giorni, questo è l'ultimo lungo prima del tapering.`,
       };
     }
+
+    if (type === 'interval') {
+      const repKm  = Math.min(qualityKm, 10);
+      const wuKm   = 2, cdKm = 2;
+      const mainKm = Math.max(4, repKm - wuKm - cdKm);
+      const nReps  = Math.max(4, Math.round(mainKm));
+      return {
+        day: dayLabel, daysFromNow, type, title: `Ripetute ${nReps}×1000m`, totalKm: repKm,
+        structure: [
+          { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
+          { phase: `${nReps}×1000m`, km: nReps, pace: fmtRange(iMin, iMax), speed: `${fmtSpd(iMax)}–${fmtSpd(iMin)}`,
+            recovery: `200m a ${_paceStr(midPace(rMin, rMax))}/km (o 90s cammino)` },
+          { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
+        ],
+        garminNote: `Interval Workout: ${nReps}×1000m. Rec: 200m lento o 90s cammino. FC zona 4-5.`,
+        rationale: `VO2max e velocità. Passo target: ${fmtRange(iMin, iMax)}.`,
+      };
+    }
+
+    if (type === 'tempo') {
+      const tempoKm = Math.min(qualityKm, 10);
+      const wuKm = 1.5, cdKm = 1.5;
+      const mainKm = Math.max(4, tempoKm - wuKm - cdKm);
+      return {
+        day: dayLabel, daysFromNow, type, title: 'Tempo run (soglia)', totalKm: tempoKm,
+        structure: [
+          { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
+          { phase: `Soglia continua ${mainKm.toFixed(0)}km`, km: mainKm,
+            pace: fmtRange(tMin, tMax), speed: `${fmtSpd(tMax)}–${fmtSpd(tMin)}` },
+          { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
+        ],
+        garminNote: `Tempo run ${mainKm.toFixed(0)}km continui a ritmo soglia. FC zona 3-4 (165-175 bpm).`,
+        rationale: `Soglia del lattato. Abitua il corpo a sostenere sforzo prolungato.`,
+      };
+    }
+
+    if (type === 'half_marathon_pace') {
+      const hmKm = Math.round(easyKm * 0.9);
+      const wuKm = 1.5, cdKm = 1.5;
+      const mainKm = Math.max(3, hmKm - wuKm - cdKm);
+      return {
+        day: dayLabel, daysFromNow, type: 'race_pace', title: 'Medio a ritmo gara', totalKm: hmKm,
+        structure: [
+          { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
+          { phase: `Ritmo mezza ${mainKm}km`, km: mainKm,
+            pace: fmtRange(hmMin, hmMax), speed: `${fmtSpd(hmMax)}–${fmtSpd(hmMin)}` },
+          { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
+        ],
+        garminNote: `Medio ${hmKm}km. Corpo principale a ritmo gara (${fmtRange(hmMin, hmMax)}). Non forzare — deve sentirsi controllato.`,
+        rationale: `Tapering: attiva le gambe e memorizza il ritmo gara senza caricare.`,
+      };
+    }
+
     if (type === 'recovery') {
       return {
         day: dayLabel, daysFromNow, type, title: 'Corsa rigenerativa', totalKm: recoverKm,
         structure: [
-          { phase: `Rigenerativa ${recoverKm}km`, km: recoverKm, pace: fmtRange(rMin,rMax), speed: `${fmtSpd(rMax)}–${fmtSpd(rMin)}` },
+          { phase: `Rigenerativa ${recoverKm}km`, km: recoverKm,
+            pace: fmtRange(rMin, rMax), speed: `${fmtSpd(rMax)}–${fmtSpd(rMin)}` },
         ],
-        garminNote: `Rigenerativa ${recoverKm}km. FC < 140. Lentissima, priorità recupero.`,
-        rationale: 'Recupero muscolare dopo sessione intensa.',
+        garminNote: `Rigenerativa ${recoverKm}km. FC < 140. Lentissima — priorità recupero muscolare.`,
+        rationale: lastWasHard && daysSinceLast <= 2
+          ? 'Recupero dopo sessione intensa. Non forzare il ritmo.'
+          : 'Mantenimento aerobico, gambe leggere.',
       };
     }
-    // easy (default) — con inserti mezza se non è il primo giorno post-hard
-    // inserti mezza solo se non è il giorno immediatamente dopo un hard
-    const forcedEasyToday = lastRunWasHard && daysSinceLastRun <= 1 && daysFromNow === 1;
-    const useInserti = !forcedEasyToday && daysFromNow > 1 && sequence.findIndex(s=>s.type==='easy' && s.daysFromNow===daysFromNow) > 0;
-    const km = Math.max(8, easyKm);
-    if (useInserti) {
-      return {
-        day: dayLabel, daysFromNow, type: 'easy', title: 'Facile + inserti mezza', totalKm: km,
-        structure: [
-          { phase: 'Riscaldamento', km: 1.5, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
-          { phase: `Facile (${km-4}km)`, km: km-4, pace: fmtRange(eMin,eMax), speed: `${fmtSpd(eMax)}–${fmtSpd(eMin)}` },
-          { phase: '2×1km ritmo mezza', km: 2, pace: fmtRange(hmMin,hmMax), speed: `${fmtSpd(hmMax)}–${fmtSpd(hmMin)}`,
-            recovery: `400m facile a ${_paceStr(midPace(eMin,eMax))}/km` },
-          { phase: 'Defaticamento', km: 1.5, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
-        ],
-        garminNote: `Facile ${km}km con 2×1km a ritmo mezza (${fmtRange(hmMin,hmMax)}). FC < 155.`,
-        rationale: 'Sensibilizzazione al ritmo gara su base di volume facile.',
-      };
-    }
+
+    // easy (default)
+    const isFirstAfterHard = lastWasHard && daysSinceLast <= 1 && daysFromNow <= 2;
     return {
-      day: dayLabel, daysFromNow, type: 'easy', title: 'Corsa facile', totalKm: km,
+      day: dayLabel, daysFromNow, type: 'easy', title: 'Corsa facile', totalKm: easyKm,
       structure: [
-        { phase: `Facile ${km}km`, km, pace: fmtRange(eMin,eMax), speed: `${fmtSpd(eMax)}–${fmtSpd(eMin)}` },
+        { phase: `Facile ${easyKm}km`, km: easyKm,
+          pace: fmtRange(eMin, eMax), speed: `${fmtSpd(eMax)}–${fmtSpd(eMin)}` },
       ],
-      garminNote: `Corsa facile ${km}km. FC < 150. Ritmo conversazionale.`,
-      rationale: daysSinceLastRun <= 1 && lastRunWasHard
-        ? 'Recupero attivo dopo sessione intensa di ieri.'
-        : 'Volume aerobico di base.',
+      garminNote: `Corsa facile ${easyKm}km. FC < 150. Ritmo conversazionale — puoi parlare senza affanno.`,
+      rationale: isFirstAfterHard
+        ? 'Recupero attivo dopo sessione intensa. Tieni il ritmo basso.'
+        : 'Volume aerobico di base. Il 70-80% dell\'allenamento deve essere qui.',
     };
   });
+
+  // ── Nota di fase ──
+  const phaseNote = {
+    load:      `Fase di carico — ${daysToRace} giorni alla gara. Ultimo blocco di stimoli: 1 lungo + 1 qualità.`,
+    taper:     `Tapering — ${daysToRace} giorni alla gara. Riduci il volume del 30%, mantieni la freschezza.`,
+    race_week: `Settimana gara — corri poco e leggero. Gambe fresche il 19 aprile.`,
+    post_race: `Post gara — recupero completo. Niente fretta di ricominciare.`,
+  }[phase];
 
   return {
     sessions,
     weekTarget: baseVol,
-    note: fatigueTrend === 'declining'
-      ? 'Volume ridotto del 15%: carico in crescita, priorità al recupero.'
-      : consistencyScore < 5
-        ? 'Piano conservativo: aumenta prima la frequenza, poi il volume.'
-        : `Volume target: ${baseVol}km (+progressione graduale).`,
+    phase,
+    daysToRace,
+    note: phaseNote,
   };
 }
 
@@ -1292,7 +1320,7 @@ Ripetute: ${_paceStr(paceZones.interval.paceMin)}–${_paceStr(paceZones.interva
     : '';
 
   const pianStr = weeklyPlan
-    ? `PIANO SETTIMANA (${weeklyPlan.weekTarget}km target):\n` +
+    ? `PIANO SETTIMANA — Fase: ${weeklyPlan.phase ?? 'load'} (${weeklyPlan.daysToRace ?? '?'}gg alla gara) — Target: ${weeklyPlan.weekTarget}km\n` +
       weeklyPlan.sessions.map(s =>
         `${s.day}: ${s.title} ${s.totalKm}km — ${s.structure.map(p => `${p.phase} ${p.pace}`).join(' → ')}`
       ).join('\n')
