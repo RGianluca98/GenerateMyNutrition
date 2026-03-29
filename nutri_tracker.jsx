@@ -1044,7 +1044,7 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
 
   // ── Fase periodizzazione ──
   const now      = new Date();
-  const RACE_DATE = new Date('2025-04-19');
+  const RACE_DATE = new Date('2026-04-19');
   const daysToRace = Math.round((RACE_DATE - now) / 86400000);
   const phase = daysToRace > 14 ? 'load' : daysToRace > 7 ? 'taper' : daysToRace > 0 ? 'race_week' : 'post_race';
 
