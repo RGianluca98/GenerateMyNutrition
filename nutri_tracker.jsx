@@ -972,36 +972,13 @@ function generateCoachingInsights(classifiedRuns, metrics) {
     coachMessage = `Continua così. Alterna uscite facili con almeno un allenamento di qualità a settimana per progredire.`;
   }
 
-  // Prossimi allenamenti suggeriti
-  const suggestedNextWorkouts = [];
-  if (!hasLongRun) {
-    suggestedNextWorkouts.push({
-      type: 'long_run',
-      description: 'Uscita lunga 18-22 km controllata',
-      targetPace: avgEasyPace ? `${_paceStr(avgEasyPace)}/km` : 'ritmo facile',
-    });
-  }
-  if (!hasQuality) {
-    const tPace = avgRacePaceWorkout ?? (avgEasyPace ? avgEasyPace - 0.6 : null);
-    suggestedNextWorkouts.push({
-      type: 'tempo',
-      description: 'Tempo run 6-8 km a ritmo soglia',
-      targetPace: tPace ? `${_paceStr(tPace)}/km` : 'ritmo sostenuto',
-    });
-  }
-  // Sempre: uscita facile di recupero
-  suggestedNextWorkouts.push({
-    type: 'easy',
-    description: 'Corsa facile rigenerativa 8-10 km',
-    targetPace: avgEasyPace ? `${_paceStr(avgEasyPace + 0.3)}/km` : 'ritmo facile',
-  });
-
   return {
     strengths: strengths.slice(0, 3),
     weaknesses: weaknesses.slice(0, 3),
     observations: observations.slice(0, 4),
     coachMessage,
-    suggestedNextWorkouts: suggestedNextWorkouts.slice(0, 3),
+    // suggestedNextWorkouts è ora derivato da weeklyPlan nel pannello UI
+    // per evitare incoerenze tra le due sorgenti
   };
 }
 
@@ -1063,21 +1040,40 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
   else if (fatigueTrend === 'improving') baseVol = Math.round(baseVol * 1.05);
   else baseVol = Math.round(baseVol * 1.02);
 
-  // Verifica se c'è stato un lungo recente e una qualità recente
+  // Giorno corrente: 0=Dom, 1=Lun, 2=Mar, 3=Mer, 4=Gio, 5=Ven, 6=Sab
   const now = new Date();
+  const todayDow = now.getDay();
+  // Calcola quanti giorni mancano a un dato giorno della settimana (da oggi, escluso oggi)
+  const daysUntil = (targetDow) => ((targetDow - todayDow + 7) % 7) || 7;
+  const dayNames  = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+
+  // Struttura fissa: qualità=Mar(2), facile=Gio(4), lungo=Sab(6), recovery=Dom(0→prossima)
+  // Se oggi è già passato quel giorno, punta alla settimana prossima (daysUntil gestisce già)
+  const dayQuality  = 2; // Martedì
+  const dayEasy     = 4; // Giovedì
+  const dayLong     = 6; // Sabato
+  const dayRecovery = 0; // Domenica (prossima)
+
+  // Verifica se c'è stato un lungo/qualità negli ultimi 7 giorni (non 14 come prima)
+  // Così se oggi è domenica e sabato ha fatto il lungo, non lo ripropone
+  const ms7  = 7  * 86400000;
   const ms14 = 14 * 86400000;
-  const recentTypes = classifiedRuns
+  const recentTypes7  = classifiedRuns
+    .filter(r => new Date(r.date) >= new Date(now - ms7))
+    .map(r => r.classification?.workoutType);
+  const recentTypes14 = classifiedRuns
     .filter(r => new Date(r.date) >= new Date(now - ms14))
     .map(r => r.classification?.workoutType);
-  const hadLong     = recentTypes.includes('long_run');
-  const hadQuality  = recentTypes.some(t => ['tempo','threshold','interval','race_pace'].includes(t));
+  const hadLong    = recentTypes7.includes('long_run');
+  const hadQuality = recentTypes7.some(t => ['tempo','threshold','interval','race_pace'].includes(t));
 
   // Distribuzione volume: lungo ~30%, qualità ~20%, facile resto
-  const longKm     = Math.round(baseVol * 0.30);
-  const qualityKm  = Math.round(baseVol * 0.20);
-  const easyKm     = Math.round(baseVol * 0.25);
-  const recoverKm  = 6;
+  const longKm    = Math.round(baseVol * 0.30);
+  const qualityKm = Math.round(baseVol * 0.20);
+  const easyKm    = Math.round(baseVol * 0.25);
+  const recoverKm = 6;
 
+  // sessions accumulate con daysFromNow per ordinare dal più prossimo al più lontano
   const sessions = [];
 
   // Sessione 1: Martedì — Qualità
@@ -1088,8 +1084,8 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
     const nReps = Math.max(4, Math.round(mainKm));
     const repDist = 1; // 1000m
     sessions.push({
-      day: 'Martedì', type: 'interval', title: 'Ripetute 1000m',
-      totalKm: repKm,
+      day: dayNames[dayQuality], daysFromNow: daysUntil(dayQuality),
+      type: 'interval', title: 'Ripetute 1000m', totalKm: repKm,
       structure: [
         { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
         { phase: `${nReps}×1000m`, km: nReps * repDist, pace: fmtRange(iMin, iMax),
@@ -1101,12 +1097,11 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
       rationale: `Sviluppo VO2max e velocità di gara. Passo target ripetute: ${fmtRange(iMin,iMax)}.`,
     });
   } else {
-    // Tempo run
     const tempoKm = Math.min(qualityKm, 10);
     const wuKm = 1.5, cdKm = 1.5, mainKm = tempoKm - wuKm - cdKm;
     sessions.push({
-      day: 'Martedì', type: 'tempo', title: 'Tempo run',
-      totalKm: tempoKm,
+      day: dayNames[dayQuality], daysFromNow: daysUntil(dayQuality),
+      type: 'tempo', title: 'Tempo run', totalKm: tempoKm,
       structure: [
         { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
         { phase: `Corpo a ritmo soglia (${mainKm.toFixed(1)}km)`, km: mainKm, pace: fmtRange(tMin,tMax), speed: `${fmtSpd(tMax)}–${fmtSpd(tMin)}` },
@@ -1117,10 +1112,10 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
     });
   }
 
-  // Sessione 2: Giovedì — Corsa facile con inserti a ritmo mezza
+  // Sessione 2: Giovedì — Facile con inserti mezza
   sessions.push({
-    day: 'Giovedì', type: 'easy', title: 'Facile + inserti mezza',
-    totalKm: easyKm,
+    day: dayNames[dayEasy], daysFromNow: daysUntil(dayEasy),
+    type: 'easy', title: 'Facile + inserti mezza', totalKm: easyKm,
     structure: [
       { phase: 'Riscaldamento', km: 1.5, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
       { phase: `Facile (${(easyKm-4).toFixed(0)}km)`, km: easyKm-4, pace: fmtRange(eMin,eMax), speed: `${fmtSpd(eMax)}–${fmtSpd(eMin)}` },
@@ -1132,13 +1127,13 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
     rationale: 'Sensibilizzazione al ritmo gara in contesto di volume facile.',
   });
 
-  // Sessione 3: Sabato — Lungo
+  // Sessione 3: Sabato — Lungo (o medio-lungo se già fatto)
   if (!hadLong) {
     const lKm = Math.max(longKm, 16);
-    const progKm = Math.round(lKm * 0.3); // ultimi 30% a ritmo maratona
+    const progKm = Math.round(lKm * 0.3);
     sessions.push({
-      day: 'Sabato', type: 'long_run', title: 'Lungo progressivo',
-      totalKm: lKm,
+      day: dayNames[dayLong], daysFromNow: daysUntil(dayLong),
+      type: 'long_run', title: 'Lungo progressivo', totalKm: lKm,
       structure: [
         { phase: `Prima parte facile (${(lKm - progKm).toFixed(0)}km)`, km: lKm-progKm, pace: fmtRange(lMin,lMax), speed: `${fmtSpd(lMax)}–${fmtSpd(lMin)}` },
         { phase: `Progressione finale (${progKm}km)`, km: progKm,
@@ -1150,8 +1145,8 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
     });
   } else {
     sessions.push({
-      day: 'Sabato', type: 'easy', title: 'Corsa facile medio-lunga',
-      totalKm: Math.round(longKm * 0.75),
+      day: dayNames[dayLong], daysFromNow: daysUntil(dayLong),
+      type: 'easy', title: 'Corsa facile medio-lunga', totalKm: Math.round(longKm * 0.75),
       structure: [
         { phase: `Corsa facile uniforme (${Math.round(longKm*0.75)}km)`, km: Math.round(longKm*0.75),
           pace: fmtRange(eMin,eMax), speed: `${fmtSpd(eMax)}–${fmtSpd(eMin)}` },
@@ -1161,10 +1156,10 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
     });
   }
 
-  // Sessione 4: Domenica — Rigenerativa (sempre)
+  // Sessione 4: Domenica — Rigenerativa
   sessions.push({
-    day: 'Domenica', type: 'recovery', title: 'Corsa rigenerativa',
-    totalKm: recoverKm,
+    day: dayNames[dayRecovery], daysFromNow: daysUntil(dayRecovery),
+    type: 'recovery', title: 'Corsa rigenerativa', totalKm: recoverKm,
     structure: [
       { phase: `Corsa rigenerativa (${recoverKm}km)`, km: recoverKm,
         pace: fmtRange(rMin, rMax), speed: `${fmtSpd(rMax)}–${fmtSpd(rMin)}` },
@@ -1172,6 +1167,9 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
     garminNote: `Rigenerativa ${recoverKm}km. Andatura lentissima. FC < 140. Priorità al recupero muscolare.`,
     rationale: 'Smaltimento delle scorie metaboliche post-sessioni qualitative.',
   });
+
+  // Ordina le sessioni dal più vicino al più lontano nel tempo
+  sessions.sort((a, b) => a.daysFromNow - b.daysFromNow);
 
   return {
     sessions,
@@ -2535,18 +2533,24 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan }
           </div>
         )}
 
-        {/* Prossimi allenamenti */}
-        {insights.suggestedNextWorkouts.length > 0 && (
+        {/* Prossimi allenamenti — derivati direttamente dal piano settimanale */}
+        {weeklyPlan && weeklyPlan.sessions.length > 0 && (
           <div style={cardStyle}>
             <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'8px'}}>PROSSIMI ALLENAMENTI</div>
             <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-              {insights.suggestedNextWorkouts.map((w,i) => (
-                <div key={i} style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                  <span style={badgeStyle(w.type)}>{WORKOUT_LABELS[w.type]??w.type}</span>
-                  <span style={{fontSize:'12px',color:'var(--text)',flex:1}}>{w.description}</span>
-                  <span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600,whiteSpace:'nowrap'}}>{w.targetPace}</span>
-                </div>
-              ))}
+              {weeklyPlan.sessions.slice(0, 2).map((s, i) => {
+                const daysLabel = s.daysFromNow === 1 ? 'domani'
+                  : s.daysFromNow === 7 ? 'domenica prossima'
+                  : `tra ${s.daysFromNow} giorni`;
+                return (
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                    <span style={badgeStyle(s.type)}>{WORKOUT_LABELS[s.type]??s.type}</span>
+                    <span style={{fontSize:'12px',color:'var(--text)',flex:1}}>{s.day} — {s.title}</span>
+                    <span style={{fontSize:'11px',color:'var(--text3)',whiteSpace:'nowrap'}}>{daysLabel}</span>
+                    <span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600,whiteSpace:'nowrap'}}>{s.totalKm} km</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
