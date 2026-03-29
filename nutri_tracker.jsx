@@ -1040,34 +1040,25 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
   else if (fatigueTrend === 'improving') baseVol = Math.round(baseVol * 1.05);
   else baseVol = Math.round(baseVol * 1.02);
 
-  // ── Analisi storico per capire le abitudini reali ──
+  // ── Analisi storico ──
   const now = new Date();
   const ms7  = 7  * 86400000;
   const ms14 = 14 * 86400000;
   const dayNames = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 
-  // Frequenza reale: media corse/settimana nelle ultime 4 settimane
-  const runsLast28 = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - 28*86400000));
-  const avgRunsPerWeek = Math.round(runsLast28.length / 4);
-  // Numero sessioni target: usa la media reale, max 6, min 3
-  const targetSessions = Math.min(6, Math.max(3, avgRunsPerWeek));
-
-  // Ultima corsa fatta: tipo e giorno
-  const lastRun = classifiedRuns[0]; // già ordinati per data desc
+  // Ultima corsa fatta
+  const lastRun = classifiedRuns[0];
   const lastRunDate = lastRun ? new Date(lastRun.date) : null;
-  const lastRunDow = lastRunDate ? lastRunDate.getDay() : null;
-  const daysSinceLastRun = lastRunDate
-    ? Math.round((now - lastRunDate) / 86400000)
-    : 99;
+  const daysSinceLastRun = lastRunDate ? Math.round((now - lastRunDate) / 86400000) : 99;
   const lastRunType = lastRun?.classification?.workoutType ?? null;
+  const lastRunWasHard = ['tempo','threshold','interval','race_pace','long_run'].includes(lastRunType);
 
-  // Tipi fatti di recente (7gg) per evitare ripetizioni immediate
+  // Tipi fatti di recente
   const recentTypes = classifiedRuns
     .filter(r => new Date(r.date) >= new Date(now - ms7))
     .map(r => r.classification?.workoutType);
   const hadLong    = recentTypes.includes('long_run');
   const hadQuality = recentTypes.some(t => ['tempo','threshold','interval','race_pace'].includes(t));
-  // Quante qualità nelle ultime 2 settimane (per bilanciare intensità)
   const qualityCount14 = classifiedRuns
     .filter(r => new Date(r.date) >= new Date(now - ms14))
     .filter(r => ['tempo','threshold','interval','race_pace'].includes(r.classification?.workoutType))
@@ -1079,63 +1070,35 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
   const easyKm    = Math.round(baseVol * 0.25);
   const recoverKm = Math.max(6, Math.round(baseVol * 0.08));
 
-  // ── Costruzione sessioni con regole di sicurezza ──
-  // Regole:
-  // 1. Mai 2 sessioni hard (quality/long) consecutive
-  // 2. Dopo una hard: sempre easy o recovery il giorno dopo
-  // 3. Il lungo va collocato preferibilmente 2+ giorni prima di fine settimana
-  // 4. Recovery dopo il lungo
-  // 5. Il primo giorno disponibile dopo riposo è sempre easy (non hard)
+  // ── Piano settimanale fisso Lun-Dom con tipi adattivi ──
+  // Struttura base: Lun easy, Mar qualità, Mer facile, Gio facile, Ven riposo, Sab lungo, Dom recovery
+  // Adattamenti: se già fatto lungo/qualità questa settimana → sostituisce con easy
+  // Se ieri era hard e domani è il giorno successivo → forza easy/recovery
 
-  // Determina se il giorno successivo (domani) deve essere obbligatoriamente easy/recovery
-  // perché oggi o ieri si è fatto un hard
-  const lastRunWasHard = ['tempo','threshold','interval','race_pace','long_run'].includes(lastRunType);
-  const forcedEasyTomorrow = lastRunWasHard && daysSinceLastRun <= 1;
+  // Giorni fissi della settimana (0=Dom, 1=Lun, ..., 6=Sab)
+  const weekPlan = [
+    { dow: 1, defaultType: 'easy' },                                          // Lunedì
+    { dow: 2, defaultType: !hadQuality ? (qualityCount14 === 0 ? 'interval' : 'tempo') : 'easy' }, // Martedì
+    { dow: 3, defaultType: 'easy' },                                          // Mercoledì
+    { dow: 4, defaultType: 'easy' },                                          // Giovedì
+    { dow: 6, defaultType: !hadLong ? 'long_run' : 'easy' },                  // Sabato
+    { dow: 0, defaultType: 'recovery' },                                      // Domenica
+  ];
 
-  // Costruisce la sequenza di tipo sessione per i prossimi targetSessions giorni
-  // a partire da domani (offset +1)
-  const sequence = [];
-  let hardCount = 0;
-  let prevWasHard = forcedEasyTomorrow; // se ieri/oggi era hard, domani è già forzato easy
+  // Calcola daysFromNow per ogni giorno della settimana
+  const todayDow = now.getDay();
+  const sequence = weekPlan.map(({ dow, defaultType }) => {
+    let diff = dow - todayDow;
+    if (diff <= 0) diff += 7; // sempre nel futuro
+    const daysFromNow = diff;
 
-  // Template di sessione: quale tipo e priorità
-  // L'ordine preferenziale dentro la settimana:
-  // se non c'è ancora il lungo → lungo è priorità alta
-  // se non c'è qualità → qualità è priorità media
-  // il resto è easy/recovery
-  const needsLong    = !hadLong;
-  const needsQuality = !hadQuality && qualityCount14 < 2;
-  const maxHardPerWeek = targetSessions <= 4 ? 1 : 2; // max 2 hard su 5-6 sessioni
-
-  for (let i = 0; i < targetSessions; i++) {
-    const daysFromNow = i + 1; // inizia da domani
-    let type;
-
-    if (prevWasHard) {
-      // Regola: dopo hard → obbligatoriamente easy o recovery
-      type = daysFromNow <= 2 ? 'recovery' : 'easy';
-      prevWasHard = false;
-    } else if (needsLong && hardCount < maxHardPerWeek && i >= Math.floor(targetSessions * 0.5)) {
-      // Lungo: nella seconda metà della settimana, non consecutivo con altro hard
-      type = 'long_run';
-      hardCount++;
-      prevWasHard = true;
-    } else if (needsQuality && hardCount < maxHardPerWeek && i > 0 && sequence[i-1]?.type !== 'long_run') {
-      // Qualità: non il primo giorno, non subito dopo il lungo
-      type = qualityCount14 === 0 ? 'interval' : 'tempo';
-      hardCount++;
-      prevWasHard = true;
-    } else if (i === targetSessions - 1 && lastRunWasHard) {
-      // Ultima sessione della settimana dopo un hard: recovery
-      type = 'recovery';
-      prevWasHard = false;
-    } else {
-      type = i === 0 && daysSinceLastRun >= 1 ? 'easy' : 'easy';
-      prevWasHard = false;
+    // Se domani (daysFromNow===1) e ieri/oggi era hard → forza easy o recovery
+    let type = defaultType;
+    if (daysFromNow === 1 && lastRunWasHard && daysSinceLastRun <= 1) {
+      type = defaultType === 'long_run' ? 'recovery' : 'easy';
     }
-
-    sequence.push({ daysFromNow, type });
-  }
+    return { daysFromNow, type };
+  }).sort((a, b) => a.daysFromNow - b.daysFromNow);
 
   // ── Crea le sessioni dettagliate dalla sequenza ──
   const sessions = sequence.map(({ daysFromNow, type }) => {
@@ -1199,7 +1162,9 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
       };
     }
     // easy (default) — con inserti mezza se non è il primo giorno post-hard
-    const useInserti = !forcedEasyTomorrow && daysFromNow > 1 && sequence.findIndex(s=>s.type==='easy' && s.daysFromNow===daysFromNow) > 0;
+    // inserti mezza solo se non è il giorno immediatamente dopo un hard
+    const forcedEasyToday = lastRunWasHard && daysSinceLastRun <= 1 && daysFromNow === 1;
+    const useInserti = !forcedEasyToday && daysFromNow > 1 && sequence.findIndex(s=>s.type==='easy' && s.daysFromNow===daysFromNow) > 0;
     const km = Math.max(8, easyKm);
     if (useInserti) {
       return {
