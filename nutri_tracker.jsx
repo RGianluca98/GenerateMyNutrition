@@ -1005,8 +1005,187 @@ function generateCoachingInsights(classifiedRuns, metrics) {
   };
 }
 
+/** Calcola le zone di ritmo personalizzate basate sulla stima di ritmo mezza maratona.
+ *  Usa la formula di Daniels: le zone sono offset dal ritmo gara target (HMP).
+ *  Ogni zona include range passo (min/km) e velocità (km/h) per il Garmin. */
+function calcPaceZones(metrics) {
+  // HMP = Half Marathon Pace (min/km come float)
+  // Fallback: se non c'è stima, si approssima da avgEasyPace
+  const hmp = metrics.estimatedHalfMarathonPace
+    ?? (metrics.avgEasyPace ? metrics.avgEasyPace - 0.9 : null);
+  if (!hmp || !isFinite(hmp) || hmp <= 0) return null;
+
+  const zone = (minOffset, maxOffset, label, desc, type) => {
+    const pMin = hmp + minOffset;
+    const pMax = hmp + maxOffset;
+    // velocità km/h = 60 / passo_min_km
+    return {
+      label, desc, type,
+      paceMin: pMin, paceMax: pMax,
+      speedMin: Math.round((60 / pMax) * 10) / 10,  // velocità min (passo più lento)
+      speedMax: Math.round((60 / pMin) * 10) / 10,  // velocità max (passo più veloce)
+    };
+  };
+
+  return {
+    recovery:    zone(1.8,  2.5,  'Rigenerativa',   'Recupero attivo, conversazione facile',          'recovery'),
+    easy:        zone(0.9,  1.7,  'Facile',          'Base aerobica, respiro controllato',             'easy'),
+    longRun:     zone(0.6,  1.5,  'Lungo',           'Fondo lungo, ultimo terzo leggermente più veloce','long_run'),
+    marathon:    zone(0.2,  0.5,  'Ritmo Maratona',  'Ritmo maratona (riferimento progressione)',      'progression'),
+    halfMarathon:zone(-0.05, 0.1, 'Ritmo Mezza ★',  'Ritmo gara obiettivo — mezza maratona',          'race_pace'),
+    tempo:       zone(-0.4, -0.1, 'Tempo/Soglia',   '20-40 min continui a sforzo sostenuto',          'tempo'),
+    interval:    zone(-1.2, -0.5, 'Ripetute',        'Ripetizioni brevi (400-1200m) con recupero',     'interval'),
+    hmp, // esposto per uso nei componenti
+  };
+}
+
+/** Genera un piano di allenamento settimanale dettagliato con struttura per Garmin.
+ *  Adatta volume e intensità a metriche reali e obiettivo mezza maratona. */
+function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
+  if (!paceZones) return null;
+  const { weeklyVolumeKm, consistencyScore, fatigueTrend, avgEasyPace } = metrics;
+  const { paceMin: eMin, paceMax: eMax } = paceZones.easy;
+  const { paceMin: rMin, paceMax: rMax } = paceZones.recovery;
+  const { paceMin: lMin, paceMax: lMax } = paceZones.longRun;
+  const { paceMin: tMin, paceMax: tMax } = paceZones.tempo;
+  const { paceMin: iMin, paceMax: iMax } = paceZones.interval;
+  const { paceMin: hmMin, paceMax: hmMax } = paceZones.halfMarathon;
+
+  // Helper: passo medio di una zona
+  const midPace = (min, max) => (min + max) / 2;
+  const fmtZ = (p) => `${_paceStr(p)}/km`;
+  const fmtSpd = (p) => `${(60/p).toFixed(1)} km/h`;
+  const fmtRange = (min, max) => `${_paceStr(min)}–${_paceStr(max)}/km (${fmtSpd(max)}–${fmtSpd(min)})`;
+
+  // Calcola volume target settimana
+  let baseVol = Math.max(weeklyVolumeKm, 20); // minimo 20km/sett
+  if (fatigueTrend === 'declining') baseVol = Math.round(baseVol * 0.85);
+  else if (fatigueTrend === 'improving') baseVol = Math.round(baseVol * 1.05);
+  else baseVol = Math.round(baseVol * 1.02);
+
+  // Verifica se c'è stato un lungo recente e una qualità recente
+  const now = new Date();
+  const ms14 = 14 * 86400000;
+  const recentTypes = classifiedRuns
+    .filter(r => new Date(r.date) >= new Date(now - ms14))
+    .map(r => r.classification?.workoutType);
+  const hadLong     = recentTypes.includes('long_run');
+  const hadQuality  = recentTypes.some(t => ['tempo','threshold','interval','race_pace'].includes(t));
+
+  // Distribuzione volume: lungo ~30%, qualità ~20%, facile resto
+  const longKm     = Math.round(baseVol * 0.30);
+  const qualityKm  = Math.round(baseVol * 0.20);
+  const easyKm     = Math.round(baseVol * 0.25);
+  const recoverKm  = 6;
+
+  const sessions = [];
+
+  // Sessione 1: Martedì — Qualità
+  if (!hadQuality) {
+    // Ripetute
+    const repKm = Math.min(qualityKm, 12);
+    const wuKm = 2, cdKm = 2, mainKm = repKm - wuKm - cdKm;
+    const nReps = Math.max(4, Math.round(mainKm));
+    const repDist = 1; // 1000m
+    sessions.push({
+      day: 'Martedì', type: 'interval', title: 'Ripetute 1000m',
+      totalKm: repKm,
+      structure: [
+        { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
+        { phase: `${nReps}×1000m`, km: nReps * repDist, pace: fmtRange(iMin, iMax),
+          speed: `${fmtSpd(iMax)}–${fmtSpd(iMin)}`,
+          recovery: `200m recupero a ${_paceStr(midPace(rMin,rMax))}/km (oppure 90s cammino)` },
+        { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
+      ],
+      garminNote: `Interval Workout: ${nReps} ripetizioni × 1000m. Recupero: 200m lento o 90s cammino. FC: zona 4-5.`,
+      rationale: `Sviluppo VO2max e velocità di gara. Passo target ripetute: ${fmtRange(iMin,iMax)}.`,
+    });
+  } else {
+    // Tempo run
+    const tempoKm = Math.min(qualityKm, 10);
+    const wuKm = 1.5, cdKm = 1.5, mainKm = tempoKm - wuKm - cdKm;
+    sessions.push({
+      day: 'Martedì', type: 'tempo', title: 'Tempo run',
+      totalKm: tempoKm,
+      structure: [
+        { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
+        { phase: `Corpo a ritmo soglia (${mainKm.toFixed(1)}km)`, km: mainKm, pace: fmtRange(tMin,tMax), speed: `${fmtSpd(tMax)}–${fmtSpd(tMin)}` },
+        { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
+      ],
+      garminNote: `Tempo run: ${mainKm.toFixed(1)}km continui a passo soglia. FC: zona 3 alta (165-175 bpm).`,
+      rationale: `Innalza la soglia del lattato. Passo target: ${fmtRange(tMin,tMax)}.`,
+    });
+  }
+
+  // Sessione 2: Giovedì — Corsa facile con inserti a ritmo mezza
+  sessions.push({
+    day: 'Giovedì', type: 'easy', title: 'Facile + inserti mezza',
+    totalKm: easyKm,
+    structure: [
+      { phase: 'Riscaldamento', km: 1.5, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
+      { phase: `Facile (${(easyKm-4).toFixed(0)}km)`, km: easyKm-4, pace: fmtRange(eMin,eMax), speed: `${fmtSpd(eMax)}–${fmtSpd(eMin)}` },
+      { phase: '2×1km a ritmo mezza', km: 2, pace: fmtRange(hmMin,hmMax), speed: `${fmtSpd(hmMax)}–${fmtSpd(hmMin)}`,
+        recovery: `400m facile a ${_paceStr(midPace(eMin,eMax))}/km tra le ripetizioni` },
+      { phase: 'Defaticamento', km: 1.5, pace: fmtZ(midPace(eMin,eMax)), speed: fmtSpd(midPace(eMin,eMax)) },
+    ],
+    garminNote: `Corsa facile. Inserisci 2×1km a ritmo mezza (${fmtRange(hmMin,hmMax)}). FC base < 155.`,
+    rationale: 'Sensibilizzazione al ritmo gara in contesto di volume facile.',
+  });
+
+  // Sessione 3: Sabato — Lungo
+  if (!hadLong) {
+    const lKm = Math.max(longKm, 16);
+    const progKm = Math.round(lKm * 0.3); // ultimi 30% a ritmo maratona
+    sessions.push({
+      day: 'Sabato', type: 'long_run', title: 'Lungo progressivo',
+      totalKm: lKm,
+      structure: [
+        { phase: `Prima parte facile (${(lKm - progKm).toFixed(0)}km)`, km: lKm-progKm, pace: fmtRange(lMin,lMax), speed: `${fmtSpd(lMax)}–${fmtSpd(lMin)}` },
+        { phase: `Progressione finale (${progKm}km)`, km: progKm,
+          pace: fmtRange(paceZones.marathon.paceMin, paceZones.marathon.paceMax),
+          speed: `${fmtSpd(paceZones.marathon.paceMax)}–${fmtSpd(paceZones.marathon.paceMin)}` },
+      ],
+      garminNote: `Long run ${lKm}km. Primi ${lKm-progKm}km lento. Ultimi ${progKm}km a ritmo maratona. Idratazione ogni 5km.`,
+      rationale: `Sviluppo resistenza e adattamento metabolico. Kilometraggio totale: ${lKm}km.`,
+    });
+  } else {
+    sessions.push({
+      day: 'Sabato', type: 'easy', title: 'Corsa facile medio-lunga',
+      totalKm: Math.round(longKm * 0.75),
+      structure: [
+        { phase: `Corsa facile uniforme (${Math.round(longKm*0.75)}km)`, km: Math.round(longKm*0.75),
+          pace: fmtRange(eMin,eMax), speed: `${fmtSpd(eMax)}–${fmtSpd(eMin)}` },
+      ],
+      garminNote: `Medio-lungo ${Math.round(longKm*0.75)}km a passo facile. FC max 155. Hai già fatto il lungo di recente.`,
+      rationale: 'Volume aerobico senza stress — hai già il lungo fatto.',
+    });
+  }
+
+  // Sessione 4: Domenica — Rigenerativa (sempre)
+  sessions.push({
+    day: 'Domenica', type: 'recovery', title: 'Corsa rigenerativa',
+    totalKm: recoverKm,
+    structure: [
+      { phase: `Corsa rigenerativa (${recoverKm}km)`, km: recoverKm,
+        pace: fmtRange(rMin, rMax), speed: `${fmtSpd(rMax)}–${fmtSpd(rMin)}` },
+    ],
+    garminNote: `Rigenerativa ${recoverKm}km. Andatura lentissima. FC < 140. Priorità al recupero muscolare.`,
+    rationale: 'Smaltimento delle scorie metaboliche post-sessioni qualitative.',
+  });
+
+  return {
+    sessions,
+    weekTarget: baseVol,
+    note: fatigueTrend === 'declining'
+      ? 'Volume ridotto del 15%: carico in crescita, priorità al recupero.'
+      : consistencyScore < 5
+        ? 'Piano conservativo: aumenta prima la frequenza, poi il volume.'
+        : `Volume target: ${baseVol}km (+progressione graduale).`,
+  };
+}
+
 /** Costruisce una stringa di contesto sintetica da passare al system prompt di Claude. */
-function buildRunningContext(classifiedRuns, metrics, insights) {
+function buildRunningContext(classifiedRuns, metrics, insights, paceZones, weeklyPlan) {
   const {
     weeklyVolumeKm, monthlyVolumeKm, runsLast7Days, runsLast30Days,
     consistencyScore, fatigueTrend, estimated10kTime,
@@ -1018,20 +1197,36 @@ function buildRunningContext(classifiedRuns, metrics, insights) {
     return `- ${r.date} "${r.title}": ${type} ${r.distanceKm.toFixed(1)}km @${_paceStr(r.avgPaceMinKm)}/km`;
   }).join('\n');
 
-  const stime = estimated10kTime
-    ? `10km: ${_timeStr(estimated10kTime)} | Mezza: ${_timeStr(estimatedHalfMarathonTime)} @${_paceStr(estimatedHalfMarathonPace)}/km`
+  const stime = estimatedHalfMarathonTime
+    ? `Mezza: ${_timeStr(estimatedHalfMarathonTime)} @${_paceStr(estimatedHalfMarathonPace)}/km${estimated10kTime ? ` | 10km: ${_timeStr(estimated10kTime)}` : ''}`
     : 'Dati insufficienti per stime di gara';
 
-  return `=== ANALISI CORSA ===
-Volume: ${weeklyVolumeKm}km/sett | ${monthlyVolumeKm}km/mese | Uscite: ${runsLast7Days}(7gg) ${runsLast30Days}(30gg) | Costanza: ${consistencyScore}/10 | Trend carico: ${fatigueTrend}
+  const zoneStr = paceZones
+    ? `ZONE DI RITMO (target mezza):
+Rigenerativa: ${_paceStr(paceZones.recovery.paceMin)}–${_paceStr(paceZones.recovery.paceMax)}/km
+Facile: ${_paceStr(paceZones.easy.paceMin)}–${_paceStr(paceZones.easy.paceMax)}/km
+Lungo: ${_paceStr(paceZones.longRun.paceMin)}–${_paceStr(paceZones.longRun.paceMax)}/km
+Ritmo mezza: ${_paceStr(paceZones.halfMarathon.paceMin)}–${_paceStr(paceZones.halfMarathon.paceMax)}/km
+Soglia/Tempo: ${_paceStr(paceZones.tempo.paceMin)}–${_paceStr(paceZones.tempo.paceMax)}/km
+Ripetute: ${_paceStr(paceZones.interval.paceMin)}–${_paceStr(paceZones.interval.paceMax)}/km`
+    : '';
 
+  const pianStr = weeklyPlan
+    ? `PIANO SETTIMANA (${weeklyPlan.weekTarget}km target):\n` +
+      weeklyPlan.sessions.map(s =>
+        `${s.day}: ${s.title} ${s.totalKm}km — ${s.structure.map(p => `${p.phase} ${p.pace}`).join(' → ')}`
+      ).join('\n')
+    : '';
+
+  return `=== ANALISI CORSA ===
+Volume: ${weeklyVolumeKm}km/sett | ${monthlyVolumeKm}km/mese | Uscite: ${runsLast7Days}(7gg) | Costanza: ${consistencyScore}/10 | Carico: ${fatigueTrend}
 ULTIME 5 CORSE:
 ${recentLabels}
-
-FORZE: ${insights.strengths.join(' | ') || 'nessuna identificata'}
-AREE DI MIGLIORAMENTO: ${insights.weaknesses.join(' | ') || 'nessuna'}
-STIME PERFORMANCE: ${stime}
-PROSSIMI ALLENAMENTI: ${insights.suggestedNextWorkouts.map(w => `${w.type} (${w.targetPace})`).join(', ')}`.slice(0, 900);
+STIME: ${stime}
+${zoneStr}
+${pianStr}
+FORZE: ${insights.strengths.join(' | ') || 'nessuna'}
+AREE: ${insights.weaknesses.join(' | ') || 'nessuna'}`.slice(0, 1800);
 }
 
 // ── PESO VIEW ─────────────────────────────────────────────────
@@ -2034,6 +2229,164 @@ function QtyEditor({value,uom,onSave,onCancel}){
   );
 }
 
+// ── RUNNING COACH COMPONENTS ───────────────────────────────────
+
+/** Leggenda visiva delle zone di ritmo, calibrata sulla stima mezza maratona. */
+function PaceZonesCard({ paceZones }) {
+  if (!paceZones) return null;
+
+  const zones = [
+    { key: 'recovery',    color: '#5A6888' },
+    { key: 'easy',        color: '#00C49A' },
+    { key: 'longRun',     color: '#FBA828' },
+    { key: 'marathon',    color: '#9b59b6' },
+    { key: 'halfMarathon',color: '#FF6B35' },
+    { key: 'tempo',       color: '#e05c5c' },
+    { key: 'interval',    color: '#4c8cde' },
+  ];
+
+  return (
+    <div style={{background:'var(--card)',borderRadius:'16px',border:'1px solid var(--border)',padding:'14px'}}>
+      <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'4px'}}>
+        ZONE DI RITMO — TARGET: MEZZA MARATONA
+      </div>
+      <div style={{fontSize:'11px',color:'var(--text3)',marginBottom:'10px'}}>
+        Basato su stima gara: <span style={{color:'var(--accent)',fontWeight:700}}>
+          {_paceStr(paceZones.hmp)}/km
+        </span>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
+        {zones.map(({key,color})=>{
+          const z = paceZones[key];
+          if (!z) return null;
+          const isTarget = key === 'halfMarathon';
+          return (
+            <div key={key} style={{
+              display:'flex', alignItems:'center', gap:'10px',
+              padding:'7px 10px', borderRadius:'10px',
+              background: isTarget ? 'var(--accent-soft)' : 'var(--surface)',
+              border: isTarget ? '1px solid var(--accent)' : '1px solid transparent',
+            }}>
+              {/* Barra colorata */}
+              <div style={{width:'4px',height:'36px',borderRadius:'2px',background:color,flexShrink:0}}/>
+              {/* Nome zona */}
+              <div style={{minWidth:'110px'}}>
+                <div style={{fontSize:'12px',fontWeight:700,color: isTarget ? 'var(--accent)' : 'var(--text)'}}>
+                  {z.label}
+                </div>
+                <div style={{fontSize:'10px',color:'var(--text3)',lineHeight:'1.3'}}>{z.desc}</div>
+              </div>
+              {/* Range passo */}
+              <div style={{flex:1,textAlign:'right'}}>
+                <div style={{fontSize:'13px',fontWeight:700,color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>
+                  {_paceStr(z.paceMin)}–{_paceStr(z.paceMax)}<span style={{fontSize:'10px',fontWeight:400,color:'var(--text3)'}}>/km</span>
+                </div>
+                <div style={{fontSize:'10px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}}>
+                  {z.speedMin}–{z.speedMax} km/h
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'8px',lineHeight:'1.5'}}>
+        Le zone si ricalcolano automaticamente ad ogni nuova attività. Inserisci la velocità in km/h sul Garmin.
+      </div>
+    </div>
+  );
+}
+
+/** Piano di allenamento settimanale con sessioni dettagliate per Garmin. */
+function WeeklyPlanCard({ weeklyPlan }) {
+  if (!weeklyPlan) return null;
+  const [openIdx, setOpenIdx] = React.useState(null);
+
+  const typeColors = {
+    interval:'#4c8cde', tempo:'#e05c5c', easy:'#00C49A',
+    long_run:'#FBA828', recovery:'#5A6888', race_pace:'#FF6B35',
+    progression:'#9b59b6', threshold:'#c44c9a',
+  };
+  const typeLabels = {
+    interval:'Ripetute', tempo:'Tempo', easy:'Facile',
+    long_run:'Lungo', recovery:'Recovery', race_pace:'Gara',
+    progression:'Progressione', threshold:'Soglia',
+  };
+
+  return (
+    <div style={{background:'var(--card)',borderRadius:'16px',border:'1px solid var(--border)',padding:'14px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+        <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>
+          PIANO SETTIMANA
+        </div>
+        <div style={{fontSize:'11px',color:'var(--text3)'}}>
+          Target: <span style={{color:'var(--accent)',fontWeight:700}}>{weeklyPlan.weekTarget} km</span>
+        </div>
+      </div>
+      {weeklyPlan.note && (
+        <div style={{fontSize:'11px',color:'var(--text3)',marginBottom:'10px',padding:'6px 10px',background:'var(--surface)',borderRadius:'8px',lineHeight:'1.4'}}>
+          💡 {weeklyPlan.note}
+        </div>
+      )}
+      <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+        {weeklyPlan.sessions.map((s, i) => {
+          const isOpen = openIdx === i;
+          const color = typeColors[s.type] ?? '#5A6888';
+          return (
+            <div key={i} style={{borderRadius:'12px',border:`1px solid ${isOpen ? color : 'var(--border)'}`,overflow:'hidden'}}>
+              {/* Header sessione */}
+              <div onClick={()=>setOpenIdx(isOpen ? null : i)}
+                style={{padding:'10px 12px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',
+                  background: isOpen ? 'var(--surface)' : 'transparent'}}>
+                <span style={{fontSize:'10px',fontWeight:700,color:'#fff',background:color,
+                  borderRadius:'6px',padding:'2px 7px',whiteSpace:'nowrap'}}>
+                  {typeLabels[s.type]??s.type}
+                </span>
+                <div style={{flex:1,minWidth:0}}>
+                  <span style={{fontSize:'13px',fontWeight:600,color:'var(--text)'}}>{s.day} — {s.title}</span>
+                </div>
+                <span style={{fontSize:'12px',color:'var(--accent)',fontWeight:700,whiteSpace:'nowrap'}}>{s.totalKm} km</span>
+                <span style={{fontSize:'11px',color:'var(--text3)',marginLeft:'4px'}}>{isOpen?'▲':'▼'}</span>
+              </div>
+              {/* Dettaglio sessione */}
+              {isOpen && (
+                <div style={{borderTop:`1px solid var(--border)`,padding:'12px',display:'flex',flexDirection:'column',gap:'8px',background:'var(--surface)'}}>
+                  {/* Struttura fasi */}
+                  <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                    {s.structure.map((ph, j) => (
+                      <div key={j} style={{padding:'7px 10px',borderRadius:'8px',background:'var(--card)',display:'flex',flexDirection:'column',gap:'3px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                          <span style={{fontSize:'11px',fontWeight:700,color:'var(--text2)',minWidth:'120px'}}>{ph.phase}</span>
+                          <span style={{fontSize:'12px',fontWeight:700,color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>{ph.pace}</span>
+                          {ph.speed && <span style={{fontSize:'11px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}}>{ph.speed}</span>}
+                          {ph.km && <span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600,marginLeft:'auto'}}>{typeof ph.km === 'number' ? ph.km.toFixed(1) : ph.km} km</span>}
+                        </div>
+                        {ph.recovery && (
+                          <div style={{fontSize:'11px',color:'#FBA828',paddingLeft:'4px'}}>
+                            ↩ Recupero: {ph.recovery}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Note Garmin */}
+                  <div style={{padding:'8px 10px',borderRadius:'8px',background:'#1a2040',border:'1px solid #2a3060'}}>
+                    <div style={{fontSize:'10px',fontWeight:700,color:'#4c8cde',letterSpacing:'0.5px',marginBottom:'3px'}}>📍 GARMIN</div>
+                    <div style={{fontSize:'11px',color:'var(--text)',lineHeight:'1.5'}}>{s.garminNote}</div>
+                  </div>
+                  {/* Obiettivo */}
+                  <div style={{fontSize:'11px',color:'var(--text3)',lineHeight:'1.4'}}>
+                    💡 <span style={{color:'var(--text2)'}}>{s.rationale}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── RUNNING INSIGHTS PANEL ─────────────────────────────────────
 const WORKOUT_COLORS = {
   easy:'#00C49A', recovery:'#5A6888', long_run:'#FBA828',
@@ -2046,7 +2399,7 @@ const WORKOUT_LABELS = {
   race_pace:'Gara', progression:'Progressione', unknown:'?',
 };
 
-function RunningInsightsPanel({ runs, metrics, insights }) {
+function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan }) {
   const {
     weeklyVolumeKm, monthlyVolumeKm, runsLast7Days,
     consistencyScore, estimatedHalfMarathonTime, estimatedHalfMarathonPace,
@@ -2127,6 +2480,12 @@ function RunningInsightsPanel({ runs, metrics, insights }) {
             <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px'}}>Stima tramite formula di Riegel — indicativa</div>
           </div>
         )}
+
+        {/* Zone di ritmo */}
+        <PaceZonesCard paceZones={paceZones} />
+
+        {/* Piano settimanale */}
+        <WeeklyPlanCard weeklyPlan={weeklyPlan} />
 
         {/* Ultime 5 corse classificate */}
         <div style={cardStyle}>
@@ -2231,6 +2590,14 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
   const coachingInsights = useMemo(() =>
     trainingMetrics ? generateCoachingInsights(classifiedRuns, trainingMetrics) : null,
     [classifiedRuns, trainingMetrics]);
+
+  const paceZones = useMemo(() =>
+    trainingMetrics ? calcPaceZones(trainingMetrics) : null,
+    [trainingMetrics]);
+
+  const weeklyPlan = useMemo(() =>
+    trainingMetrics && paceZones ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZones, classifiedRuns) : null,
+    [trainingMetrics, paceZones, coachingInsights, classifiedRuns]);
 
   // Legge il ?code= dall'URL dopo il redirect OAuth Strava
   useEffect(()=>{
@@ -2356,7 +2723,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
     setChatMessages(newMessages);setChatInput('');setChatLoading(true);setError('');
     try{
       const runningContext = classifiedRuns.length>=3 && trainingMetrics && coachingInsights
-        ? buildRunningContext(classifiedRuns, trainingMetrics, coachingInsights) : null;
+        ? buildRunningContext(classifiedRuns, trainingMetrics, coachingInsights, paceZones, weeklyPlan) : null;
       const res=await fetch('/.netlify/functions/ai-chat',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({messages:newMessages,activities:stravaActivities,runningContext})
@@ -2565,7 +2932,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 
       {/* Running Insights Panel */}
       {isConnected && classifiedRuns.length >= 3 && trainingMetrics && coachingInsights && (
-        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights}/>
+        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights} paceZones={paceZones} weeklyPlan={weeklyPlan}/>
       )}
 
       {/* Chat AI */}
