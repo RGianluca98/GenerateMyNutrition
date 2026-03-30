@@ -2469,6 +2469,7 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,
               </div>
               {showReadinessInfo&&(
                 <div style={{marginTop:'10px',borderTop:'1px solid var(--border)',paddingTop:'8px',fontSize:'10px',color:'var(--text3)',lineHeight:1.6}}>
+                  <div style={{marginBottom:'6px',color:'var(--text2)'}}>Il Readiness Score è un numero da 0 a 100 che risponde alla domanda: quanto sono riposato e pronto per allenarmi oggi?</div>
                   <div style={{marginBottom:'4px',color:'var(--text2)',fontWeight:600}}>Come si calcola:</div>
                   <div>score = 100 − fatica + recupero</div>
                   <div style={{marginTop:'3px'}}>Fatica = somma effort 7gg, dove effort = km × (pace_gara / pace_run). Normalizzato su 120.</div>
@@ -2934,16 +2935,17 @@ function ReadinessCard({ readinessScore }) {
   if (!readinessScore) return null;
   const { score, label, flags } = readinessScore;
   const color = score >= 80 ? '#4ade80' : score >= 60 ? '#facc15' : '#f87171';
-  const cardStyle = { background:'var(--card)', borderRadius:8, padding:'14px 16px', marginBottom:8, border:'1px solid var(--border)' };
+  const cardStyle = { background:'var(--card)', borderRadius:8, padding:'14px 16px', marginBottom:8, border:'1px solid var(--border)', cursor:'pointer' };
+  const [showInfo, setShowInfo] = React.useState(false);
   return (
-    <div style={cardStyle}>
+    <div style={cardStyle} onClick={()=>setShowInfo(v=>!v)}>
       <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
         <div style={{width:52,height:52,borderRadius:'50%',border:`3px solid ${color}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
           <span style={{fontSize:'15px',fontWeight:700,color}}>{score}</span>
           <span style={{fontSize:'8px',color:'var(--text3)',lineHeight:1}}>/ 100</span>
         </div>
         <div>
-          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>READINESS</div>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>READINESS <span style={{color:'var(--accent)'}}>*</span></div>
           <div style={{fontSize:'14px',fontWeight:700,color,marginTop:2}}>{label}</div>
         </div>
       </div>
@@ -2954,6 +2956,15 @@ function ReadinessCard({ readinessScore }) {
               <span style={{color:color,flexShrink:0}}>•</span>{f}
             </div>
           ))}
+        </div>
+      )}
+      {showInfo&&(
+        <div style={{marginTop:'10px',borderTop:'1px solid var(--border)',paddingTop:'8px',fontSize:'10px',color:'var(--text3)',lineHeight:1.6}}>
+          <div style={{marginBottom:'6px',color:'var(--text2)'}}>Il Readiness Score è un numero da 0 a 100 che risponde alla domanda: quanto sono riposato e pronto per allenarmi oggi?</div>
+          <div style={{marginBottom:'4px',color:'var(--text2)',fontWeight:600}}>Come si calcola:</div>
+          <div>score = 100 − fatica + recupero</div>
+          <div style={{marginTop:'3px'}}>Fatica = somma effort 7gg, dove effort = km × (pace_gara / pace_run). Normalizzato su 120.</div>
+          <div style={{marginTop:'3px'}}>Recupero = +5pt/giorno dall'ultima sessione dura (max +20).</div>
         </div>
       )}
     </div>
