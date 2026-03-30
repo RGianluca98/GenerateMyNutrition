@@ -1016,276 +1016,305 @@ function calcPaceZones(metrics) {
   };
 }
 
-/** Piano di allenamento periodizzato verso la Mezza Maratona di Genova (19 aprile).
+/** Piano di allenamento periodizzato verso la Mezza Maratona di Genova (19 aprile 2026).
  *
- *  Logica da coach:
- *  - Calcola in quale fase siamo rispetto alla gara (carico / tapering / gara)
- *  - Fase CARICO (> 14gg): 1 lungo + 1 qualità + easy/recovery
- *  - Fase TAPERING (7-14gg): niente sessioni dure, solo easy + 1 medio a ritmo mezza
- *  - Fase GARA (< 7gg): solo 2-3 uscite brevi e leggere, gambe fresche
- *  - Numero sessioni = media reale ultime 4 settimane (clamp 3-5)
- *  - Ogni sessione parte dal giorno successivo all'ultima corsa fatta
- *  - Mai 2 sessioni dure consecutive
+ *  Sessioni reali settimana per settimana, con zone di ritmo FISSE calibrate sull'atleta.
+ *  Le zone calcolate da calcPaceZones vengono ignorate internamente (parametro mantenuto
+ *  per compatibilità con i chiamanti).
+ *
+ *  Fasi:
+ *  - load      (> 14gg): Settimana 4 (30 marzo – 5 aprile)
+ *  - taper     (7–14gg): Settimana 5 (6–12 aprile)
+ *  - race_week (< 7gg):  Settimana gara (13–19 aprile)
+ *  - post_race (< 0):    Dopo la gara
  */
 function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
-  if (!paceZones) return null;
-  const { weeklyVolumeKm, consistencyScore, fatigueTrend } = metrics;
-  const { paceMin: eMin, paceMax: eMax } = paceZones.easy;
-  const { paceMin: rMin, paceMax: rMax } = paceZones.recovery;
-  const { paceMin: lMin, paceMax: lMax } = paceZones.longRun;
-  const { paceMin: tMin, paceMax: tMax } = paceZones.tempo;
-  const { paceMin: iMin, paceMax: iMax } = paceZones.interval;
-  const { paceMin: hmMin, paceMax: hmMax } = paceZones.halfMarathon;
-
-  const midPace  = (a, b) => (a + b) / 2;
-  const fmtZ     = (p) => `${_paceStr(p)}/km`;
-  const fmtSpd   = (p) => `${(60/p).toFixed(1)} km/h`;
-  const fmtRange = (a, b) => `${_paceStr(a)}–${_paceStr(b)}/km (${fmtSpd(b)}–${fmtSpd(a)})`;
+  // ── Zone di ritmo FISSE (valori assoluti calibrati sull'atleta) ──
+  // NON derivate da paceZones — sovrascrivono qualsiasi calcolo dinamico.
+  const ZONES = {
+    recovery:   { label: 'Recovery',    paceRange: '5:45–6:00/km', speedRange: '10.0–10.4 km/h', fc: 'FC < 145' },
+    easy:       { label: 'Easy',        paceRange: '5:30–5:45/km', speedRange: '10.4–10.9 km/h', fc: 'FC 140–150' },
+    long_run:   { label: 'Lungo',       paceRange: '5:20–5:35/km', speedRange: '10.7–11.3 km/h', fc: 'FC 145–152' },
+    race_pace:  { label: 'Ritmo mezza', paceRange: '5:00–5:05/km', speedRange: '11.8–12.0 km/h', fc: 'FC 150–158' },
+    tempo:      { label: 'Soglia',      paceRange: '4:50–4:58/km', speedRange: '12.1–12.4 km/h', fc: 'FC 158–165' },
+    interval:   { label: 'Ripetute',    paceRange: '4:25–4:35/km', speedRange: '13.1–13.6 km/h', fc: 'FC fino a 169' },
+  };
 
   // ── Fase periodizzazione ──
-  const now      = new Date();
-  const RACE_DATE = new Date('2026-04-19');
+  const now       = new Date();
+  const RACE_DATE = new Date('2026-04-19T00:00:00');
   const daysToRace = Math.round((RACE_DATE - now) / 86400000);
   const phase = daysToRace > 14 ? 'load' : daysToRace > 7 ? 'taper' : daysToRace > 0 ? 'race_week' : 'post_race';
 
   const dayNames = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 
-  // ── Contesto ultimo allenamento ──
-  const lastRun        = classifiedRuns[0];
-  const lastRunDate    = lastRun ? new Date(lastRun.date) : null;
-  const daysSinceLast  = lastRunDate ? Math.round((now - lastRunDate) / 86400000) : 99;
-  const lastType       = lastRun?.classification?.workoutType ?? null;
-  const lastWasHard    = ['tempo','threshold','interval','race_pace','long_run'].includes(lastType);
+  // Helper: restituisce il nome del giorno per una data offset da oggi
+  const dayLabel = (offsetDays) => {
+    const d = new Date(now.getTime() + offsetDays * 86400000);
+    return dayNames[d.getDay()];
+  };
 
-  // Ultimi 7 e 14 giorni
-  const ms7 = 7 * 86400000, ms14 = 14 * 86400000;
-  const last7Types = classifiedRuns
-    .filter(r => new Date(r.date) >= new Date(now - ms7))
-    .map(r => r.classification?.workoutType);
-  const hadLong7    = last7Types.includes('long_run');
-  const hadQuality7 = last7Types.some(t => ['tempo','threshold','interval','race_pace'].includes(t));
-  const qualityLast14 = classifiedRuns
-    .filter(r => new Date(r.date) >= new Date(now - ms14))
-    .filter(r => ['tempo','threshold','interval','race_pace'].includes(r.classification?.workoutType)).length;
+  // Helper: calcola daysFromNow per una data ISO 'YYYY-MM-DD'
+  const daysFrom = (isoDate) => {
+    const target = new Date(isoDate + 'T00:00:00');
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((target - todayMidnight) / 86400000);
+  };
 
-  // ── Volume target ──
-  let baseVol = Math.max(weeklyVolumeKm, 20);
-  if (phase === 'taper')     baseVol = Math.round(baseVol * 0.70);
-  else if (phase === 'race_week') baseVol = Math.round(baseVol * 0.40);
-  else if (fatigueTrend === 'declining') baseVol = Math.round(baseVol * 0.85);
-  else baseVol = Math.round(baseVol * 1.02);
-
-  const longKm    = Math.max(16, Math.round(baseVol * 0.32));
-  const qualityKm = Math.round(baseVol * 0.20);
-  const easyKm    = Math.max(8, Math.round(baseVol * 0.22));
-  const recoverKm = Math.max(5, Math.round(baseVol * 0.08));
-
-  // ── Numero sessioni basato su storico reale ──
-  const runsLast28 = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - 28*86400000));
-  const avgPerWeek = runsLast28.length / 4;
-  let targetSessions = Math.min(5, Math.max(3, Math.round(avgPerWeek)));
-  if (phase === 'race_week') targetSessions = Math.min(3, targetSessions);
-  if (phase === 'taper')     targetSessions = Math.min(4, targetSessions);
-
-  // ── Template sessioni per fase ──
-  // Ogni template descrive: tipo, priorità (1=prima da piazzare), vincoli
-  let templates = [];
-
-  if (phase === 'load') {
-    // Settimana di carico: lungo + qualità + easy/recovery
-    if (!hadLong7)    templates.push({ type: 'long_run',  priority: 1, preferLate: true });
-    if (!hadQuality7 && qualityLast14 < 2)
-                      templates.push({ type: qualityLast14 === 0 ? 'interval' : 'tempo', priority: 2, preferLate: false });
-    // Riempi con easy fino a targetSessions
-    while (templates.length < targetSessions)
-      templates.push({ type: 'easy', priority: 3, preferLate: false });
-    // Aggiungi recovery dopo lungo (non conta nel targetSessions)
-    if (!hadLong7) templates.push({ type: 'recovery', priority: 4, afterLong: true });
-
-  } else if (phase === 'taper') {
-    // Tapering: niente lungo né ripetute. 1 medio a ritmo mezza, resto easy/recovery
-    templates.push({ type: 'half_marathon_pace', priority: 1, preferLate: false });
-    while (templates.length < targetSessions)
-      templates.push({ type: templates.length === targetSessions - 1 ? 'recovery' : 'easy', priority: 2, preferLate: false });
-
-  } else if (phase === 'race_week') {
-    // Settimana gara: solo uscite brevi e leggere
-    templates = [
-      { type: 'easy',     priority: 1, preferLate: false },
-      { type: 'recovery', priority: 2, preferLate: false },
-      { type: 'easy',     priority: 3, preferLate: false },
-    ].slice(0, targetSessions);
-
-  } else {
-    // Post gara: recupero totale
-    templates = [{ type: 'recovery', priority: 1 }, { type: 'easy', priority: 2 }];
-  }
-
-  // ── Piazza le sessioni nei giorni ──
-  // Parte dal primo giorno libero dopo l'ultima corsa,
-  // rispettando: mai hard consecutive, recovery dopo hard se < 2gg.
-
-  // Giorno di partenza = max(domani, giorno dopo ultima corsa)
-  const startOffset = Math.max(1, daysSinceLast >= 1 ? 1 : 2);
-
-  // Ordina: prima le sessioni a priorità bassa (long_run/quality prima per avere spazio)
-  const ordered = [...templates].sort((a,b) => a.priority - b.priority);
-
-  const placed = []; // { daysFromNow, type }
-  let cursor = startOffset;
-
-  for (const tmpl of ordered) {
-    // Recovery dopo lungo: va il giorno successivo al lungo
-    if (tmpl.afterLong) {
-      const longPlaced = placed.find(p => p.type === 'long_run');
-      if (longPlaced) {
-        placed.push({ daysFromNow: longPlaced.daysFromNow + 1, type: 'recovery' });
-      }
-      continue;
-    }
-
-    // Trova il primo giorno disponibile a partire da cursor
-    let day = tmpl.preferLate
-      ? Math.max(cursor, startOffset + Math.floor(targetSessions * 0.5))  // lungo nella seconda metà
-      : cursor;
-
-    // Salta giorni già occupati o adiacenti a hard (per sessioni hard)
-    const isHard = ['long_run','interval','tempo','half_marathon_pace'].includes(tmpl.type);
-    let attempts = 0;
-    while (attempts < 10) {
-      const alreadyTaken = placed.some(p => p.daysFromNow === day);
-      const adjHard = isHard && placed.some(p =>
-        ['long_run','interval','tempo','half_marathon_pace'].includes(p.type) &&
-        Math.abs(p.daysFromNow - day) <= 1
-      );
-      // Se domani era un hard → non possiamo mettere hard domani
-      const tooSoonAfterHard = isHard && lastWasHard && daysSinceLast <= 1 && day === 1;
-      if (!alreadyTaken && !adjHard && !tooSoonAfterHard) break;
-      day++;
-      attempts++;
-    }
-
-    placed.push({ daysFromNow: day, type: tmpl.type });
-    cursor = day + 1;
-  }
-
-  // Ordina per data
-  placed.sort((a, b) => a.daysFromNow - b.daysFromNow);
-
-  // ── Crea oggetti sessione dettagliati ──
-  const sessions = placed.map(({ daysFromNow, type }) => {
-    const date    = new Date(now.getTime() + daysFromNow * 86400000);
-    const dayLabel = dayNames[date.getDay()];
-
-    if (type === 'long_run') {
-      const lKm    = phase === 'taper' ? Math.min(longKm, 16) : longKm;
-      const progKm = Math.round(lKm * 0.25);
-      return {
-        day: dayLabel, daysFromNow, type, title: 'Lungo progressivo', totalKm: lKm,
-        structure: [
-          { phase: `Prima parte facile (${lKm - progKm}km)`, km: lKm - progKm,
-            pace: fmtRange(lMin, lMax), speed: `${fmtSpd(lMax)}–${fmtSpd(lMin)}` },
-          { phase: `Progressione finale (${progKm}km)`, km: progKm,
-            pace: fmtRange(paceZones.marathon.paceMin, paceZones.marathon.paceMax),
-            speed: `${fmtSpd(paceZones.marathon.paceMax)}–${fmtSpd(paceZones.marathon.paceMin)}` },
-        ],
-        garminNote: `Long run ${lKm}km. Primi ${lKm - progKm}km a passo lungo, ultimi ${progKm}km a ritmo maratona. Idratazione ogni 5km.`,
-        rationale: `Resistenza aerobica. Con la gara tra ${daysToRace} giorni, questo è l'ultimo lungo prima del tapering.`,
-      };
-    }
-
-    if (type === 'interval') {
-      const repKm  = Math.min(qualityKm, 10);
-      const wuKm   = 2, cdKm = 2;
-      const mainKm = Math.max(4, repKm - wuKm - cdKm);
-      const nReps  = Math.max(4, Math.round(mainKm));
-      return {
-        day: dayLabel, daysFromNow, type, title: `Ripetute ${nReps}×1000m`, totalKm: repKm,
-        structure: [
-          { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
-          { phase: `${nReps}×1000m`, km: nReps, pace: fmtRange(iMin, iMax), speed: `${fmtSpd(iMax)}–${fmtSpd(iMin)}`,
-            recovery: `200m a ${_paceStr(midPace(rMin, rMax))}/km (o 90s cammino)` },
-          { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
-        ],
-        garminNote: `Interval Workout: ${nReps}×1000m. Rec: 200m lento o 90s cammino. FC zona 4-5.`,
-        rationale: `VO2max e velocità. Passo target: ${fmtRange(iMin, iMax)}.`,
-      };
-    }
-
-    if (type === 'tempo') {
-      const tempoKm = Math.min(qualityKm, 10);
-      const wuKm = 1.5, cdKm = 1.5;
-      const mainKm = Math.max(4, tempoKm - wuKm - cdKm);
-      return {
-        day: dayLabel, daysFromNow, type, title: 'Tempo run (soglia)', totalKm: tempoKm,
-        structure: [
-          { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
-          { phase: `Soglia continua ${mainKm.toFixed(0)}km`, km: mainKm,
-            pace: fmtRange(tMin, tMax), speed: `${fmtSpd(tMax)}–${fmtSpd(tMin)}` },
-          { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
-        ],
-        garminNote: `Tempo run ${mainKm.toFixed(0)}km continui a ritmo soglia. FC zona 3-4 (165-175 bpm).`,
-        rationale: `Soglia del lattato. Abitua il corpo a sostenere sforzo prolungato.`,
-      };
-    }
-
-    if (type === 'half_marathon_pace') {
-      const hmKm = Math.round(easyKm * 0.9);
-      const wuKm = 1.5, cdKm = 1.5;
-      const mainKm = Math.max(3, hmKm - wuKm - cdKm);
-      return {
-        day: dayLabel, daysFromNow, type: 'race_pace', title: 'Medio a ritmo gara', totalKm: hmKm,
-        structure: [
-          { phase: 'Riscaldamento', km: wuKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
-          { phase: `Ritmo mezza ${mainKm}km`, km: mainKm,
-            pace: fmtRange(hmMin, hmMax), speed: `${fmtSpd(hmMax)}–${fmtSpd(hmMin)}` },
-          { phase: 'Defaticamento', km: cdKm, pace: fmtZ(midPace(eMin, eMax)), speed: fmtSpd(midPace(eMin, eMax)) },
-        ],
-        garminNote: `Medio ${hmKm}km. Corpo principale a ritmo gara (${fmtRange(hmMin, hmMax)}). Non forzare — deve sentirsi controllato.`,
-        rationale: `Tapering: attiva le gambe e memorizza il ritmo gara senza caricare.`,
-      };
-    }
-
-    if (type === 'recovery') {
-      return {
-        day: dayLabel, daysFromNow, type, title: 'Corsa rigenerativa', totalKm: recoverKm,
-        structure: [
-          { phase: `Rigenerativa ${recoverKm}km`, km: recoverKm,
-            pace: fmtRange(rMin, rMax), speed: `${fmtSpd(rMax)}–${fmtSpd(rMin)}` },
-        ],
-        garminNote: `Rigenerativa ${recoverKm}km. FC < 140. Lentissima — priorità recupero muscolare.`,
-        rationale: lastWasHard && daysSinceLast <= 2
-          ? 'Recupero dopo sessione intensa. Non forzare il ritmo.'
-          : 'Mantenimento aerobico, gambe leggere.',
-      };
-    }
-
-    // easy (default)
-    const isFirstAfterHard = lastWasHard && daysSinceLast <= 1 && daysFromNow <= 2;
-    return {
-      day: dayLabel, daysFromNow, type: 'easy', title: 'Corsa facile', totalKm: easyKm,
+  // ── Piano completo hardcoded (sessioni reali fino al 19 aprile) ──
+  // Struttura: { isoDate, type, title, totalKm, structure[], garminNote, rationale }
+  const ALL_SESSIONS = [
+    // ═══════════════════════════════════════════════════════════════
+    // SETTIMANA 4 (30 marzo – 5 aprile) — FASE CARICO
+    // ═══════════════════════════════════════════════════════════════
+    {
+      isoDate: '2026-03-30', type: 'recovery',
+      title: 'Recovery jog',
+      totalKm: 6.5,
       structure: [
-        { phase: `Facile ${easyKm}km`, km: easyKm,
-          pace: fmtRange(eMin, eMax), speed: `${fmtSpd(eMax)}–${fmtSpd(eMin)}` },
+        { phase: 'Recovery 6-7km', km: 6.5, pace: ZONES.recovery.paceRange, speed: ZONES.recovery.speedRange },
       ],
-      garminNote: `Corsa facile ${easyKm}km. FC < 150. Ritmo conversazionale — puoi parlare senza affanno.`,
-      rationale: isFirstAfterHard
-        ? 'Recupero attivo dopo sessione intensa. Tieni il ritmo basso.'
-        : 'Volume aerobico di base. Il 70-80% dell\'allenamento deve essere qui.',
-    };
-  });
+      garminNote: 'Recovery run 6-7km. FC < 145. Lentissima — assorbimento post-lungo.',
+      rationale: 'Assorbire il lungo da 20km di ieri. Gambe pesanti: tieni il ritmo basso.',
+    },
+    {
+      isoDate: '2026-03-31', type: 'rest',
+      title: 'Riposo / mobilità',
+      totalKm: 0,
+      structure: [],
+      garminNote: '',
+      rationale: 'Recupero tendinoso completo. Mobilità e stretching se vuoi.',
+    },
+    {
+      isoDate: '2026-04-01', type: 'tempo',
+      title: 'W4-A2 — Threshold + HM blend',
+      totalKm: 10,
+      structure: [
+        { phase: 'Riscaldamento', km: 2, pace: '5:37/km', speed: '10.7 km/h' },
+        { phase: '3×2km soglia', km: 6, pace: `${ZONES.tempo.paceRange} (12.0–12.4 km/h)`, recovery: 'rec: 2min jog @ 6:00/km' },
+        { phase: 'Defaticamento', km: 2, pace: '5:37/km', speed: '10.7 km/h' },
+      ],
+      garminNote: 'Interval: 3 reps × 2km. Rec: 2min jog. FC zona 3-4.',
+      rationale: 'Specifico mezza: soglia + sensazione ritmo gara. Non forzare — passo sostenuto ma controllato.',
+    },
+    {
+      isoDate: '2026-04-02', type: 'recovery',
+      title: 'Easy/Recovery post-soglia',
+      totalKm: 5.5,
+      structure: [
+        { phase: 'Easy/Recovery 5-6km', km: 5.5, pace: ZONES.recovery.paceRange, speed: ZONES.recovery.speedRange },
+      ],
+      garminNote: 'Rigenerativa 5-6km. FC < 145. Se le gambe sono pesanti, riposo totale.',
+      rationale: 'Recupero dopo mercoledì di soglia. Ascolta il corpo: se pesante, salta e riposa.',
+    },
+    {
+      isoDate: '2026-04-03', type: 'easy',
+      title: 'Easy aerobico',
+      totalKm: 8,
+      structure: [
+        { phase: 'Easy 8km', km: 8, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange },
+      ],
+      garminNote: 'Corsa facile 8km. FC 140–150. Ritmo conversazionale.',
+      rationale: 'Volume aerobico di base. Preparazione al lungo domenicale.',
+    },
+    {
+      isoDate: '2026-04-04', type: 'rest',
+      title: 'Riposo',
+      totalKm: 0,
+      structure: [],
+      garminNote: '',
+      rationale: 'Riposo pre-lungo. Gambe fresche per domenica.',
+    },
+    {
+      isoDate: '2026-04-05', type: 'long_run',
+      title: 'W4-A4 — Medio-lungo progressivo',
+      totalKm: 14,
+      structure: [
+        { phase: 'Km 1-8 base', km: 8, pace: '5:25–5:30/km', speed: '10.9–11.1 km/h' },
+        { phase: 'Km 9-12 progressione', km: 4, pace: '5:10–5:15/km', speed: '11.4–11.6 km/h' },
+        { phase: 'Km 13-14 ritmo gara', km: 2, pace: ZONES.race_pace.paceRange, speed: ZONES.race_pace.speedRange },
+      ],
+      garminNote: 'Lungo progressivo 14km. 8km lungo facile → 4km progressione → 2km HM pace. Gel/acqua a km 7.',
+      rationale: 'Ultimo lungo della fase carico. La progressione finale insegna al corpo a correre veloce a fine gara.',
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // SETTIMANA 5 (6–12 aprile) — TAPERING INIZIALE
+    // ═══════════════════════════════════════════════════════════════
+    {
+      isoDate: '2026-04-06', type: 'rest',
+      title: 'Riposo',
+      totalKm: 0,
+      structure: [],
+      garminNote: '',
+      rationale: 'Riposo dopo il lungo. Inizio tapering.',
+    },
+    {
+      isoDate: '2026-04-07', type: 'interval',
+      title: 'W5-A1 — Ripetute 6×800m',
+      totalKm: 10,
+      structure: [
+        { phase: 'Riscaldamento', km: 2, pace: '5:37/km', speed: '10.7 km/h' },
+        { phase: '6×800m ripetute', km: 4.8, pace: `${ZONES.interval.paceRange} (13.1–13.6 km/h)`, recovery: 'rec: 400m jog @ 5:45–6:00/km' },
+        { phase: 'Defaticamento', km: 2, pace: '5:37/km', speed: '10.7 km/h' },
+      ],
+      garminNote: 'Interval: 6 reps × 800m @ 4:25–4:30/km. Rec: 400m jog. FC zona 4-5.',
+      rationale: 'Ultima sessione di velocità pre-gara. Mantieni la sharpness senza esaurire.',
+    },
+    {
+      isoDate: '2026-04-08', type: 'rest',
+      title: 'Riposo / mobilità',
+      totalKm: 0,
+      structure: [],
+      garminNote: '',
+      rationale: 'Recupero dopo ripetute. Stretching, foam roller.',
+    },
+    {
+      isoDate: '2026-04-09', type: 'easy',
+      title: 'Easy tapering',
+      totalKm: 8,
+      structure: [
+        { phase: 'Easy 8km', km: 8, pace: '5:40–5:55/km', speed: '10.2–10.6 km/h' },
+      ],
+      garminNote: 'Easy 8km. FC 140–148. Più lento del solito — tapering attivo.',
+      rationale: 'Volume ridotto, intensità bassa. Il corpo si ricarica per la gara.',
+    },
+    {
+      isoDate: '2026-04-10', type: 'rest',
+      title: 'Riposo',
+      totalKm: 0,
+      structure: [],
+      garminNote: '',
+      rationale: 'Riposo pre-sessione ritmo gara.',
+    },
+    {
+      isoDate: '2026-04-11', type: 'race_pace',
+      title: 'W5-A3 — HM pace 10km',
+      totalKm: 10,
+      structure: [
+        { phase: 'Riscaldamento easy', km: 2, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange },
+        { phase: '6km @ ritmo gara', km: 6, pace: ZONES.race_pace.paceRange, speed: ZONES.race_pace.speedRange },
+        { phase: 'Defaticamento easy', km: 2, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange },
+      ],
+      garminNote: `Medio 10km: 2km easy + 6km @ ${ZONES.race_pace.paceRange} + 2km easy. FC 150–158. Non forzare.`,
+      rationale: 'Memorizza il ritmo gara. Deve sentirsi sostenuto ma non massimale — prova generale.',
+    },
+    {
+      isoDate: '2026-04-12', type: 'long_run',
+      title: 'Long easy tapering',
+      totalKm: 12,
+      structure: [
+        { phase: 'Lungo easy 12km', km: 12, pace: '5:25–5:40/km', speed: '10.5–11.1 km/h' },
+      ],
+      garminNote: 'Lungo easy 12km. FC 145–150. Nessuna progressione — solo volume leggero.',
+      rationale: 'Ultimo lungo prima della race week. Mantieni le gambe attive senza caricare.',
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // SETTIMANA GARA (13–19 aprile) — RACE WEEK
+    // ═══════════════════════════════════════════════════════════════
+    {
+      isoDate: '2026-04-13', type: 'rest',
+      title: 'Riposo o 5km molto easy',
+      totalKm: 0,
+      structure: [
+        { phase: 'Opzionale: 5km easy', km: 5, pace: '5:50–6:05/km', speed: '9.8–10.3 km/h' },
+      ],
+      garminNote: 'Opzionale: 5km @ 5:50–6:05/km. Gambe leggere. Riposo totale se preferisci.',
+      rationale: 'Primo giorno race week. Priorità: recupero psico-fisico.',
+    },
+    {
+      isoDate: '2026-04-14', type: 'interval',
+      title: 'RW-A1 — Sharpening 4×400m',
+      totalKm: 6,
+      structure: [
+        { phase: 'Riscaldamento', km: 2, pace: '5:37/km', speed: '10.7 km/h' },
+        { phase: '4×400m sharpening', km: 1.6, pace: '4:30–4:35/km (13.1–13.3 km/h)', recovery: 'rec: 400m jog' },
+        { phase: 'Defaticamento', km: 1.5, pace: '5:37/km', speed: '10.7 km/h' },
+      ],
+      garminNote: 'Sharpening: 4×400m @ 4:30–4:35/km. Rec: 400m jog. Breve e sveglio.',
+      rationale: 'Mantieni la velocità nelle gambe senza affaticare. Breve, intenso, sveglio.',
+    },
+    {
+      isoDate: '2026-04-15', type: 'rest',
+      title: 'Riposo',
+      totalKm: 0,
+      structure: [],
+      garminNote: '',
+      rationale: 'Recupero pre-reminder. Mangia bene, dormi.',
+    },
+    {
+      isoDate: '2026-04-16', type: 'race_pace',
+      title: 'RW-A2 — HM pace reminder',
+      totalKm: 5,
+      structure: [
+        { phase: 'Easy', km: 2, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange },
+        { phase: '3km @ ritmo gara', km: 3, pace: ZONES.race_pace.paceRange, speed: ZONES.race_pace.speedRange },
+      ],
+      garminNote: `5km: 2km easy + 3km @ ${ZONES.race_pace.paceRange}. Sensazione = ok per domenica.`,
+      rationale: 'Conferma che il ritmo gara è fresco e comodo. Deve sembrare facile.',
+    },
+    {
+      isoDate: '2026-04-17', type: 'rest',
+      title: 'Riposo',
+      totalKm: 0,
+      structure: [],
+      garminNote: '',
+      rationale: 'Riposo totale. Idratazione, preparazione zaino gara, riposo mentale.',
+    },
+    {
+      isoDate: '2026-04-18', type: 'recovery',
+      title: 'Shakeout opzionale',
+      totalKm: 0,
+      structure: [
+        { phase: 'Opzionale: 20min easy + 4 strides', km: 3.5, pace: '5:45–6:00/km', speed: '10.0–10.4 km/h' },
+      ],
+      garminNote: 'Shakeout: 20min easy + 4 strides rilassati. Oppure riposo totale — decidi in base a come ti senti.',
+      rationale: 'Pre-gara: muovi le gambe se senti rigidità. Riposo totale è ugualmente valido.',
+    },
+    {
+      isoDate: '2026-04-19', type: 'race',
+      title: 'GARA — Mezza Maratona di Genova',
+      totalKm: 21.1,
+      structure: [
+        { phase: 'Km 1-5 (conservativo)', km: 5, pace: '5:08–5:10/km', speed: '11.5–11.7 km/h' },
+        { phase: 'Km 6-15 (ritmo gara)', km: 10, pace: '5:03–5:05/km', speed: '11.8–11.9 km/h' },
+        { phase: 'Km 15-21.1 (by feel)', km: 6.1, pace: '4:58–5:03/km by feel', speed: '11.9–12.1 km/h' },
+      ],
+      garminNote: 'Race day. Warm-up 10-15min easy. Fuel: gel km 7-8 e km 14-15. Parti conservativo!',
+      rationale: 'Obiettivo: completare in controllo. Km 1-5 conservativo, poi gestisci il ritmo. Ultimi 6km by feel.',
+    },
+  ];
+
+  // ── Filtra le sessioni da mostrare (domani → +7 giorni + gara se entro 21gg) ──
+  const sessions = ALL_SESSIONS
+    .map(s => {
+      const dfn = daysFrom(s.isoDate);
+      return { ...s, day: dayLabel(dfn), daysFromNow: dfn };
+    })
+    .filter(s => {
+      if (s.type === 'race') return s.daysFromNow >= 1 && s.daysFromNow <= 21;
+      return s.daysFromNow >= 1 && s.daysFromNow <= 7;
+    })
+    .sort((a, b) => a.daysFromNow - b.daysFromNow);
+
+  // ── weekTarget = somma km sessioni non-riposo della settimana corrente ──
+  const weekTarget = sessions
+    .filter(s => s.type !== 'rest' && s.daysFromNow >= 1 && s.daysFromNow <= 7)
+    .reduce((sum, s) => sum + (s.totalKm || 0), 0);
 
   // ── Nota di fase ──
-  const phaseNote = {
-    load:      `Fase di carico — ${daysToRace} giorni alla gara. Ultimo blocco di stimoli: 1 lungo + 1 qualità.`,
-    taper:     `Tapering — ${daysToRace} giorni alla gara. Riduci il volume del 30%, mantieni la freschezza.`,
-    race_week: `Settimana gara — corri poco e leggero. Gambe fresche il 19 aprile.`,
-    post_race: `Post gara — recupero completo. Niente fretta di ricominciare.`,
-  }[phase];
+  const phaseNote = phase === 'load'
+    ? `Fase carico — ${daysToRace} giorni alla gara. Ultimo blocco di stimoli prima del tapering.`
+    : phase === 'taper'
+    ? `Tapering — ${daysToRace} giorni alla gara. Volume ridotto, freschezza in aumento.`
+    : phase === 'race_week'
+    ? `Settimana gara! ${daysToRace} giorni alla Mezza di Genova. Gambe fresche, mente pronta.`
+    : `Post gara — recupero completo. Ben fatto!`;
 
   return {
     sessions,
-    weekTarget: baseVol,
+    weekTarget: Math.round(weekTarget),
     phase,
     daysToRace,
     note: phaseNote,
