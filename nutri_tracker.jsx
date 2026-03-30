@@ -2375,44 +2375,12 @@ function SaveAsRecipeModal({meal,items,onSave,onClose}){
   );
 }
 
-function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,setSelectedDayIndex,setWeekStart}){
+function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,setSelectedDayIndex,setWeekStart,weeklyPlan,readinessScore,stravaActivities,raceGoal}){
   const iso=toISO(weekDates[selectedDayIndex]);
   const di=selectedDayIndex;
   const type=getDayType(dayTypes,weekPlan,iso,di);
-  const dayItems=getDayItems(weekPlan,di,iso,dayTypes);
-  const dayLog=dailyLog[iso]||{};
-  const allItems=MEAL_ORDER.flatMap(m=>dayItems[m]||[]);
-  const checkedItems=allItems.filter(it=>dayLog[it.key]?.checked);
-  const consumedKcal=checkedItems.reduce((s,it)=>{
-    const qty=dayLog[it.key]?.qtyOverride??it.qty;
-    return s+(calcKcal({...it,qty})||0);
-  },0);
-  const targetKcal=(type==='Corsa'||type==='Calcio')?2300:2100;
-  const kcalPct=Math.min(consumedKcal/targetKcal,1);
 
-  // proteine stimate: items con kcal proteiche (pollo, pesce, uova, latticini) — approssimazione con FOOD_DB
-  const estimatedProtein=checkedItems.reduce((s,it)=>{
-    const qty=dayLog[it.key]?.qtyOverride??it.qty;
-    // stima grezza: 25% kcal da proteine per item proteici (context contiene 'protein' o 'chicken')
-    const isProtein=it.context&&(it.context.includes('protein')||it.context.includes('chicken')||it.context.includes('yogurt')||it.context.includes('dairy'));
-    if(!isProtein)return s;
-    const kcal=calcKcal({...it,qty})||0;
-    return s+Math.round(kcal*0.25/4); // kcal → g proteina
-  },0);
-
-  // meal strip
-  const mealLabels={Colazione:'Col','Spuntino mattina':'Mat',Pranzo:'Pra','Spuntino pomeriggio':'Pom',
-    'Pre-workout':'Pre',Cena:'Cen','Post-workout':'Post'};
-  const activeMeals=MEAL_ORDER.filter(m=>dayItems[m]&&dayItems[m].length>0);
-
-  // SVG arc
-  const R=40,CX=50,CY=50;
-  const circ=2*Math.PI*R;
-  const arcFull=circ*0.78;
-  const arcOffset=circ*(1-0.78)+circ*0.78*(1-kcalPct);
-  const arcStart=circ*(1-0.78)/2;
-
-  // badge tipo
+  // badge tipo giorno
   const typeCfg={
     Corsa:{bg:'rgba(74,178,107,0.15)',color:'#4ab26b',icon:'🏃'},
     Calcio:{bg:'rgba(74,130,210,0.15)',color:'#4a82d2',icon:'⚽'},
@@ -2423,108 +2391,144 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,
   const mesi=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
   const d=weekDates[selectedDayIndex];
   const dataLabel=`${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]}`;
-  const frase=FRASI[d.getDay()%FRASI.length];
+
+  // Volume settimana corrente da Strava
+  const now=new Date();
+  const startOfWeek=new Date(now);
+  startOfWeek.setDate(now.getDate()-((now.getDay()+6)%7)); // lunedì
+  startOfWeek.setHours(0,0,0,0);
+  const weekKmDone=(stravaActivities||[])
+    .filter(a=>a.type==='Run'&&new Date(a.start_date)>=startOfWeek)
+    .reduce((s,a)=>s+(a.distance/1000),0);
+  const weekTarget=weeklyPlan?.weekTarget??0;
+  const weekPct=weekTarget>0?Math.min(weekKmDone/weekTarget,1):0;
+
+  // Prossimo allenamento (prima sessione non-riposo da oggi)
+  const nextSession=weeklyPlan?.sessions?.find(s=>s.type!=='rest'&&(s.daysFromNow??99)>=0)??null;
+
+  // Banner gara
+  const dtr=weeklyPlan?.daysToRace??null;
+  const phase=weeklyPlan?.phase??null;
+  const raceName=raceGoal?.name??weeklyPlan?.raceName??null;
+  const raceDate=raceGoal?.date??weeklyPlan?.raceDate??null;
+  const phaseColors={load:'#FBA828',taper:'#00C49A',race_week:'#FF6B35',post_race:'#5A6888'};
+  const phaseLabels={load:'Fase carico',taper:'Tapering',race_week:'Settimana gara!',post_race:'Post gara'};
+
+  // Readiness
+  const rs=readinessScore?.score??null;
+  const rsLabel=readinessScore?.label??null;
+  const rsColor=rs==null?'var(--text3)':rs>=75?'#00C49A':rs>=50?'#FBA828':'#e05c5c';
+
+  // Colori tipo sessione
+  const sessColors={interval:'#4c8cde',tempo:'#e05c5c',easy:'#00C49A',long_run:'#FBA828',recovery:'#5A6888',race_pace:'#FF6B35',threshold:'#c44c9a',rest:'#2a2f3e'};
+  const sessLabels={interval:'Ripetute',tempo:'Tempo',easy:'Facile',long_run:'Lungo',recovery:'Recovery',race_pace:'Ritmo gara',threshold:'Soglia',rest:'Riposo'};
 
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'8px'}}>
 
       {/* Header giorno */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:'4px'}}>
-        <div>
-          <div style={{fontFamily:'var(--display)',fontSize:'22px',color:'var(--text)',lineHeight:1.1}}>{dataLabel}</div>
-        </div>
+        <div style={{fontFamily:'var(--display)',fontSize:'22px',color:'var(--text)',lineHeight:1.1}}>{dataLabel}</div>
         <div style={{display:'flex',alignItems:'center',gap:'6px',background:typeCfg.bg,padding:'5px 10px',borderRadius:'999px'}}>
           <span style={{fontSize:'13px'}}>{typeCfg.icon}</span>
           <span style={{fontSize:'12px',fontWeight:600,color:typeCfg.color}}>{type}</span>
         </div>
       </div>
 
-      {/* Card kcal con arco SVG */}
-      <div style={{...S.card(),padding:'18px 20px',display:'flex',alignItems:'center',gap:'20px',position:'relative',overflow:'hidden'}}>
-        <div style={{position:'absolute',right:'-20px',bottom:'-20px',width:'100px',height:'100px',borderRadius:'50%',background:'var(--accent-soft)',opacity:0.5}}/>
-        {/* Arc */}
-        <div style={{flexShrink:0}}>
-          <svg viewBox="0 0 100 100" width="90" height="90">
-            <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--chip)" strokeWidth="7"
-              strokeDasharray={`${arcFull} ${circ}`}
-              strokeDashoffset={-arcStart}
-              strokeLinecap="round" transform="rotate(-90 50 50)" style={{transformOrigin:'50% 50%'}}/>
-            <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--accent)" strokeWidth="7"
-              strokeDasharray={`${(arcFull*kcalPct).toFixed(1)} ${circ}`}
-              strokeDashoffset={-arcStart}
-              strokeLinecap="round" transform="rotate(-90 50 50)" style={{transformOrigin:'50% 50%'}}/>
-            <text x="50" y="47" textAnchor="middle" fontSize="14" fontWeight="700" fill="var(--text)" fontFamily="var(--font)">{consumedKcal.toLocaleString('it-IT')}</text>
-            <text x="50" y="59" textAnchor="middle" fontSize="8" fill="var(--text3)" fontFamily="var(--font)">kcal</text>
-          </svg>
-        </div>
-        {/* Info destra */}
-        <div style={{position:'relative',flex:1,minWidth:0}}>
-          <div style={{fontSize:'11px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'4px'}}>CALORIE</div>
-          <div style={{display:'flex',alignItems:'baseline',gap:'4px',marginBottom:'2px'}}>
-            <span style={{fontFamily:'var(--display)',fontSize:'28px',lineHeight:1,color:'var(--text)'}}>{consumedKcal.toLocaleString('it-IT')}</span>
+      {/* Banner obiettivo gara */}
+      {raceName&&dtr!=null&&dtr>0&&(
+        <div style={{background:'linear-gradient(135deg,#1a1f35 0%,#0d1220 100%)',borderRadius:'16px',
+          border:`2px solid ${phaseColors[phase]??'#FBA828'}`,padding:'12px 14px',
+          display:'flex',alignItems:'center',gap:'12px'}}>
+          <div style={{background:phaseColors[phase]??'#FBA828',borderRadius:'10px',padding:'8px 10px',textAlign:'center',minWidth:'46px',flexShrink:0}}>
+            <div style={{fontSize:'18px',fontWeight:900,color:'#0C0E14',lineHeight:1}}>{dtr}</div>
+            <div style={{fontSize:'9px',fontWeight:700,color:'#0C0E14'}}>giorni</div>
           </div>
-          <div style={{fontSize:'12px',color:'var(--text3)'}}>di {targetKcal.toLocaleString('it-IT')} kcal obiettivo</div>
-          <div style={{marginTop:'10px',height:'3px',borderRadius:'3px',background:'var(--chip)',overflow:'hidden'}}>
-            <div style={{height:'100%',width:`${Math.round(kcalPct*100)}%`,background:'var(--accent)',borderRadius:'3px',transition:'width 0.4s'}}/>
-          </div>
-          <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px'}}>{Math.round(kcalPct*100)}% del target giornaliero</div>
-        </div>
-      </div>
-
-      {/* Meal strip */}
-      {activeMeals.length>0&&(
-        <div style={{...S.card(),padding:'14px'}}>
-          <div style={{fontSize:'11px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'10px'}}>PASTI DI OGGI</div>
-          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-            {activeMeals.map(meal=>{
-              const items=dayItems[meal]||[];
-              const done=items.filter(it=>dayLog[it.key]?.checked).length;
-              const total=items.length;
-              const pct=total?done/total:0;
-              const full=pct===1,partial=pct>0&&pct<1;
-              return(
-                <div key={meal} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',flex:'1 1 0',minWidth:'36px'}}>
-                  <div style={{width:'100%',height:'5px',borderRadius:'3px',background:full?'var(--accent)':partial?'rgba(193,122,90,0.4)':'var(--chip)'}}/>
-                  <span style={{fontSize:'9px',color:full?'var(--accent)':partial?'var(--text2)':'var(--text3)',fontWeight:full?600:400,textAlign:'center',letterSpacing:'0.2px'}}>
-                    {mealLabels[meal]||meal.slice(0,3)}
-                  </span>
-                </div>
-              );
-            })}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:'10px',fontWeight:700,color:phaseColors[phase]??'#FBA828',letterSpacing:'0.7px'}}>{phaseLabels[phase]??''}</div>
+            <div style={{fontSize:'13px',fontWeight:800,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{raceName}</div>
+            {raceDate&&<div style={{fontSize:'10px',color:'var(--text3)'}}>{new Date(raceDate+'T00:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'long'})}</div>}
           </div>
         </div>
       )}
 
-      {/* Quick stats */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-        <div style={{...S.card(),padding:'14px'}}>
-          <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>PASTI</div>
-          <div style={{fontFamily:'var(--display)',fontSize:'26px',lineHeight:1,color:'var(--text)'}}>{checkedItems.length}<span style={{fontSize:'14px',color:'var(--text3)',fontFamily:'var(--font)'}}>/{allItems.length}</span></div>
-          <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'4px'}}>alimenti spuntati</div>
+      {/* Readiness + Volume row */}
+      {(rs!=null||weekTarget>0)&&(
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+          {/* Readiness */}
+          {rs!=null&&(
+            <div style={{...S.card(),padding:'14px'}}>
+              <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>READINESS</div>
+              <div style={{fontFamily:'var(--display)',fontSize:'28px',lineHeight:1,color:rsColor}}>{rs}</div>
+              <div style={{fontSize:'10px',color:rsColor,marginTop:'2px',fontWeight:600}}>{rsLabel??''}</div>
+              <div style={{marginTop:'8px',height:'3px',borderRadius:'3px',background:'var(--chip)',overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${rs}%`,background:rsColor,borderRadius:'3px'}}/>
+              </div>
+            </div>
+          )}
+          {/* Volume settimana */}
+          {weekTarget>0&&(
+            <div style={{...S.card(),padding:'14px'}}>
+              <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>VOLUME SETT.</div>
+              <div style={{fontFamily:'var(--display)',fontSize:'24px',lineHeight:1,color:'var(--text)'}}>{weekKmDone.toFixed(1)}<span style={{fontSize:'13px',color:'var(--text3)',fontFamily:'var(--font)'}}>/{weekTarget}km</span></div>
+              <div style={{marginTop:'8px',height:'3px',borderRadius:'3px',background:'var(--chip)',overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${Math.round(weekPct*100)}%`,background:'var(--accent)',borderRadius:'3px'}}/>
+              </div>
+              <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'3px'}}>{Math.round(weekPct*100)}% del target</div>
+            </div>
+          )}
         </div>
-        <div style={{...S.card(),padding:'14px'}}>
-          <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>PROTEINE EST.</div>
-          <div style={{fontFamily:'var(--display)',fontSize:'26px',lineHeight:1,color:'var(--text)'}}>~{estimatedProtein}<span style={{fontSize:'14px',color:'var(--text3)',fontFamily:'var(--font)'}}>g</span></div>
-          <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'4px'}}>da fonti proteiche</div>
+      )}
+
+      {/* Prossimo allenamento */}
+      {nextSession&&(
+        <div style={{...S.card(),padding:'14px',borderLeft:`3px solid ${sessColors[nextSession.type]??'#5A6888'}`}}>
+          <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>PROSSIMO ALLENAMENTO</div>
+          <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+            <span style={{fontSize:'10px',fontWeight:700,color:'#fff',background:sessColors[nextSession.type]??'#5A6888',
+              borderRadius:'6px',padding:'2px 7px'}}>{sessLabels[nextSession.type]??nextSession.type}</span>
+            <span style={{fontSize:'13px',fontWeight:600,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nextSession.day} — {nextSession.title}</span>
+            {nextSession.totalKm>0&&<span style={{fontSize:'12px',color:'var(--accent)',fontWeight:700,whiteSpace:'nowrap'}}>{nextSession.totalKm}km</span>}
+          </div>
+          {nextSession.structure?.length>0&&(
+            <div style={{fontSize:'11px',color:'var(--text3)',lineHeight:1.5}}>
+              {nextSession.structure.map((ph,j)=>(
+                <span key={j}>{ph.phase}{ph.pace?` @ ${ph.pace}`:''}{j<nextSession.structure.length-1?' → ':''}</span>
+              ))}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Calendario allenamenti */}
+      <div style={{...S.card(),padding:'14px 0 8px'}}>
+        <div style={{fontSize:'10px',color:'var(--text2)',letterSpacing:'0.8px',fontWeight:700,marginBottom:'4px',paddingLeft:'16px'}}>CALENDARIO ALLENAMENTI</div>
+        <CalendarView
+          dailyLog={dailyLog}
+          dayTypes={dayTypes}
+          weekPlan={weekPlan}
+          setTab={setTab}
+          setSelectedDayIndex={setSelectedDayIndex}
+          setWeekStart={setWeekStart}
+          stravaActivities={stravaActivities}
+          mode="training"
+        />
       </div>
 
-      {/* Frase del giorno */}
-      <div style={{...S.card(),padding:'16px 18px',borderLeft:'3px solid var(--accent)'}}>
-        <div style={{fontFamily:'var(--display)',fontSize:'15px',color:'var(--text2)',lineHeight:1.6,fontStyle:'italic'}}>
-          "{frase}"
+      {/* Link discreto nutrizione */}
+      <button onClick={()=>setTab('oggi')}
+        style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'12px',
+          padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',
+          cursor:'pointer',width:'100%',boxSizing:'border-box'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+          <span style={{fontSize:'16px'}}>🍽️</span>
+          <div style={{textAlign:'left'}}>
+            <div style={{fontSize:'12px',fontWeight:600,color:'var(--text)'}}>Traccia i pasti di oggi</div>
+            <div style={{fontSize:'10px',color:'var(--text3)'}}>Vai al NutriTracker →</div>
+          </div>
         </div>
-      </div>
-
-      {/* Calendario mensile */}
-      <CalendarView
-        dailyLog={dailyLog}
-        dayTypes={dayTypes}
-        weekPlan={weekPlan}
-        setTab={setTab}
-        setSelectedDayIndex={setSelectedDayIndex}
-        setWeekStart={setWeekStart}
-      />
+        <span style={{fontSize:'16px',color:'var(--text3)'}}>›</span>
+      </button>
 
     </div>
   );
@@ -3405,11 +3409,11 @@ const STRAVA_CLIENT_ID_PLACEHOLDER='YOUR_CLIENT_ID'; // sostituito da Netlify en
 const STRAVA_SCOPE='activity:read_all';
 const STRAVA_REDIRECT=typeof window!=='undefined'?`${window.location.origin}/strava-callback`:'';
 
-function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal}){
+function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal,setWeeklyPlanGlobal,setReadinessScoreGlobal}){
   const [loadingAct,setLoadingAct]=useState(false);
   const [expandedActivity,setExpandedActivity]=useState(null);
   const [loadingDetail,setLoadingDetail]=useState(null);
-  const [activityTab,setActivityTab]=useState('Run'); // categoria aperta di default
+  const [activityTab,setActivityTab]=useState(null);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState('');
   const [chatLoading,setChatLoading]=useState(false);
@@ -3479,6 +3483,10 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
   const weekReview = useMemo(() =>
     weeklyPlan && classifiedRuns.length ? generateWeekReview(classifiedRuns, weeklyPlan) : null,
     [classifiedRuns, weeklyPlan]);
+
+  // Sync weeklyPlan e readinessScore verso App (per HomeView)
+  useEffect(() => { if(setWeeklyPlanGlobal) setWeeklyPlanGlobal(weeklyPlan); }, [weeklyPlan]);
+  useEffect(() => { if(setReadinessScoreGlobal) setReadinessScoreGlobal(readinessScore); }, [readinessScore]);
 
   // Legge il ?code= dall'URL dopo il redirect OAuth Strava
   useEffect(()=>{
@@ -4088,7 +4096,9 @@ function ExtraFoodModal({modal,onAdd,onClose}){
 
 // ── CALENDAR VIEW ─────────────────────────────────────────────
 const MONTH_NAMES=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
-function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,setWeekStart}){
+// mode: 'nutrition' (mostra kcal, click→oggi) | 'training' (mostra km Strava, click→oggi)
+function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,setWeekStart,stravaActivities,mode}){
+  const calMode = mode ?? 'nutrition';
   const todayISO=toISO(new Date());
   const [cur,setCur]=useState(()=>{const d=new Date();return{year:d.getFullYear(),month:d.getMonth()};});
   const {year,month}=cur;
@@ -4109,6 +4119,12 @@ function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,set
       const qty=dl[it.key]?.qtyOverride??it.qty;
       return sum+(calcKcal({...it,qty})||0);
     },0);
+  };
+  const getStravaKmForDay=(dateISO)=>{
+    if(!stravaActivities?.length) return 0;
+    return stravaActivities
+      .filter(a=>a.type==='Run'&&a.start_date?.slice(0,10)===dateISO)
+      .reduce((s,a)=>s+(a.distance/1000),0);
   };
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
@@ -4135,6 +4151,8 @@ function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,set
           const isToday=dateISO===todayISO;
           const type=dayTypes?.[dateISO];
           const hasLog=!!(dailyLog[dateISO]&&Object.keys(dailyLog[dateISO]).length>0);
+          const kmRun = calMode==='training' ? getStravaKmForDay(dateISO) : 0;
+          const hasRun = kmRun > 0;
           return(
             <div key={i} onClick={()=>{
                 if(isFuture)return;
@@ -4145,8 +4163,8 @@ function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,set
               }}
               style={{
                 borderRadius:'10px',
-                border:`${isToday?'2px':'1px'} solid ${isToday?'var(--accent)':'var(--border)'}`,
-                background:hasLog?'var(--card)':'var(--surface)',
+                border:`${isToday?'2px':'1px'} solid ${isToday?'var(--accent)':hasRun?'rgba(0,196,154,0.4)':'var(--border)'}`,
+                background:hasRun?'rgba(0,196,154,0.07)':hasLog&&calMode==='nutrition'?'var(--card)':'var(--surface)',
                 opacity:isFuture?0.3:1,
                 padding:'6px 2px',
                 textAlign:'center',
@@ -4156,13 +4174,20 @@ function CalendarView({dailyLog,dayTypes,weekPlan,setTab,setSelectedDayIndex,set
               }}>
               <span style={{fontSize:'11px',color:isToday?'var(--accent)':'var(--text2)',fontWeight:isToday?700:400}}>{d}</span>
               {type&&<span style={{fontSize:'11px'}}>{TYPE_CFG[type].icon}</span>}
-              {!isFuture&&(()=>{const k=getDayConsumedKcal(dateISO);return k>0?<span style={{fontSize:'9px',color:'var(--accent)',fontWeight:600}}>{k}</span>:null;})()}
+              {calMode==='training'
+                ? hasRun&&<span style={{fontSize:'9px',color:'#00C49A',fontWeight:700}}>{kmRun.toFixed(1)}k</span>
+                : !isFuture&&(()=>{const k=getDayConsumedKcal(dateISO);return k>0?<span style={{fontSize:'9px',color:'var(--accent)',fontWeight:600}}>{k}</span>:null;})()
+              }
             </div>
           );
         })}
       </div>
       {/* Legenda */}
       <div style={{display:'flex',gap:'16px',justifyContent:'center',padding:'4px 0'}}>
+        {calMode==='training'&&<div style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',color:'var(--text3)'}}>
+          <span style={{width:'8px',height:'8px',borderRadius:'50%',background:'#00C49A',display:'inline-block'}}/>
+          <span>corsa registrata</span>
+        </div>}
         <div style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',color:'var(--text3)'}}>
           <span>💤</span><span>Riposo</span>
         </div>
@@ -4212,6 +4237,8 @@ export default function App(){
   const [weightLog,setWeightLog]=useState([]);
   const [raceGoal,setRaceGoal]=useState(null); // { name, date, distanceKm, targetTime }
   const saveRaceGoal=async g=>{setRaceGoal(g);try{await window.storage.set('nt_raceGoal',JSON.stringify(g));}catch(e){}};
+  const [weeklyPlanGlobal,setWeeklyPlanGlobal]=useState(null); // training plan (da TrainingsView)
+  const [readinessScoreGlobal,setReadinessScoreGlobal]=useState(null); // readiness (da TrainingsView)
   const saveWeightLog=async log=>{setWeightLog(log);try{await window.storage.set('nt_weightLog',JSON.stringify(log));}catch(e){}};
   const [userRecipes,setUserRecipes]=useState([]);
   const saveRecipes=async list=>{setUserRecipes(list);try{await window.storage.set('nt_recipes',JSON.stringify(list));}catch(e){}};
@@ -4431,7 +4458,7 @@ export default function App(){
 
       {/* Content */}
       <div style={{paddingTop:'12px'}}>
-        {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes} setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart}/>}
+        {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes} setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart} weeklyPlan={weeklyPlanGlobal} readinessScore={readinessScoreGlobal} stravaActivities={stravaActivities} raceGoal={raceGoal}/>}
         {tab==='oggi'&&<OggiView weekPlan={weekPlan} weekDates={weekDates} todayISO={todayISO}
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
           dailyLog={dailyLog} toggleLogItem={toggleLog} updateLogQty={updateQty}
@@ -4449,7 +4476,8 @@ export default function App(){
           dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}
           stravaActivities={stravaActivities} setStravaActivities={setStravaActivities}
           activityDetails={activityDetails} setActivityDetails={setActivityDetails}
-          raceGoal={raceGoal} saveRaceGoal={saveRaceGoal}/>}
+          raceGoal={raceGoal} saveRaceGoal={saveRaceGoal}
+          setWeeklyPlanGlobal={setWeeklyPlanGlobal} setReadinessScoreGlobal={setReadinessScoreGlobal}/>}
         {tab==='peso'&&<PesoView weightLog={weightLog} saveWeightLog={saveWeightLog}/>}
       </div>
 
