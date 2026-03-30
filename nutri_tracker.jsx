@@ -3445,12 +3445,45 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
   );
 }
 
+// ── POLYLINE DECODER (Google Encoded Polyline Algorithm) ───────
+function decodePolyline(encoded) {
+  if(!encoded)return[];
+  const pts=[];let idx=0,lat=0,lng=0;
+  while(idx<encoded.length){
+    let b,shift=0,result=0;
+    do{b=encoded.charCodeAt(idx++)-63;result|=(b&0x1f)<<shift;shift+=5;}while(b>=0x20);
+    lat+=(result&1)?~(result>>1):(result>>1);
+    shift=0;result=0;
+    do{b=encoded.charCodeAt(idx++)-63;result|=(b&0x1f)<<shift;shift+=5;}while(b>=0x20);
+    lng+=(result&1)?~(result>>1):(result>>1);
+    pts.push([lat/1e5,lng/1e5]);
+  }
+  return pts;
+}
+
+function PolylineSVG({polyline,width=280,height=140}){
+  const pts=decodePolyline(polyline);
+  if(pts.length<2)return null;
+  const lats=pts.map(p=>p[0]),lngs=pts.map(p=>p[1]);
+  const minLat=Math.min(...lats),maxLat=Math.max(...lats);
+  const minLng=Math.min(...lngs),maxLng=Math.max(...lngs);
+  const pad=10;
+  const scaleX=(lng)=>pad+(lng-minLng)/(maxLng-minLng||1)*(width-pad*2);
+  const scaleY=(lat)=>height-pad-(lat-minLat)/(maxLat-minLat||1)*(height-pad*2);
+  const d=pts.map((p,i)=>`${i===0?'M':'L'}${scaleX(p[1]).toFixed(1)},${scaleY(p[0]).toFixed(1)}`).join(' ');
+  return(
+    <svg width={width} height={height} style={{borderRadius:'8px',background:'#1a1f2e',display:'block'}}>
+      <path d={d} fill="none" stroke="#FC4C02" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
 // ── TRAININGS VIEW ─────────────────────────────────────────────
 const STRAVA_CLIENT_ID_PLACEHOLDER='YOUR_CLIENT_ID'; // sostituito da Netlify env
 const STRAVA_SCOPE='activity:read_all';
 const STRAVA_REDIRECT=typeof window!=='undefined'?`${window.location.origin}/strava-callback`:'';
 
-function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal,normalizedRuns,classifiedRuns,trainingMetrics,coachingInsights,paceZones,readinessScore,weeklyPlan}){
+function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal,normalizedRuns,classifiedRuns,trainingMetrics,coachingInsights,paceZones,readinessScore,weeklyPlan,showStravaPopup,setShowStravaPopup}){
   const [loadingAct,setLoadingAct]=useState(false);
   const [expandedActivity,setExpandedActivity]=useState(null);
   const [loadingDetail,setLoadingDetail]=useState(null);
@@ -3524,7 +3557,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
   const fetchActivities=async(token)=>{
     setLoadingAct(true);setError('');
     try{
-      const res=await fetch('/.netlify/functions/strava-activities?per_page=50',{
+      const res=await fetch('/.netlify/functions/strava-activities?per_page=100&after=1737072000',{
         headers:{Authorization:`Bearer ${token}`}
       });
       const data=await res.json();
@@ -3615,190 +3648,74 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 
   return(
     <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
-      {/* Strava connection card */}
-      <div style={{...{borderRadius:'16px',background:'var(--card)',border:'1px solid var(--border)',padding:'16px'},display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-          <div style={{width:'40px',height:'40px',borderRadius:'12px',background:'#FC4C02',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px'}}>🏃</div>
-          <div>
-            <div style={{fontSize:'14px',fontWeight:700,color:'var(--text)'}}>Strava</div>
-            <div style={{fontSize:'12px',color:isConnected?'var(--accent)':'var(--text3)'}}>
-              {isConnected?(stravaTokens.athlete?`Connesso come ${stravaTokens.athlete.firstname} ${stravaTokens.athlete.lastname}`:'Connesso'):'Non connesso'}
+
+      {/* Popup Strava — position:fixed, si apre dall'icona nell'header */}
+      {showStravaPopup&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:300,display:'flex',alignItems:'flex-end'}}
+          onClick={e=>{if(e.target===e.currentTarget)setShowStravaPopup(false);}}>
+          <div style={{width:'100%',background:'var(--surface)',borderRadius:'20px 20px 0 0',padding:'20px',display:'flex',flexDirection:'column',gap:'14px'}}>
+            {/* Handle */}
+            <div style={{width:'36px',height:'4px',borderRadius:'2px',background:'var(--border)',margin:'0 auto'}}/>
+            {/* Titolo + logo */}
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <div style={{width:'44px',height:'44px',borderRadius:'12px',background:'#FC4C02',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+                  <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+                </svg>
+              </div>
+              <div>
+                <div style={{fontSize:'16px',fontWeight:700,color:'var(--text)'}}>Strava</div>
+                <div style={{fontSize:'12px',color:isConnected?'var(--accent)':'var(--text3)'}}>
+                  {isConnected?(stravaTokens.athlete?`${stravaTokens.athlete.firstname} ${stravaTokens.athlete.lastname}`:'Connesso'):'Non connesso'}
+                </div>
+              </div>
+            </div>
+            {/* Attività non-Run nel popup */}
+            {isConnected&&(()=>{
+              const others=stravaActivities.filter(a=>a.type!=='Run');
+              if(!others.length)return null;
+              const byType={};
+              others.forEach(a=>{const t=a.type||'Altro';if(!byType[t])byType[t]=[];byType[t].push(a);});
+              const tabIcon={Ride:'🚴',Walk:'🚶',Hike:'🥾',Swim:'🏊',Soccer:'⚽',Football:'⚽',Workout:'💪'};
+              const tabLabel={Ride:'Ciclismo',Walk:'Camminata',Hike:'Escursione',Swim:'Nuoto',Soccer:'Calcio',Football:'Calcio',Workout:'Workout'};
+              return(
+                <div style={{display:'flex',flexDirection:'column',gap:'6px',maxHeight:'240px',overflowY:'auto'}}>
+                  <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:600,letterSpacing:'0.7px',marginBottom:'2px'}}>ALTRE ATTIVITÀ</div>
+                  {Object.entries(byType).map(([type,acts])=>(
+                    <div key={type} style={{background:'var(--card)',borderRadius:'12px',padding:'10px 12px',display:'flex',alignItems:'center',gap:'10px'}}>
+                      <span style={{fontSize:'20px'}}>{tabIcon[type]||'🏅'}</span>
+                      <div>
+                        <div style={{fontSize:'13px',fontWeight:600,color:'var(--text)'}}>{tabLabel[type]||type}</div>
+                        <div style={{fontSize:'11px',color:'var(--text3)'}}>{acts.length} attività</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            {error&&<div style={{fontSize:'12px',color:'#e05c5c',padding:'8px 12px',background:'#2c1a1a',borderRadius:'10px'}}>{error}</div>}
+            {/* Azioni */}
+            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+              {isConnected&&(
+                <button onClick={()=>{fetchActivities(stravaTokens.access_token);setShowStravaPopup(false);}}
+                  style={{padding:'12px',borderRadius:'12px',border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontSize:'14px',fontWeight:600,cursor:'pointer'}}>
+                  {loadingAct?'Aggiornamento...':'↻ Aggiorna attività'}
+                </button>
+              )}
+              <button onClick={isConnected?()=>{disconnect();setShowStravaPopup(false);}:connectStrava}
+                style={{padding:'12px',borderRadius:'12px',border:'none',background:isConnected?'#2c1a1a':'#FC4C02',color:isConnected?'#e05c5c':'#fff',fontSize:'14px',fontWeight:600,cursor:'pointer'}}>
+                {isConnected?'Disconnetti Strava':'Connetti Strava'}
+              </button>
             </div>
           </div>
         </div>
-        <button onClick={isConnected?disconnect:connectStrava}
-          style={{padding:'8px 16px',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'13px',fontWeight:600,
-            background:isConnected?'var(--muted)':'#FC4C02',color:isConnected?'var(--text2)':'#fff'}}>
-          {isConnected?'Disconnetti':'Connetti'}
-        </button>
-      </div>
+      )}
 
-      {error&&<div style={{fontSize:'12px',color:'#e05c5c',padding:'8px 12px',background:'#2c1a1a',borderRadius:'10px'}}>{error}</div>}
-
-      {/* Attività divise per categoria */}
-      {isConnected&&(()=>{
-        // Raggruppa le attività per tipo
-        const typeGroups={};
-        stravaActivities.forEach(a=>{
-          const t=a.type||'Altro';
-          if(!typeGroups[t])typeGroups[t]=[];
-          typeGroups[t].push(a);
-        });
-        // Ordine preferito dei tab
-        const typeOrder=['Run','Ride','Walk','Hike','Swim','Soccer','Football','Workout'];
-        const allTypes=[...typeOrder.filter(t=>typeGroups[t]),...Object.keys(typeGroups).filter(t=>!typeOrder.includes(t))];
-
-        const tabIcon={Run:'🏃',Ride:'🚴',Walk:'🚶',Hike:'🥾',Swim:'🏊',Soccer:'⚽',Football:'⚽',Workout:'💪'};
-        const tabLabel={Run:'Corsa',Ride:'Ciclismo',Walk:'Camminata',Hike:'Escursione',Swim:'Nuoto',Soccer:'Calcio',Football:'Calcio',Workout:'Workout'};
-
-        return(
-          <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-            {/* Header con refresh */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 2px'}}>
-              <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>LE TUE ATTIVITÀ</div>
-              <button onClick={()=>fetchActivities(stravaTokens.access_token)}
-                style={{fontSize:'11px',color:'var(--accent)',background:'none',border:'none',cursor:'pointer',fontWeight:600}}>
-                {loadingAct?'...':'↻ Aggiorna'}
-              </button>
-            </div>
-            {loadingAct&&<div style={{textAlign:'center',padding:'20px',color:'var(--text3)',fontSize:'13px'}}>Caricamento...</div>}
-            {!loadingAct&&stravaActivities.length===0&&<div style={{textAlign:'center',padding:'20px',color:'var(--text3)',fontSize:'13px'}}>Nessuna attività trovata</div>}
-            {!loadingAct&&allTypes.length>0&&allTypes.map(type=>{
-              const acts=typeGroups[type];
-              const icon=tabIcon[type]||'🏅';
-              const label=tabLabel[type]||type;
-              const totalKm=acts.filter(a=>a.distance).reduce((s,a)=>s+(a.distance/1000),0);
-              const isOpen=activityTab===type;
-              return(
-                <div key={type} style={{borderRadius:'14px',background:'var(--card)',border:`1px solid ${isOpen?'var(--accent)':'var(--border)'}`,overflow:'hidden'}}>
-                  {/* Tab header — clicca per aprire/chiudere la categoria */}
-                  <div onClick={()=>setActivityTab(isOpen?null:type)}
-                    style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:'12px',cursor:'pointer',userSelect:'none'}}>
-                    <div style={{fontSize:'24px',lineHeight:1}}>{icon}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:'14px',fontWeight:700,color:'var(--text)'}}>{label}</div>
-                      <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}}>
-                        {acts.length} {acts.length===1?'attività':'attività'}
-                        {totalKm>0&&` · ${totalKm.toFixed(1)} km totali`}
-                      </div>
-                    </div>
-                    <span style={{color:'var(--text3)',fontSize:'13px'}}>{isOpen?'▲':'▼'}</span>
-                  </div>
-                  {/* Lista attività della categoria */}
-                  {isOpen&&(
-                    <div style={{borderTop:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:'0'}}>
-                      {acts.map((a,idx)=>{
-                        const date=new Date(a.start_date).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'});
-                        const time=new Date(a.start_date).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-                        const dist=a.distance?(a.distance/1000).toFixed(2)+' km':'';
-                        const dur=a.moving_time?fmtTime(a.moving_time):'';
-                        const pace=a.distance&&a.moving_time?fmtPace(a.distance/a.moving_time):'';
-                        const isExpanded=expandedActivity===a.id;
-                        const detail=activityDetails[a.id];
-                        const kcalVal=detail?.calories??a.calories;
-                        const kcal=kcalVal?Math.round(kcalVal)+' kcal':'';
-                        // Classificazione per le Run
-                        const runClass=a.type==='Run'?classifiedRuns.find(r=>r.id===a.id)?.classification:null;
-                        return(
-                          <div key={a.id} style={{borderTop:idx>0?'1px solid var(--border)':'none'}}>
-                            {/* Riga attività */}
-                            <div onClick={()=>toggleActivity(a.id)}
-                              style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',
-                                background:isExpanded?'var(--surface)':'transparent'}}>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
-                                  <span style={{fontSize:'13px',fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'160px'}}>{a.name}</span>
-                                  {runClass&&runClass.workoutType!=='unknown'&&(
-                                    <span style={{fontSize:'10px',fontWeight:700,color:'#fff',background:WORKOUT_COLORS[runClass.workoutType]??'#5A6888',borderRadius:'5px',padding:'1px 5px',whiteSpace:'nowrap'}}>
-                                      {WORKOUT_LABELS[runClass.workoutType]??runClass.workoutType}
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}}>{date} · {time}</div>
-                              </div>
-                              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px',flexShrink:0}}>
-                                <div style={{display:'flex',gap:'8px'}}>
-                                  {dist&&<span style={{fontSize:'12px',color:'var(--text)',fontWeight:700}}>{dist}</span>}
-                                  {dur&&<span style={{fontSize:'12px',color:'var(--text2)',fontWeight:600}}>{dur}</span>}
-                                </div>
-                                <div style={{display:'flex',gap:'6px'}}>
-                                  {pace&&<span style={{fontSize:'11px',color:'var(--text3)'}}>⏱ {pace}/km</span>}
-                                  {kcal&&<span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600}}>{kcal}</span>}
-                                </div>
-                              </div>
-                              <span style={{color:'var(--text3)',fontSize:'11px',marginLeft:'2px'}}>{isExpanded?'▲':'▼'}</span>
-                            </div>
-                            {/* Dettaglio espanso */}
-                            {isExpanded&&(
-                              <div style={{borderTop:'1px solid var(--border)',padding:'12px 14px',display:'flex',flexDirection:'column',gap:'10px',background:'var(--surface)'}}>
-                                {loadingDetail===a.id&&<div style={{textAlign:'center',color:'var(--text3)',fontSize:'12px'}}>Caricamento dettagli...</div>}
-                                {!detail&&loadingDetail!==a.id&&<div style={{textAlign:'center',color:'var(--text3)',fontSize:'12px'}}>Espandi per caricare i dettagli</div>}
-                                {detail&&(
-                                  <>
-                                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                                      {detail.calories&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--accent)',fontWeight:600}}>🔥 {Math.round(detail.calories)} kcal</span>}
-                                      {detail.average_heartrate&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>❤️ {Math.round(detail.average_heartrate)} bpm medio</span>}
-                                      {detail.max_heartrate&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>❤️‍🔥 {Math.round(detail.max_heartrate)} bpm max</span>}
-                                      {detail.total_elevation_gain>0&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>↑ {Math.round(detail.total_elevation_gain)} m</span>}
-                                      {detail.suffer_score&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>💪 Suffer: {detail.suffer_score}</span>}
-                                      {detail.average_cadence&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>👟 {Math.round(detail.average_cadence*2)} passi/min</span>}
-                                      {detail.max_speed>0&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>⚡ {(detail.max_speed*3.6).toFixed(1)} km/h max</span>}
-                                    </div>
-                                    {/* Note classificazione corsa */}
-                                    {runClass&&runClass.notes?.length>0&&(
-                                      <div style={{fontSize:'11px',color:'var(--text3)',lineHeight:'1.5'}}>
-                                        {runClass.notes.join(' · ')}
-                                      </div>
-                                    )}
-                                    {/* Laps */}
-                                    {detail.laps?.length>0&&(
-                                      <div>
-                                        <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,marginBottom:'6px',letterSpacing:'0.5px'}}>LAPS</div>
-                                        <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-                                          {detail.laps.map(lap=>(
-                                            <div key={lap.id} style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',padding:'6px 8px',borderRadius:'8px',background:'var(--card)'}}>
-                                              <span style={{color:'var(--text3)',minWidth:'18px',fontWeight:600}}>#{lap.lap_index}</span>
-                                              <span style={{color:'var(--text)',fontWeight:600,minWidth:'52px'}}>{(lap.distance/1000).toFixed(2)}km</span>
-                                              <span style={{color:'var(--text2)',minWidth:'42px'}}>{fmtTime(lap.elapsed_time)}</span>
-                                              <span style={{color:'var(--text3)',minWidth:'52px'}}>{fmtPace(lap.average_speed)}/km</span>
-                                              {lap.average_heartrate&&<span style={{color:'#e05c5c',marginLeft:'auto'}}>❤️ {Math.round(lap.average_heartrate)}</span>}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {/* Splits km */}
-                                    {detail.splits_metric?.length>0&&(
-                                      <div>
-                                        <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,marginBottom:'6px',letterSpacing:'0.5px'}}>SPLITS (km)</div>
-                                        <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-                                          {detail.splits_metric.map((s,i)=>(
-                                            <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',padding:'6px 8px',borderRadius:'8px',background:'var(--card)'}}>
-                                              <span style={{color:'var(--text3)',minWidth:'18px',fontWeight:600}}>{i+1}</span>
-                                              <span style={{color:'var(--text)',fontWeight:600,minWidth:'52px'}}>{(s.distance/1000).toFixed(2)}km</span>
-                                              <span style={{color:'var(--text2)',minWidth:'42px'}}>{fmtTime(s.elapsed_time)}</span>
-                                              <span style={{color:'var(--text3)',minWidth:'52px'}}>{fmtPace(s.distance/s.elapsed_time)}/km</span>
-                                              {s.average_heartrate&&<span style={{color:'#e05c5c',marginLeft:'auto'}}>❤️ {Math.round(s.average_heartrate)}</span>}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
+      {!isConnected&&(
+        <div style={{textAlign:'center',padding:'40px 16px',color:'var(--text3)',fontSize:'14px'}}>
+          Connetti Strava tramite l'icona in alto a destra per vedere le tue attività.
+        </div>
+      )}
 
       {/* Running Insights Panel */}
       {isConnected && classifiedRuns.length >= 3 && trainingMetrics && coachingInsights && (
@@ -3835,10 +3752,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
           )}
         </div>
         <div style={{display:'flex',gap:'8px'}}>
-          <input
-            type='text'
-            value={chatInput}
-            onChange={e=>setChatInput(e.target.value)}
+          <input type='text' value={chatInput} onChange={e=>setChatInput(e.target.value)}
             onKeyDown={e=>e.key==='Enter'&&sendChat()}
             placeholder='Es: programma la settimana prossima...'
             style={{flex:1,padding:'10px 14px',borderRadius:'12px',border:'1.5px solid var(--border)',
@@ -3846,11 +3760,124 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
           <button onClick={sendChat} disabled={chatLoading||!chatInput.trim()}
             style={{padding:'10px 18px',borderRadius:'12px',border:'none',cursor:'pointer',
               background:'var(--accent)',color:'#fff',fontSize:'13px',fontWeight:600,
-              opacity:chatLoading||!chatInput.trim()?0.5:1}}>
-            →
-          </button>
+              opacity:chatLoading||!chatInput.trim()?0.5:1}}>→</button>
         </div>
       </div>
+
+      {/* Lista corse (Run) — in fondo */}
+      {isConnected&&(()=>{
+        const runs=stravaActivities.filter(a=>a.type==='Run');
+        if(!runs.length)return null;
+        return(
+          <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 2px'}}>
+              <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px'}}>LE TUE CORSE 🏃</div>
+              {loadingAct&&<span style={{fontSize:'11px',color:'var(--text3)'}}>Aggiornamento...</span>}
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+              {runs.map((a,idx)=>{
+                const date=new Date(a.start_date).toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});
+                const dist=a.distance?(a.distance/1000).toFixed(2)+' km':'';
+                const dur=a.moving_time?fmtTime(a.moving_time):'';
+                const pace=a.distance&&a.moving_time?fmtPace(a.distance/a.moving_time):'';
+                const kcalVal=activityDetails[a.id]?.calories??a.calories;
+                const kcal=kcalVal?Math.round(kcalVal)+' kcal':'';
+                const isExpanded=expandedActivity===a.id;
+                const detail=activityDetails[a.id];
+                const runClass=classifiedRuns.find(r=>r.id===a.id)?.classification;
+                const polyline=a.map?.summary_polyline;
+                return(
+                  <div key={a.id} style={{borderRadius:'14px',background:'var(--card)',border:`1px solid ${isExpanded?'var(--accent)':'var(--border)'}`,overflow:'hidden'}}>
+                    {/* Riga principale */}
+                    <div onClick={()=>toggleActivity(a.id)}
+                      style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginBottom:'3px'}}>
+                          <span style={{fontSize:'13px',fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'150px'}}>{a.name}</span>
+                          {runClass&&runClass.workoutType!=='unknown'&&(
+                            <span style={{fontSize:'10px',fontWeight:700,color:'#fff',background:WORKOUT_COLORS[runClass.workoutType]??'#5A6888',borderRadius:'5px',padding:'1px 5px',whiteSpace:'nowrap'}}>
+                              {WORKOUT_LABELS[runClass.workoutType]??runClass.workoutType}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{fontSize:'11px',color:'var(--text3)'}}>{date}</div>
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'2px',flexShrink:0}}>
+                        <div style={{display:'flex',gap:'8px'}}>
+                          {dist&&<span style={{fontSize:'12px',color:'var(--text)',fontWeight:700}}>{dist}</span>}
+                          {dur&&<span style={{fontSize:'12px',color:'var(--text2)',fontWeight:600}}>{dur}</span>}
+                        </div>
+                        <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                          {pace&&<span style={{fontSize:'11px',color:'var(--text3)'}}>⏱ {pace}/km</span>}
+                          {kcal&&<span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600}}>🔥 {kcal}</span>}
+                        </div>
+                      </div>
+                      <span style={{color:'var(--text3)',fontSize:'11px',marginLeft:'2px'}}>{isExpanded?'▲':'▼'}</span>
+                    </div>
+                    {/* Dettaglio espanso */}
+                    {isExpanded&&(
+                      <div style={{borderTop:'1px solid var(--border)',padding:'12px 14px',display:'flex',flexDirection:'column',gap:'10px',background:'var(--surface)'}}>
+                        {/* Mappa percorso SVG */}
+                        {polyline&&<PolylineSVG polyline={polyline} width={Math.min(window.innerWidth-60,400)} height={160}/>}
+                        {loadingDetail===a.id&&<div style={{textAlign:'center',color:'var(--text3)',fontSize:'12px'}}>Caricamento dettagli...</div>}
+                        {detail&&(
+                          <>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                              {detail.calories&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--accent)',fontWeight:600}}>🔥 {Math.round(detail.calories)} kcal</span>}
+                              {detail.average_heartrate&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>❤️ {Math.round(detail.average_heartrate)} bpm medio</span>}
+                              {detail.max_heartrate&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>❤️‍🔥 {Math.round(detail.max_heartrate)} bpm max</span>}
+                              {detail.total_elevation_gain>0&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>↑ {Math.round(detail.total_elevation_gain)} m</span>}
+                              {detail.suffer_score&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>💪 Suffer: {detail.suffer_score}</span>}
+                              {detail.average_cadence&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>👟 {Math.round(detail.average_cadence*2)} passi/min</span>}
+                              {detail.max_speed>0&&<span style={{fontSize:'12px',padding:'4px 8px',borderRadius:'8px',background:'var(--card)',color:'var(--text2)'}}>⚡ {(detail.max_speed*3.6).toFixed(1)} km/h max</span>}
+                            </div>
+                            {runClass?.notes?.length>0&&(
+                              <div style={{fontSize:'11px',color:'var(--text3)',lineHeight:'1.5'}}>{runClass.notes.join(' · ')}</div>
+                            )}
+                            {detail.laps?.length>0&&(
+                              <div>
+                                <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,marginBottom:'6px',letterSpacing:'0.5px'}}>LAPS</div>
+                                <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                                  {detail.laps.map(lap=>(
+                                    <div key={lap.id} style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',padding:'6px 8px',borderRadius:'8px',background:'var(--card)'}}>
+                                      <span style={{color:'var(--text3)',minWidth:'18px',fontWeight:600}}>#{lap.lap_index}</span>
+                                      <span style={{color:'var(--text)',fontWeight:600,minWidth:'52px'}}>{(lap.distance/1000).toFixed(2)}km</span>
+                                      <span style={{color:'var(--text2)',minWidth:'42px'}}>{fmtTime(lap.elapsed_time)}</span>
+                                      <span style={{color:'var(--text3)',minWidth:'52px'}}>{fmtPace(lap.average_speed)}/km</span>
+                                      {lap.average_heartrate&&<span style={{color:'#e05c5c',marginLeft:'auto'}}>❤️ {Math.round(lap.average_heartrate)}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {detail.splits_metric?.length>0&&(
+                              <div>
+                                <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,marginBottom:'6px',letterSpacing:'0.5px'}}>SPLITS (km)</div>
+                                <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                                  {detail.splits_metric.map((s,i)=>(
+                                    <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',padding:'6px 8px',borderRadius:'8px',background:'var(--card)'}}>
+                                      <span style={{color:'var(--text3)',minWidth:'18px',fontWeight:600}}>{i+1}</span>
+                                      <span style={{color:'var(--text)',fontWeight:600,minWidth:'52px'}}>{(s.distance/1000).toFixed(2)}km</span>
+                                      <span style={{color:'var(--text2)',minWidth:'42px'}}>{fmtTime(s.elapsed_time)}</span>
+                                      <span style={{color:'var(--text3)',minWidth:'52px'}}>{fmtPace(s.distance/s.elapsed_time)}/km</span>
+                                      {s.average_heartrate&&<span style={{color:'#e05c5c',marginLeft:'auto'}}>❤️ {Math.round(s.average_heartrate)}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }
@@ -4215,6 +4242,7 @@ export default function App(){
   const [stravaTokens,setStravaTokens]=useState(null);
   const [stravaActivities,setStravaActivities]=useState([]);
   const [activityDetails,setActivityDetails]=useState({});
+  const [showStravaPopup,setShowStravaPopup]=useState(false);
   const [weightLog,setWeightLog]=useState([]);
   const [raceGoal,setRaceGoal]=useState(null); // { name, date, distanceKm, targetTime }
   const saveRaceGoal=async g=>{setRaceGoal(g);try{await window.storage.set('nt_raceGoal',JSON.stringify(g));}catch(e){}};
@@ -4310,7 +4338,7 @@ export default function App(){
     if(!stravaTokens?.access_token)return;
     const expired=stravaTokens.expires_at&&(stravaTokens.expires_at*1000)<Date.now();
     if(expired)return; // il refresh avviene dentro TrainingsView
-    fetch('/.netlify/functions/strava-activities?per_page=50',{
+    fetch('/.netlify/functions/strava-activities?per_page=100&after=1737072000',{
       headers:{Authorization:`Bearer ${stravaTokens.access_token}`}
     }).then(r=>r.json()).then(data=>{
       if(Array.isArray(data))setStravaActivities(data);
@@ -4468,6 +4496,19 @@ export default function App(){
             Il tuo percorso
           </div>
         )}
+        {tab==='trainings'&&(
+          <button onClick={()=>setShowStravaPopup(true)}
+            style={{background:'none',border:'none',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center',gap:'6px'}}>
+            <div style={{width:'28px',height:'28px',borderRadius:'8px',background:'#FC4C02',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+              </svg>
+            </div>
+            <span style={{fontSize:'11px',color:stravaTokens?.access_token?'var(--accent)':'var(--text3)',fontWeight:600}}>
+              {stravaTokens?.access_token?'Connesso':'Connetti'}
+            </span>
+          </button>
+        )}
         {tab==='oggi'&&(
           <div style={{fontSize:'12px',color:'var(--text2)'}}>
             Nutri Tracker
@@ -4509,13 +4550,14 @@ export default function App(){
           normalizedRuns={normalizedRuns} classifiedRuns={classifiedRuns}
           trainingMetrics={trainingMetrics} coachingInsights={coachingInsights}
           paceZones={paceZonesGlobal} readinessScore={readinessScoreGlobal}
-          weeklyPlan={weeklyPlanGlobal}/>}
+          weeklyPlan={weeklyPlanGlobal}
+          showStravaPopup={showStravaPopup} setShowStravaPopup={setShowStravaPopup}/>}
         {tab==='peso'&&<PesoView weightLog={weightLog} saveWeightLog={saveWeightLog}/>}
       </div>
 
       {/* Bottom nav */}
       <div style={{position:'fixed',bottom:0,left:0,right:0,background:'var(--surface)',borderTop:'1px solid var(--border)',display:'flex',zIndex:100,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'home',label:'Home'},{id:'trainings',label:'Sport'},{id:'ricette',label:'Ricette'},{id:'peso',label:'Weight Tracker'},{id:'oggi',label:'Nutri Tracker'},{id:'dashboard',label:'Weekly food portions'}].map(t=>(
+        {[{id:'home',label:'Home'},{id:'trainings',label:'Sport'},{id:'oggi',label:'Nutri Tracker'},{id:'dashboard',label:'Weekly food portions'},{id:'ricette',label:'Ricette'},{id:'peso',label:'Weight Tracker'}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{flex:1,padding:'10px 0 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'}}>
             <NavGlyph id={t.id} active={tab===t.id}/>

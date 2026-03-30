@@ -24,7 +24,8 @@ exports.handler = async (event) => {
       url = `https://www.strava.com/api/v3/activities/${activityId}?include_all_efforts=true`;
     } else {
       const perPage = event.queryStringParameters?.per_page || 20;
-      url = `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}`;
+      const after = event.queryStringParameters?.after || '';
+      url = `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}${after ? `&after=${after}` : ''}`;
     }
 
     const res = await fetch(url, {
