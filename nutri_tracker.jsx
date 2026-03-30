@@ -3490,28 +3490,33 @@ function PolylineSVG({polyline,width=300,height=160}){
   const pts=decodePolyline(polyline);
   if(pts.length<2)return null;
   const lats=pts.map(p=>p[0]),lngs=pts.map(p=>p[1]);
-  const minLat=Math.min(...lats),maxLat=Math.max(...lats);
-  const minLng=Math.min(...lngs),maxLng=Math.max(...lngs);
-  const pad=20;
-  // Mantieni proporzioni geografiche
-  const latRange=maxLat-minLat||0.001;
-  const lngRange=maxLng-minLng||0.001;
-  const latScale=(height-pad*2)/latRange;
-  const lngScale=(width-pad*2)/lngRange;
-  const scale=Math.min(latScale,lngScale);
-  const offX=(width-lngRange*scale)/2;
-  const offY=(height-latRange*scale)/2;
-  const scaleX=(lng)=>offX+(lng-minLng)*scale;
-  const scaleY=(lat)=>height-offY-(lat-minLat)*scale;
-  const d=pts.map((p,i)=>`${i===0?'M':'L'}${scaleX(p[1]).toFixed(1)},${scaleY(p[0]).toFixed(1)}`).join(' ');
-  const start=pts[0], end=pts[pts.length-1];
+  const centerLat=((Math.min(...lats)+Math.max(...lats))/2).toFixed(5);
+  const centerLng=((Math.min(...lngs)+Math.max(...lngs))/2).toFixed(5);
+  // Calcola zoom in base all'estensione del tracciato
+  const latRange=Math.max(...lats)-Math.min(...lats);
+  const lngRange=Math.max(...lngs)-Math.min(...lngs);
+  const maxRange=Math.max(latRange,lngRange);
+  let zoom=14;
+  if(maxRange>0.5)zoom=11;
+  else if(maxRange>0.2)zoom=12;
+  else if(maxRange>0.08)zoom=13;
+  else if(maxRange>0.03)zoom=14;
+  else zoom=15;
+  // Usa geoapify static maps (supporta polyline encoded, dark theme, nessuna API key visibile nel client)
+  // Fallback: openstreetmap via staticmap service
+  const encodedPolyline=encodeURIComponent(polyline);
+  const url=`https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLng}&zoom=${zoom}&size=${width}x${height}&maptype=osmarenderer&path=color:0xFC4C02ff|weight:3|enc:${encodedPolyline}`;
   return(
-    <svg width={width} height={height} style={{borderRadius:'12px',background:'#0d1220',display:'block',border:'1px solid rgba(255,255,255,0.08)'}}>
-      <path d={d} fill="none" stroke="rgba(252,76,2,0.4)" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round"/>
-      <path d={d} fill="none" stroke="#FC4C02" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-      <circle cx={scaleX(start[1]).toFixed(1)} cy={scaleY(start[0]).toFixed(1)} r="5" fill="#00C49A"/>
-      <circle cx={scaleX(end[1]).toFixed(1)} cy={scaleY(end[0]).toFixed(1)} r="5" fill="#e05c5c"/>
-    </svg>
+    <div style={{borderRadius:'12px',overflow:'hidden',border:'1px solid rgba(255,255,255,0.1)',background:'#1a1f2e',width:width,height:height,position:'relative'}}>
+      <img src={url} width={width} height={height}
+        style={{display:'block',objectFit:'cover',width:'100%',height:'100%'}}
+        alt="Mappa percorso"
+        onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}
+      />
+      <div style={{display:'none',position:'absolute',inset:0,alignItems:'center',justifyContent:'center',color:'var(--text3)',fontSize:'12px',flexDirection:'column',gap:'6px'}}>
+        <span>Mappa non disponibile</span>
+      </div>
+    </div>
   );
 }
 
