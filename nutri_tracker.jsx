@@ -1309,8 +1309,10 @@ function calcPaceZones(metrics) {
  *  - taper     (7–14gg): Settimana 5 (6–12 aprile)
  *  - race_week (< 7gg):  Settimana gara (13–19 aprile)
  *  - post_race (< 0):    Dopo la gara
+ *
+ * @param {object} raceGoal  { name, date (YYYY-MM-DD), distanceKm, targetTime }
  */
-function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readinessScore) {
+function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readinessScore, raceGoal) {
   // ── Zone di ritmo FISSE (valori assoluti calibrati sull'atleta) ──
   // NON derivate da paceZones — sovrascrivono qualsiasi calcolo dinamico.
   const ZONES = {
@@ -1324,7 +1326,8 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
 
   // ── Fase periodizzazione ──
   const now       = new Date();
-  const RACE_DATE = new Date('2026-04-19T00:00:00');
+  const RACE_DATE = raceGoal?.date ? new Date(raceGoal.date + 'T00:00:00') : new Date('2026-04-19T00:00:00');
+  const RACE_NAME = raceGoal?.name ?? 'Mezza Maratona di Genova';
   const daysToRace = Math.round((RACE_DATE - now) / 86400000);
   const phase = daysToRace > 14 ? 'load' : daysToRace > 7 ? 'taper' : daysToRace > 0 ? 'race_week' : 'post_race';
 
@@ -1556,7 +1559,7 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     },
     {
       isoDate: '2026-04-19', type: 'race',
-      title: 'GARA — Mezza Maratona di Genova',
+      title: `GARA — ${RACE_NAME}`,
       totalKm: 21.1,
       structure: [
         { phase: 'Km 1-5 (conservativo)', km: 5, pace: '5:08–5:10/km', speed: '11.5–11.7 km/h' },
@@ -1568,18 +1571,53 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     },
   ];
 
-  // ── Filtra le sessioni da mostrare (domani → +7 giorni + gara se entro 21gg) ──
+  // ── Sessioni opzionali "boost" (se ti senti bene, puoi aggiungere) ──
+  const OPTIONAL_SESSIONS = [
+    {
+      isoDate: '2026-04-03', optional: true, type: 'interval',
+      title: 'BOOST — 4×1km ripetute veloci',
+      totalKm: 9,
+      structure: [
+        { phase: 'Riscaldamento', km: 2, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange },
+        { phase: '4×1km @ ritmo veloce', km: 4, pace: ZONES.interval.paceRange, recovery: 'rec: 90s jog' },
+        { phase: 'Defaticamento', km: 3, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange },
+      ],
+      garminNote: 'OPZIONALE. 4×1km @ 4:25–4:35/km. Solo se le gambe sono fresche e il readiness > 75.',
+      rationale: 'Sessione boost: aggiunge velocità se ti senti in forma. Salta se sei stanco.',
+    },
+    {
+      isoDate: '2026-04-10', optional: true, type: 'tempo',
+      title: 'BOOST — Progressione 8km',
+      totalKm: 8,
+      structure: [
+        { phase: 'Km 1-3 easy', km: 3, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange },
+        { phase: 'Km 4-6 progressione', km: 3, pace: ZONES.tempo.paceRange, speed: '12.1–12.4 km/h' },
+        { phase: 'Km 7-8 ritmo gara', km: 2, pace: ZONES.race_pace.paceRange, speed: ZONES.race_pace.speedRange },
+      ],
+      garminNote: 'OPZIONALE tapering. Progressione 8km: easy → soglia → ritmo gara. Solo se gambe fresche.',
+      rationale: 'Boost di tapering: mantieni la sharpness senza sovraccaricare. Readiness deve essere > 70.',
+    },
+  ];
+
+  // ── Filtra le sessioni della settimana corrente (da oggi a domenica prossima) ──
+  // Calcola quanti giorni mancano a domenica (fine settimana corrente)
+  const todayDow = now.getDay(); // 0=Dom, 1=Lun, ..., 6=Sab
+  const daysUntilSunday = todayDow === 0 ? 7 : 7 - todayDow; // giorni fino a domenica inclusa
+  const endOfWeek = daysUntilSunday; // includi domenica della settimana corrente
+
   const rsScore = readinessScore?.score ?? 70;
   const isHardType = t => ['tempo','threshold','interval','race_pace','long_run'].includes(t);
 
-  let sessions = ALL_SESSIONS
+  const allSessWithOptional = [...ALL_SESSIONS, ...OPTIONAL_SESSIONS];
+
+  let sessions = allSessWithOptional
     .map(s => {
       const dfn = daysFrom(s.isoDate);
       return { ...s, day: dayLabel(dfn), daysFromNow: dfn };
     })
     .filter(s => {
-      if (s.type === 'race') return s.daysFromNow >= 1 && s.daysFromNow <= 21;
-      return s.daysFromNow >= 1 && s.daysFromNow <= 7;
+      if (s.type === 'race') return false; // la gara si mostra nel banner, non nella lista
+      return s.daysFromNow >= 1 && s.daysFromNow <= endOfWeek;
     })
     .sort((a, b) => a.daysFromNow - b.daysFromNow);
 
@@ -1659,21 +1697,40 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     return s;
   });
 
-  // 2. Vincolo: 48h tra lungo e interval/tempo
+  // 2. Vincolo: 48h tra lungo e interval/tempo (considera anche l'ultimo lungo REALE)
+  const lastRealLong = classifiedRuns?.find(r => r.classification?.workoutType === 'long_run');
+  const daysSinceRealLong = lastRealLong
+    ? Math.round((now - new Date(lastRealLong.date)) / 86400000)
+    : 99;
+
   const longIdx = sessions.findIndex(s => s.type === 'long_run');
-  if (longIdx >= 0) {
-    sessions = sessions.map((s, i) => {
-      if (i === longIdx || s.type === 'rest' || s.type === 'race') return s;
-      const gap = Math.abs(s.daysFromNow - sessions[longIdx].daysFromNow);
-      if (gap < 2 && ['interval','tempo','threshold'].includes(s.type)) {
+  sessions = sessions.map((s, i) => {
+    if (s.type === 'rest' || s.type === 'race' || s._downgraded) return s;
+    // gap rispetto al lungo pianificato nella settimana
+    const gapFromPlanned = longIdx >= 0 && i !== longIdx
+      ? Math.abs(s.daysFromNow - sessions[longIdx].daysFromNow)
+      : 99;
+    // gap rispetto all'ultimo lungo reale già corso
+    const gapFromReal = s.daysFromNow <= daysSinceRealLong ? 99 : s.daysFromNow - (0 - daysSinceRealLong);
+    // In pratica: se il lungo reale è avvenuto X giorni fa e la sessione è tra Y giorni, distanza = X+Y
+    const totalGapFromReal = daysSinceRealLong + s.daysFromNow;
+
+    if (['interval','tempo','threshold'].includes(s.type)) {
+      if (gapFromPlanned < 2) {
         return { ...s, type: 'easy', title: 'Corsa facile (vicina al lungo)',
           structure: [{ phase: `Easy ${s.totalKm}km`, km: s.totalKm, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange }],
           garminNote: `Easy ${s.totalKm}km. Piano adattato: lungo e qualità separati da almeno 48h.`,
           rationale: 'Guardrail: lungo e interval/tempo devono essere separati di almeno 2 giorni.', _downgraded: true };
       }
-      return s;
-    });
-  }
+      if (totalGapFromReal < 2) {
+        return { ...s, type: 'easy', title: 'Corsa facile (recupero post-lungo)',
+          structure: [{ phase: `Easy ${s.totalKm}km`, km: s.totalKm, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange }],
+          garminNote: `Easy ${s.totalKm}km. Recupero attivo — hai corso lungo ${daysSinceRealLong === 0 ? 'oggi' : `${daysSinceRealLong} gg fa`}.`,
+          rationale: `Guardrail: ${daysSinceRealLong === 0 ? 'hai corso lungo oggi' : `lungo ${daysSinceRealLong} gg fa`} — aspetta almeno 48h prima di qualità.`, _downgraded: true };
+      }
+    }
+    return s;
+  });
 
   // 3. Readiness-based downgrade
   if (rsScore < 60) {
@@ -1699,9 +1756,9 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
   const volumeWarning = avgWeekly > 0 && weekKm > avgWeekly * 1.4
     ? `⚠️ Volume pianificato (${Math.round(weekKm)}km) supera del 40% la media (${Math.round(avgWeekly)}km/sett)` : null;
 
-  // ── weekTarget = somma km sessioni non-riposo della settimana corrente ──
+  // ── weekTarget = somma km sessioni non-riposo (escluse opzionali) ──
   const weekTarget = sessions
-    .filter(s => s.type !== 'rest' && s.daysFromNow >= 1 && s.daysFromNow <= 7)
+    .filter(s => s.type !== 'rest' && !s.optional)
     .reduce((sum, s) => sum + (s.totalKm || 0), 0);
 
   // ── Nota di fase ──
@@ -1710,7 +1767,7 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     : phase === 'taper'
     ? `Tapering — ${daysToRace} giorni alla gara. Volume ridotto, freschezza in aumento.`
     : phase === 'race_week'
-    ? `Settimana gara! ${daysToRace} giorni alla Mezza di Genova. Gambe fresche, mente pronta.`
+    ? `Settimana gara! ${daysToRace} giorni a ${RACE_NAME}. Gambe fresche, mente pronta.`
     : `Post gara — recupero completo. Ben fatto!`;
 
   return {
@@ -1718,6 +1775,8 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     weekTarget: Math.round(weekTarget),
     phase,
     daysToRace,
+    raceName: RACE_NAME,
+    raceDate: RACE_DATE.toISOString().slice(0, 10),
     note: volumeWarning ?? phaseNote,
     readinessLabel: readinessScore?.label ?? null,
   };
@@ -2931,91 +2990,227 @@ function WeekReviewCard({ weekReview }) {
 }
 
 /** Piano di allenamento settimanale con sessioni dettagliate per Garmin. */
-function WeeklyPlanCard({ weeklyPlan }) {
+function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal }) {
   if (!weeklyPlan) return null;
   const [openIdx, setOpenIdx] = React.useState(null);
+  const [showGoalForm, setShowGoalForm] = React.useState(false);
+  const [formName, setFormName] = React.useState('');
+  const [formDate, setFormDate] = React.useState('');
+  const [formDist, setFormDist] = React.useState('21.1');
+  const [formTime, setFormTime] = React.useState('');
 
   const typeColors = {
     interval:'#4c8cde', tempo:'#e05c5c', easy:'#00C49A',
     long_run:'#FBA828', recovery:'#5A6888', race_pace:'#FF6B35',
-    progression:'#9b59b6', threshold:'#c44c9a',
+    progression:'#9b59b6', threshold:'#c44c9a', rest:'#2a2f3e',
   };
   const typeLabels = {
     interval:'Ripetute', tempo:'Tempo', easy:'Facile',
     long_run:'Lungo', recovery:'Recovery', race_pace:'Gara',
-    progression:'Progressione', threshold:'Soglia',
+    progression:'Progressione', threshold:'Soglia', rest:'Riposo',
+  };
+
+  // Banner obiettivo gara
+  const activeGoal = raceGoal ?? (weeklyPlan.raceName ? { name: weeklyPlan.raceName, date: weeklyPlan.raceDate } : null);
+  const dtr = weeklyPlan.daysToRace;
+  const phaseColors = { load:'#FBA828', taper:'#00C49A', race_week:'#FF6B35', post_race:'#5A6888' };
+  const phaseLabels = { load:'Fase carico', taper:'Tapering', race_week:'Settimana gara!', post_race:'Post gara' };
+
+  const handleSaveGoal = () => {
+    if (!formName || !formDate) return;
+    saveRaceGoal({ name: formName, date: formDate, distanceKm: parseFloat(formDist)||21.1, targetTime: formTime||null });
+    setShowGoalForm(false);
   };
 
   return (
-    <div style={{background:'var(--card)',borderRadius:'16px',border:'1px solid var(--border)',padding:'14px'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-        <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>
-          PIANO SETTIMANA
-        </div>
-        <div style={{fontSize:'11px',color:'var(--text3)'}}>
-          Target: <span style={{color:'var(--accent)',fontWeight:700}}>{weeklyPlan.weekTarget} km</span>
-        </div>
-      </div>
-      {weeklyPlan.note && (
-        <div style={{fontSize:'11px',color:'var(--text3)',marginBottom:'10px',padding:'6px 10px',background:'var(--surface)',borderRadius:'8px',lineHeight:'1.4'}}>
-          💡 {weeklyPlan.note}
+    <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+
+      {/* ── Banner obiettivo gara ── */}
+      {activeGoal && dtr > 0 && (
+        <div style={{
+          background: `linear-gradient(135deg, #1a1f35 0%, #0d1220 100%)`,
+          borderRadius:'16px',
+          border:`2px solid ${phaseColors[weeklyPlan.phase]??'#FBA828'}`,
+          padding:'14px 16px',
+          display:'flex', alignItems:'center', gap:'14px',
+        }}>
+          {/* Icona/countdown */}
+          <div style={{
+            background: phaseColors[weeklyPlan.phase]??'#FBA828',
+            borderRadius:'12px', padding:'10px 12px', textAlign:'center', minWidth:'52px',
+            flexShrink:0,
+          }}>
+            <div style={{fontSize:'20px',fontWeight:900,color:'#0C0E14',lineHeight:1}}>{dtr}</div>
+            <div style={{fontSize:'9px',fontWeight:700,color:'#0C0E14',letterSpacing:'0.5px'}}>giorni</div>
+          </div>
+          {/* Info gara */}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:'10px',fontWeight:700,color:phaseColors[weeklyPlan.phase]??'#FBA828',letterSpacing:'0.8px',marginBottom:'2px'}}>
+              {phaseLabels[weeklyPlan.phase]??''}
+            </div>
+            <div style={{fontSize:'14px',fontWeight:800,color:'var(--text)',lineHeight:1.2,marginBottom:'3px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+              {activeGoal.name}
+            </div>
+            <div style={{fontSize:'11px',color:'var(--text3)'}}>
+              {new Date(activeGoal.date+'T00:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})}
+              {activeGoal.distanceKm && ` · ${activeGoal.distanceKm}km`}
+              {activeGoal.targetTime && ` · obiettivo ${activeGoal.targetTime}`}
+            </div>
+          </div>
+          {/* Cambio obiettivo */}
+          <button onClick={()=>{
+            setFormName(activeGoal.name??'');
+            setFormDate(activeGoal.date??'');
+            setFormDist(String(activeGoal.distanceKm??21.1));
+            setFormTime(activeGoal.targetTime??'');
+            setShowGoalForm(v=>!v);
+          }} style={{background:'none',border:'1px solid var(--border)',borderRadius:'8px',padding:'4px 8px',color:'var(--text3)',fontSize:'10px',cursor:'pointer'}}>
+            ✏️ modifica
+          </button>
         </div>
       )}
-      <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-        {weeklyPlan.sessions.map((s, i) => {
-          const isOpen = openIdx === i;
-          const color = typeColors[s.type] ?? '#5A6888';
-          return (
-            <div key={i} style={{borderRadius:'12px',border:`1px solid ${isOpen ? color : 'var(--border)'}`,overflow:'hidden'}}>
-              {/* Header sessione */}
-              <div onClick={()=>setOpenIdx(isOpen ? null : i)}
-                style={{padding:'10px 12px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',
-                  background: isOpen ? 'var(--surface)' : 'transparent'}}>
-                <span style={{fontSize:'10px',fontWeight:700,color:'#fff',background:color,
-                  borderRadius:'6px',padding:'2px 7px',whiteSpace:'nowrap'}}>
-                  {typeLabels[s.type]??s.type}
-                </span>
-                <div style={{flex:1,minWidth:0}}>
-                  <span style={{fontSize:'13px',fontWeight:600,color:'var(--text)'}}>{s.day} — {s.title}</span>
-                </div>
-                <span style={{fontSize:'12px',color:'var(--accent)',fontWeight:700,whiteSpace:'nowrap'}}>{s.totalKm} km</span>
-                <span style={{fontSize:'11px',color:'var(--text3)',marginLeft:'4px'}}>{isOpen?'▲':'▼'}</span>
+
+      {/* ── Banner "aggiungi obiettivo" se non c'è ancora ── */}
+      {!activeGoal && (
+        <div style={{borderRadius:'16px',border:'1px dashed var(--border)',padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px'}}>
+          <div>
+            <div style={{fontSize:'12px',fontWeight:600,color:'var(--text2)'}}>Nessuna gara obiettivo</div>
+            <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}}>Aggiungi la tua prossima gara per personalizzare il piano</div>
+          </div>
+          <button onClick={()=>setShowGoalForm(v=>!v)}
+            style={{background:'var(--accent)',border:'none',borderRadius:'10px',padding:'8px 14px',color:'#0C0E14',fontSize:'11px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>
+            + Aggiungi
+          </button>
+        </div>
+      )}
+
+      {/* ── Form obiettivo gara ── */}
+      {showGoalForm && (
+        <div style={{background:'var(--surface)',borderRadius:'12px',border:'1px solid var(--border)',padding:'14px',display:'flex',flexDirection:'column',gap:'10px'}}>
+          <div style={{fontSize:'11px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.5px'}}>OBIETTIVO GARA</div>
+          <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+            <input value={formName} onChange={e=>setFormName(e.target.value)} placeholder="Nome gara (es. Mezza Maratona di Genova)"
+              style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 10px',color:'var(--text)',fontSize:'12px',width:'100%',boxSizing:'border-box'}}/>
+            <div style={{display:'flex',gap:'8px'}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:'10px',color:'var(--text3)',marginBottom:'3px'}}>Data gara</div>
+                <input type="date" value={formDate} onChange={e=>setFormDate(e.target.value)}
+                  style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',padding:'7px 10px',color:'var(--text)',fontSize:'12px',width:'100%',boxSizing:'border-box'}}/>
               </div>
-              {/* Dettaglio sessione */}
-              {isOpen && (
-                <div style={{borderTop:`1px solid var(--border)`,padding:'12px',display:'flex',flexDirection:'column',gap:'8px',background:'var(--surface)'}}>
-                  {/* Struttura fasi */}
-                  <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-                    {s.structure.map((ph, j) => (
-                      <div key={j} style={{padding:'7px 10px',borderRadius:'8px',background:'var(--card)',display:'flex',flexDirection:'column',gap:'3px'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
-                          <span style={{fontSize:'11px',fontWeight:700,color:'var(--text2)',minWidth:'120px'}}>{ph.phase}</span>
-                          <span style={{fontSize:'12px',fontWeight:700,color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>{ph.pace}</span>
-                          {ph.speed && <span style={{fontSize:'11px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}}>{ph.speed}</span>}
-                          {ph.km && <span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600,marginLeft:'auto'}}>{typeof ph.km === 'number' ? ph.km.toFixed(1) : ph.km} km</span>}
-                        </div>
-                        {ph.recovery && (
-                          <div style={{fontSize:'11px',color:'#FBA828',paddingLeft:'4px'}}>
-                            ↩ Recupero: {ph.recovery}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {/* Note Garmin */}
-                  <div style={{padding:'8px 10px',borderRadius:'8px',background:'#1a2040',border:'1px solid #2a3060'}}>
-                    <div style={{fontSize:'10px',fontWeight:700,color:'#4c8cde',letterSpacing:'0.5px',marginBottom:'3px'}}>📍 GARMIN</div>
-                    <div style={{fontSize:'11px',color:'var(--text)',lineHeight:'1.5'}}>{s.garminNote}</div>
-                  </div>
-                  {/* Obiettivo */}
-                  <div style={{fontSize:'11px',color:'var(--text3)',lineHeight:'1.4'}}>
-                    💡 <span style={{color:'var(--text2)'}}>{s.rationale}</span>
-                  </div>
-                </div>
-              )}
+              <div style={{flex:1}}>
+                <div style={{fontSize:'10px',color:'var(--text3)',marginBottom:'3px'}}>Distanza (km)</div>
+                <input type="number" value={formDist} onChange={e=>setFormDist(e.target.value)} min="1" max="100" step="0.1"
+                  style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',padding:'7px 10px',color:'var(--text)',fontSize:'12px',width:'100%',boxSizing:'border-box'}}/>
+              </div>
             </div>
-          );
-        })}
+            <div>
+              <div style={{fontSize:'10px',color:'var(--text3)',marginBottom:'3px'}}>Tempo obiettivo (opzionale, es. 1:45:00)</div>
+              <input value={formTime} onChange={e=>setFormTime(e.target.value)} placeholder="es. 1:45:00"
+                style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:'8px',padding:'7px 10px',color:'var(--text)',fontSize:'12px',width:'100%',boxSizing:'border-box'}}/>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:'8px'}}>
+            <button onClick={handleSaveGoal}
+              style={{flex:1,background:'var(--accent)',border:'none',borderRadius:'10px',padding:'9px',color:'#0C0E14',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>
+              Salva obiettivo
+            </button>
+            <button onClick={()=>setShowGoalForm(false)}
+              style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',padding:'9px 14px',color:'var(--text3)',fontSize:'12px',cursor:'pointer'}}>
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Header piano settimana ── */}
+      <div style={{background:'var(--card)',borderRadius:'16px',border:'1px solid var(--border)',padding:'14px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>
+            PIANO SETTIMANA
+          </div>
+          <div style={{fontSize:'11px',color:'var(--text3)'}}>
+            Target: <span style={{color:'var(--accent)',fontWeight:700}}>{weeklyPlan.weekTarget} km</span>
+          </div>
+        </div>
+        {weeklyPlan.note && (
+          <div style={{fontSize:'11px',color:'var(--text3)',marginBottom:'10px',padding:'6px 10px',background:'var(--surface)',borderRadius:'8px',lineHeight:'1.4'}}>
+            💡 {weeklyPlan.note}
+          </div>
+        )}
+        <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+          {weeklyPlan.sessions.map((s, i) => {
+            const isOpen = openIdx === i;
+            const color = typeColors[s.type] ?? '#5A6888';
+            return (
+              <div key={i} style={{borderRadius:'12px',border:`1px solid ${isOpen ? color : s.optional ? 'rgba(251,168,40,0.3)' : 'var(--border)'}`,overflow:'hidden',
+                opacity: s.optional ? 0.85 : 1}}>
+                {/* Header sessione */}
+                <div onClick={()=>setOpenIdx(isOpen ? null : i)}
+                  style={{padding:'10px 12px',display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',
+                    background: isOpen ? 'var(--surface)' : s.optional ? 'rgba(251,168,40,0.04)' : 'transparent'}}>
+                  {s.optional && (
+                    <span style={{fontSize:'9px',fontWeight:700,color:'#FBA828',background:'rgba(251,168,40,0.15)',
+                      borderRadius:'5px',padding:'2px 5px',whiteSpace:'nowrap',flexShrink:0}}>
+                      OPZIONALE
+                    </span>
+                  )}
+                  <span style={{fontSize:'10px',fontWeight:700,color:'#fff',background:color,
+                    borderRadius:'6px',padding:'2px 7px',whiteSpace:'nowrap',flexShrink:0}}>
+                    {typeLabels[s.type]??s.type}
+                  </span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <span style={{fontSize:'13px',fontWeight:600,color:'var(--text)',display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.day} — {s.title}</span>
+                  </div>
+                  {s.totalKm > 0 && <span style={{fontSize:'12px',color:'var(--accent)',fontWeight:700,whiteSpace:'nowrap'}}>{s.totalKm} km</span>}
+                  <span style={{fontSize:'11px',color:'var(--text3)',marginLeft:'2px'}}>{isOpen?'▲':'▼'}</span>
+                </div>
+                {/* Dettaglio sessione */}
+                {isOpen && (
+                  <div style={{borderTop:`1px solid var(--border)`,padding:'12px',display:'flex',flexDirection:'column',gap:'8px',background:'var(--surface)'}}>
+                    {s.optional && (
+                      <div style={{padding:'6px 10px',borderRadius:'8px',background:'rgba(251,168,40,0.1)',border:'1px solid rgba(251,168,40,0.3)'}}>
+                        <span style={{fontSize:'11px',color:'#FBA828'}}>✨ Allenamento opzionale — esegui solo se ti senti in forma e il readiness è alto</span>
+                      </div>
+                    )}
+                    {/* Struttura fasi */}
+                    {s.structure.length > 0 && (
+                      <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                        {s.structure.map((ph, j) => (
+                          <div key={j} style={{padding:'7px 10px',borderRadius:'8px',background:'var(--card)',display:'flex',flexDirection:'column',gap:'3px'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                              <span style={{fontSize:'11px',fontWeight:700,color:'var(--text2)',minWidth:'120px'}}>{ph.phase}</span>
+                              <span style={{fontSize:'12px',fontWeight:700,color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>{ph.pace}</span>
+                              {ph.speed && <span style={{fontSize:'11px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}}>{ph.speed}</span>}
+                              {ph.km && <span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600,marginLeft:'auto'}}>{typeof ph.km === 'number' ? ph.km.toFixed(1) : ph.km} km</span>}
+                            </div>
+                            {ph.recovery && (
+                              <div style={{fontSize:'11px',color:'#FBA828',paddingLeft:'4px'}}>
+                                ↩ Recupero: {ph.recovery}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Note Garmin */}
+                    {s.garminNote && (
+                      <div style={{padding:'8px 10px',borderRadius:'8px',background:'#1a2040',border:'1px solid #2a3060'}}>
+                        <div style={{fontSize:'10px',fontWeight:700,color:'#4c8cde',letterSpacing:'0.5px',marginBottom:'3px'}}>📍 GARMIN</div>
+                        <div style={{fontSize:'11px',color:'var(--text)',lineHeight:'1.5'}}>{s.garminNote}</div>
+                      </div>
+                    )}
+                    {/* Obiettivo */}
+                    {s.rationale && (
+                      <div style={{fontSize:'11px',color:'var(--text3)',lineHeight:'1.4'}}>
+                        💡 <span style={{color:'var(--text2)'}}>{s.rationale}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -3033,7 +3228,7 @@ const WORKOUT_LABELS = {
   race_pace:'Gara', progression:'Progressione', unknown:'?',
 };
 
-function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, readinessScore, weekReview }) {
+function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, readinessScore, weekReview, raceGoal, saveRaceGoal }) {
   const {
     weeklyVolumeKm, monthlyVolumeKm, runsLast7Days,
     consistencyScore, estimatedHalfMarathonTime, estimatedHalfMarathonPace,
@@ -3122,7 +3317,7 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
         <PaceZonesCard paceZones={paceZones} />
 
         {/* Piano settimanale */}
-        <WeeklyPlanCard weeklyPlan={weeklyPlan} />
+        <WeeklyPlanCard weeklyPlan={weeklyPlan} raceGoal={raceGoal} saveRaceGoal={saveRaceGoal} />
 
         {/* Settimana scorsa — compliance */}
         <WeekReviewCard weekReview={weekReview} />
@@ -3206,7 +3401,7 @@ const STRAVA_CLIENT_ID_PLACEHOLDER='YOUR_CLIENT_ID'; // sostituito da Netlify en
 const STRAVA_SCOPE='activity:read_all';
 const STRAVA_REDIRECT=typeof window!=='undefined'?`${window.location.origin}/strava-callback`:'';
 
-function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails}){
+function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal}){
   const [loadingAct,setLoadingAct]=useState(false);
   const [expandedActivity,setExpandedActivity]=useState(null);
   const [loadingDetail,setLoadingDetail]=useState(null);
@@ -3273,9 +3468,9 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 
   const weeklyPlan = useMemo(() =>
     trainingMetrics && paceZones
-      ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZones, classifiedRuns, readinessScore)
+      ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZones, classifiedRuns, readinessScore, raceGoal)
       : null,
-    [trainingMetrics, paceZones, coachingInsights, classifiedRuns, readinessScore]);
+    [trainingMetrics, paceZones, coachingInsights, classifiedRuns, readinessScore, raceGoal]);
 
   const weekReview = useMemo(() =>
     weeklyPlan && classifiedRuns.length ? generateWeekReview(classifiedRuns, weeklyPlan) : null,
@@ -3614,7 +3809,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 
       {/* Running Insights Panel */}
       {isConnected && classifiedRuns.length >= 3 && trainingMetrics && coachingInsights && (
-        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights} paceZones={paceZones} weeklyPlan={weeklyPlan} readinessScore={readinessScore} weekReview={weekReview}/>
+        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights} paceZones={paceZones} weeklyPlan={weeklyPlan} readinessScore={readinessScore} weekReview={weekReview} raceGoal={raceGoal} saveRaceGoal={saveRaceGoal}/>
       )}
 
       {/* Chat AI */}
@@ -4011,6 +4206,8 @@ export default function App(){
   const [stravaActivities,setStravaActivities]=useState([]);
   const [activityDetails,setActivityDetails]=useState({});
   const [weightLog,setWeightLog]=useState([]);
+  const [raceGoal,setRaceGoal]=useState(null); // { name, date, distanceKm, targetTime }
+  const saveRaceGoal=async g=>{setRaceGoal(g);try{await window.storage.set('nt_raceGoal',JSON.stringify(g));}catch(e){}};
   const saveWeightLog=async log=>{setWeightLog(log);try{await window.storage.set('nt_weightLog',JSON.stringify(log));}catch(e){}};
   const [userRecipes,setUserRecipes]=useState([]);
   const saveRecipes=async list=>{setUserRecipes(list);try{await window.storage.set('nt_recipes',JSON.stringify(list));}catch(e){}};
@@ -4042,6 +4239,8 @@ export default function App(){
         if(wl?.value)setWeightLog(JSON.parse(wl.value));
         const rr=await window.storage.get('nt_recipes');
         if(rr?.value)setUserRecipes(JSON.parse(rr.value));
+        const rg=await window.storage.get('nt_raceGoal');
+        if(rg?.value)setRaceGoal(JSON.parse(rg.value));
       }catch(e){}
     })();
   },[]);
@@ -4245,7 +4444,8 @@ export default function App(){
         {tab==='trainings'&&<TrainingsView stravaTokens={stravaTokens} setStravaTokens={setStravaTokens}
           dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes}
           stravaActivities={stravaActivities} setStravaActivities={setStravaActivities}
-          activityDetails={activityDetails} setActivityDetails={setActivityDetails}/>}
+          activityDetails={activityDetails} setActivityDetails={setActivityDetails}
+          raceGoal={raceGoal} saveRaceGoal={saveRaceGoal}/>}
         {tab==='peso'&&<PesoView weightLog={weightLog} saveWeightLog={saveWeightLog}/>}
       </div>
 
