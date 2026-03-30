@@ -3489,34 +3489,31 @@ function decodePolyline(encoded) {
 function PolylineSVG({polyline,width=300,height=160}){
   const pts=decodePolyline(polyline);
   if(pts.length<2)return null;
-  const lats=pts.map(p=>p[0]),lngs=pts.map(p=>p[1]);
-  const centerLat=((Math.min(...lats)+Math.max(...lats))/2).toFixed(5);
-  const centerLng=((Math.min(...lngs)+Math.max(...lngs))/2).toFixed(5);
-  // Calcola zoom in base all'estensione del tracciato
-  const latRange=Math.max(...lats)-Math.min(...lats);
-  const lngRange=Math.max(...lngs)-Math.min(...lngs);
-  const maxRange=Math.max(latRange,lngRange);
-  let zoom=14;
-  if(maxRange>0.5)zoom=11;
-  else if(maxRange>0.2)zoom=12;
-  else if(maxRange>0.08)zoom=13;
-  else if(maxRange>0.03)zoom=14;
-  else zoom=15;
-  // Usa geoapify static maps (supporta polyline encoded, dark theme, nessuna API key visibile nel client)
-  // Fallback: openstreetmap via staticmap service
-  const encodedPolyline=encodeURIComponent(polyline);
-  const url=`https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLng}&zoom=${zoom}&size=${width}x${height}&maptype=osmarenderer&path=color:0xFC4C02ff|weight:3|enc:${encodedPolyline}`;
+  // Costruisce una pagina HTML inline con Leaflet che mostra il tracciato su OSM
+  const latlngs=JSON.stringify(pts.map(p=>[p[0],p[1]]));
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<style>html,body,#m{margin:0;padding:0;width:100%;height:100%;background:#0d1117;}
+.leaflet-tile-pane{filter:brightness(0.85) saturate(0.7);}
+</style></head><body>
+<div id="m"></div>
+<script>
+var pts=${latlngs};
+var map=L.map('m',{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
+var line=L.polyline(pts,{color:'#FC4C02',weight:3,opacity:0.9}).addTo(map);
+L.circleMarker(pts[0],{radius:5,color:'#00C49A',fillColor:'#00C49A',fillOpacity:1,weight:2}).addTo(map);
+L.circleMarker(pts[pts.length-1],{radius:5,color:'#e05c5c',fillColor:'#e05c5c',fillOpacity:1,weight:2}).addTo(map);
+map.fitBounds(line.getBounds(),{padding:[10,10]});
+<\/script></body></html>`;
+  const src='data:text/html;charset=utf-8,'+encodeURIComponent(html);
   return(
-    <div style={{borderRadius:'12px',overflow:'hidden',border:'1px solid rgba(255,255,255,0.1)',background:'#1a1f2e',width:width,height:height,position:'relative'}}>
-      <img src={url} width={width} height={height}
-        style={{display:'block',objectFit:'cover',width:'100%',height:'100%'}}
-        alt="Mappa percorso"
-        onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}
-      />
-      <div style={{display:'none',position:'absolute',inset:0,alignItems:'center',justifyContent:'center',color:'var(--text3)',fontSize:'12px',flexDirection:'column',gap:'6px'}}>
-        <span>Mappa non disponibile</span>
-      </div>
-    </div>
+    <iframe src={src} width={width} height={height}
+      style={{borderRadius:'12px',border:'1px solid rgba(255,255,255,0.1)',display:'block'}}
+      sandbox="allow-scripts"
+      title="Mappa percorso"
+    />
   );
 }
 
