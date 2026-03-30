@@ -3409,7 +3409,7 @@ const STRAVA_CLIENT_ID_PLACEHOLDER='YOUR_CLIENT_ID'; // sostituito da Netlify en
 const STRAVA_SCOPE='activity:read_all';
 const STRAVA_REDIRECT=typeof window!=='undefined'?`${window.location.origin}/strava-callback`:'';
 
-function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal,setWeeklyPlanGlobal,setReadinessScoreGlobal}){
+function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal,normalizedRuns,classifiedRuns,trainingMetrics,coachingInsights,paceZones,readinessScore,weeklyPlan}){
   const [loadingAct,setLoadingAct]=useState(false);
   const [expandedActivity,setExpandedActivity]=useState(null);
   const [loadingDetail,setLoadingDetail]=useState(null);
@@ -3419,74 +3419,14 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
   const [chatLoading,setChatLoading]=useState(false);
   const [error,setError]=useState('');
 
-  // ── Analisi corsa (reattiva ai dati Strava) ──
-  const normalizedRuns = useMemo(() =>
-    stravaActivities
-      .filter(a => a.type === 'Run')
-      .map(a => normalizeRun(a, activityDetails[a.id] || null))
-      .filter(Boolean)
-      .sort((a, b) => b.date.localeCompare(a.date)),
-    [stravaActivities, activityDetails]);
-
-  const classifiedRuns = useMemo(() => {
-    // Passo 1: classificazione base
-    const base = normalizedRuns.map(r => ({ ...r, classification: classifyRun(r) }));
-    // Passo 2: calcola race_pace reale dalle sessioni di qualità
-    const rp = calcRacePace(base) ?? FIXED_ZONES.race_pace.paceMin;
-    // Passo 3: aggiungi effortScore e override classificazione borderline
-    return base.map(r => {
-      const effortScore = Math.round(r.distanceKm * (rp / r.avgPaceMinKm) * 10) / 10;
-      // Override classificazione se confidence bassa — usa pace relativa a race_pace
-      let classification = r.classification;
-      if (classification.confidence < 0.70) {
-        const p = r.avgPaceMinKm, d = r.distanceKm;
-        let overrideType = null;
-        if (d >= 18) overrideType = 'long_run';
-        else if (p <= rp - 0.20) overrideType = 'threshold';
-        else if (p <= rp + 0.05) overrideType = 'tempo';
-        else if (p > rp + 0.30) overrideType = 'easy';
-        else overrideType = 'easy'; // steady → easy come fallback
-        if (overrideType && overrideType !== classification.workoutType) {
-          classification = { ...classification, workoutType: overrideType, _reclassified: true };
-        }
-      }
-      return { ...r, classification, effortScore };
-    });
-  }, [normalizedRuns]);
-
-  const trainingMetrics = useMemo(() =>
-    classifiedRuns.length >= 1 ? calcTrainingMetrics(classifiedRuns) : null,
-    [classifiedRuns]);
-
-  const coachingInsights = useMemo(() =>
-    trainingMetrics ? generateCoachingInsights(classifiedRuns, trainingMetrics) : null,
-    [classifiedRuns, trainingMetrics]);
-
-  const paceZones = useMemo(() =>
-    trainingMetrics ? calcPaceZones(trainingMetrics) : null,
-    [trainingMetrics]);
-
-  const readinessScore = useMemo(() =>
-    classifiedRuns.length ? calcReadinessScore(classifiedRuns) : null,
-    [classifiedRuns]);
-
+  // dynamicPaceZones e weekReview sono specifici di TrainingsView
   const dynamicPaceZones = useMemo(() =>
     trainingMetrics ? calcDynamicPaceZones(classifiedRuns, trainingMetrics) : null,
     [classifiedRuns, trainingMetrics]);
 
-  const weeklyPlan = useMemo(() =>
-    trainingMetrics && paceZones
-      ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZones, classifiedRuns, readinessScore, raceGoal)
-      : null,
-    [trainingMetrics, paceZones, coachingInsights, classifiedRuns, readinessScore, raceGoal]);
-
   const weekReview = useMemo(() =>
     weeklyPlan && classifiedRuns.length ? generateWeekReview(classifiedRuns, weeklyPlan) : null,
     [classifiedRuns, weeklyPlan]);
-
-  // Sync weeklyPlan e readinessScore verso App (per HomeView)
-  useEffect(() => { if(setWeeklyPlanGlobal) setWeeklyPlanGlobal(weeklyPlan); }, [weeklyPlan]);
-  useEffect(() => { if(setReadinessScoreGlobal) setReadinessScoreGlobal(readinessScore); }, [readinessScore]);
 
   // Legge il ?code= dall'URL dopo il redirect OAuth Strava
   useEffect(()=>{
@@ -4237,8 +4177,56 @@ export default function App(){
   const [weightLog,setWeightLog]=useState([]);
   const [raceGoal,setRaceGoal]=useState(null); // { name, date, distanceKm, targetTime }
   const saveRaceGoal=async g=>{setRaceGoal(g);try{await window.storage.set('nt_raceGoal',JSON.stringify(g));}catch(e){}};
-  const [weeklyPlanGlobal,setWeeklyPlanGlobal]=useState(null); // training plan (da TrainingsView)
-  const [readinessScoreGlobal,setReadinessScoreGlobal]=useState(null); // readiness (da TrainingsView)
+  // Pipeline analisi corsa — disponibile al boot, reattiva a stravaActivities
+  const normalizedRuns = useMemo(() =>
+    stravaActivities.filter(a=>a.type==='Run')
+      .map(a=>normalizeRun(a, activityDetails[a.id]||null))
+      .filter(Boolean).sort((a,b)=>b.date.localeCompare(a.date)),
+    [stravaActivities, activityDetails]);
+
+  const classifiedRuns = useMemo(() => {
+    const base = normalizedRuns.map(r=>({...r, classification:classifyRun(r)}));
+    const rp = calcRacePace(base) ?? FIXED_ZONES.race_pace.paceMin;
+    return base.map(r => {
+      const effortScore = Math.round(r.distanceKm*(rp/r.avgPaceMinKm)*10)/10;
+      let classification = r.classification;
+      if (classification.confidence < 0.70) {
+        const p=r.avgPaceMinKm, d=r.distanceKm;
+        let overrideType=null;
+        if(d>=18)overrideType='long_run';
+        else if(p<=rp-0.20)overrideType='threshold';
+        else if(p<=rp+0.05)overrideType='tempo';
+        else if(p>rp+0.30)overrideType='easy';
+        else overrideType='easy';
+        if(overrideType&&overrideType!==classification.workoutType){
+          classification={...classification,workoutType:overrideType,_reclassified:true};
+        }
+      }
+      return {...r, classification, effortScore};
+    });
+  }, [normalizedRuns]);
+
+  const trainingMetrics = useMemo(() =>
+    classifiedRuns.length>=1 ? calcTrainingMetrics(classifiedRuns) : null,
+    [classifiedRuns]);
+
+  const coachingInsights = useMemo(() =>
+    trainingMetrics ? generateCoachingInsights(classifiedRuns, trainingMetrics) : null,
+    [classifiedRuns, trainingMetrics]);
+
+  const paceZonesGlobal = useMemo(() =>
+    trainingMetrics ? calcPaceZones(trainingMetrics) : null,
+    [trainingMetrics]);
+
+  const readinessScoreGlobal = useMemo(() =>
+    classifiedRuns.length ? calcReadinessScore(classifiedRuns) : null,
+    [classifiedRuns]);
+
+  const weeklyPlanGlobal = useMemo(() =>
+    trainingMetrics && paceZonesGlobal
+      ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZonesGlobal, classifiedRuns, readinessScoreGlobal, raceGoal)
+      : null,
+    [trainingMetrics, paceZonesGlobal, coachingInsights, classifiedRuns, readinessScoreGlobal, raceGoal]);
   const saveWeightLog=async log=>{setWeightLog(log);try{await window.storage.set('nt_weightLog',JSON.stringify(log));}catch(e){}};
   const [userRecipes,setUserRecipes]=useState([]);
   const saveRecipes=async list=>{setUserRecipes(list);try{await window.storage.set('nt_recipes',JSON.stringify(list));}catch(e){}};
@@ -4477,7 +4465,10 @@ export default function App(){
           stravaActivities={stravaActivities} setStravaActivities={setStravaActivities}
           activityDetails={activityDetails} setActivityDetails={setActivityDetails}
           raceGoal={raceGoal} saveRaceGoal={saveRaceGoal}
-          setWeeklyPlanGlobal={setWeeklyPlanGlobal} setReadinessScoreGlobal={setReadinessScoreGlobal}/>}
+          normalizedRuns={normalizedRuns} classifiedRuns={classifiedRuns}
+          trainingMetrics={trainingMetrics} coachingInsights={coachingInsights}
+          paceZones={paceZonesGlobal} readinessScore={readinessScoreGlobal}
+          weeklyPlan={weeklyPlanGlobal}/>}
         {tab==='peso'&&<PesoView weightLog={weightLog} saveWeightLog={saveWeightLog}/>}
       </div>
 
