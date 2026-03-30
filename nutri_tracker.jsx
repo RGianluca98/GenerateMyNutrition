@@ -755,9 +755,11 @@ function classifyRun(run) {
     scores['interval'] = 0.60 + (variance > 1.0 ? 0.20 : 0) + (run.maxHeartRate > 175 ? 0.10 : 0);
   }
 
-  // Recovery: corto e lento
+  // Recovery: corto e lento, oppure pace > 5:30 con HR bassa
   if (dist < 8 && pace > 6.0) {
     scores['recovery'] = 0.60 + (hr && hr < 135 ? 0.15 : 0) + (dist < 5 ? 0.10 : 0);
+  } else if (dist < 10 && pace > 5.5 && hr && hr < 145) {
+    scores['recovery'] = 0.55 + (hr < 135 ? 0.10 : 0);
   }
 
   // Long run: distanza > 15km
@@ -775,9 +777,12 @@ function classifyRun(run) {
     scores['tempo'] = 0.60 + (variance < 0.10 ? 0.15 : 0) + (hr && hr >= 160 ? 0.10 : 0) - (variance > 0.40 ? 0.10 : 0);
   }
 
-  // Race pace: veloce su distanza significativa
+  // Race pace: veloce su distanza significativa, o sessione HM-pace 8-10km
   if (pace < 5.0 && dist >= 10) {
     scores['race_pace'] = 0.60 + (dist >= 20 ? 0.15 : 0) + (variance < 0.15 ? 0.10 : 0);
+  } else if (dist >= 8 && dist < 12 && pace >= 4.97 && pace <= 5.13 && variance < 0.20) {
+    // HM-pace session (5:00–5:08/km su 8-12km, passo uniforme)
+    scores['race_pace'] = 0.65 + (hr && hr >= 148 && hr <= 162 ? 0.10 : 0);
   }
 
   // Easy: ritmo moderato, distanza media
@@ -982,6 +987,264 @@ function generateCoachingInsights(classifiedRuns, metrics) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MODULO 2 — Readiness Score
+// ─────────────────────────────────────────────────────────────────────────────
+/** Calcola uno score 0-100 che misura la prontezza dell'atleta ad allenarsi.
+ *  Basato su: volume recente, densità sessioni hard, freschezza post-lungo, gg di riposo. */
+function calcReadinessScore(classifiedRuns) {
+  const now = new Date();
+  const ms3  = 3  * 86400000;
+  const ms7  = 7  * 86400000;
+  const ms21 = 21 * 86400000;
+
+  const runs21 = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - ms21));
+  const runs7  = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - ms7));
+  const runs3  = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - ms3));
+
+  const isHard = t => ['tempo','threshold','interval','race_pace','long_run'].includes(t);
+  const sumDist = arr => arr.reduce((s,r) => s + r.distanceKm, 0);
+
+  let score = 60;
+  const flags = [];
+
+  // Volume 7gg vs media 21gg
+  const vol7  = sumDist(runs7);
+  const avg21 = sumDist(runs21) / 3; // media settimanale su 3 settimane
+  if (avg21 > 0) {
+    const ratio = vol7 / avg21;
+    if (ratio < 0.80) { score += 15; flags.push('Volume ridotto questa settimana — gambe fresche'); }
+    else if (ratio > 1.40) { score -= 15; flags.push('Volume molto alto questa settimana — attenzione al recupero'); }
+  }
+
+  // Hard session density ultimi 3 giorni
+  const hard3 = runs3.filter(r => isHard(r.classification?.workoutType));
+  if (hard3.length >= 2) {
+    score -= 20;
+    flags.push('2+ sessioni dure negli ultimi 3 giorni — rischio sovraccarico');
+  } else if (hard3.length === 1) {
+    score -= 5;
+  }
+
+  // Penalità extra: 2 hard entro 72h (stessa cosa ma più precisa)
+  const hardRuns21 = runs21.filter(r => isHard(r.classification?.workoutType))
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+  if (hardRuns21.length >= 2) {
+    const gap = (new Date(hardRuns21[0].date) - new Date(hardRuns21[1].date)) / 86400000;
+    if (Math.abs(gap) < 1) { // stesso giorno o giorni adiacenti
+      score -= 20;
+      flags.push('Due sessioni dure consecutive — recupero insufficiente');
+    }
+  }
+
+  // Long run freshness
+  const lastLong = classifiedRuns.find(r => r.classification?.workoutType === 'long_run');
+  if (lastLong) {
+    const daysSinceLong = Math.round((now - new Date(lastLong.date)) / 86400000);
+    if (daysSinceLong < 4) { score -= 10; flags.push(`Lungo fatto ${daysSinceLong}gg fa — gambe ancora cariche`); }
+    else if (daysSinceLong >= 10) { flags.push('Nessun lungo recente — buon momento per il lungo'); }
+  }
+
+  // Days since last run
+  const lastRun = classifiedRuns[0];
+  const daysSinceLast = lastRun ? Math.round((now - new Date(lastRun.date)) / 86400000) : 99;
+  if (daysSinceLast > 5) { score -= 10; flags.push(`${daysSinceLast} giorni senza correre — ripartenza graduale`); }
+
+  // HR drift: ultima easy con HR > 158
+  const lastEasy = classifiedRuns.find(r => r.classification?.workoutType === 'easy');
+  if (lastEasy?.avgHeartRate > 158) {
+    score -= 10;
+    flags.push(`FC alta nell'ultima easy (${lastEasy.avgHeartRate} bpm) — possibile affaticamento`);
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  const label = score >= 80 ? 'Pronto' : score >= 60 ? 'Discreto' : 'Affaticato';
+  return { score, label, flags };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODULO 3 — Zone di ritmo dinamiche
+// ─────────────────────────────────────────────────────────────────────────────
+/** Zone di ritmo fisse calibrate sui dati reali dell'atleta (fallback sempre valido). */
+const FIXED_ZONES = {
+  recovery:  { paceMin: 5.75, paceMax: 6.00, fc: 'FC < 145' },
+  easy:      { paceMin: 5.50, paceMax: 5.75, fc: 'FC 140–150' },
+  long_run:  { paceMin: 5.33, paceMax: 5.58, fc: 'FC 145–152' },
+  race_pace: { paceMin: 5.00, paceMax: 5.08, fc: 'FC 150–158' },
+  tempo:     { paceMin: 4.83, paceMax: 4.97, fc: 'FC 158–165' },
+  interval:  { paceMin: 4.42, paceMax: 4.58, fc: 'FC fino a 169' },
+};
+
+/** Aggiorna HMP solo se ENTRAMBI i segnali migliorano:
+ *  (a) long run recente con FC < 150 e passo stabile
+ *  (b) HM-pace session con FC < 158
+ *  Intervals da soli non giustificano una revisione. */
+function calcDynamicPaceZones(classifiedRuns, metrics) {
+  const now = new Date();
+  const ms30 = 30 * 86400000;
+  const recent = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - ms30));
+
+  // Segnale A: long run recente con FC controllata
+  const recentLongs = recent
+    .filter(r => r.classification?.workoutType === 'long_run' && r.distanceKm >= 15)
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+  const longOk = recentLongs.length > 0
+    && recentLongs[0].avgHeartRate
+    && recentLongs[0].avgHeartRate < 150
+    && recentLongs[0].avgPaceMinKm < 5.6; // passo ragionevole
+
+  // Segnale B: HM-pace session con FC controllata
+  const recentHMSessions = recent
+    .filter(r => r.classification?.workoutType === 'race_pace' && r.distanceKm >= 8)
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+  const hmOk = recentHMSessions.length > 0
+    && recentHMSessions[0].avgHeartRate
+    && recentHMSessions[0].avgHeartRate < 158;
+
+  // Entrambi i segnali necessari per aggiornare HMP
+  if (longOk && hmOk) {
+    // Stima HMP dalle sessioni recenti (media pesata)
+    const longPace = recentLongs[0].avgPaceMinKm - 0.25; // long→HM adjustment
+    const hmPace   = recentHMSessions[0].avgPaceMinKm;
+    const newHMP   = (longPace + hmPace) / 2;
+
+    // Ritorna zone aggiornate se migliorano (HMP più basso = più veloce)
+    const currentHMP = metrics.estimatedHalfMarathonPace ?? FIXED_ZONES.race_pace.paceMin;
+    if (newHMP < currentHMP - 0.05) {
+      const delta = currentHMP - newHMP;
+      return {
+        ...Object.fromEntries(Object.entries(FIXED_ZONES).map(([k, z]) => [k, {
+          ...z,
+          paceMin: z.paceMin - delta,
+          paceMax: z.paceMax - delta,
+          updated: true,
+        }])),
+        hmp: newHMP,
+        updated: true,
+        reason: `HMP aggiornato a ${_paceStr(newHMP)}/km (lungo FC ${recentLongs[0].avgHeartRate} + HM-pace controllata)`,
+      };
+    }
+  }
+
+  // Fallback: zone fisse
+  return {
+    ...Object.fromEntries(Object.entries(FIXED_ZONES).map(([k, z]) => [k, { ...z, updated: false }])),
+    hmp: metrics.estimatedHalfMarathonPace ?? FIXED_ZONES.race_pace.paceMin,
+    updated: false,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODULO 5 — Compliance Score
+// ─────────────────────────────────────────────────────────────────────────────
+/** Confronta una sessione pianificata con quella effettivamente eseguita.
+ *  Restituisce score 0-100 su 3 assi: volume (40pt), passo (40pt), FC (20pt). */
+function calcComplianceScore(planned, actual) {
+  if (!actual) return { score: 0, notes: ['Sessione non eseguita'] };
+
+  const notes = [];
+  let score = 0;
+
+  // Volume (40 punti)
+  if (planned.totalKm > 0) {
+    const volRatio = 1 - Math.abs(actual.distanceKm - planned.totalKm) / planned.totalKm;
+    const volScore = Math.max(0, Math.min(1, volRatio)) * 40;
+    score += volScore;
+    const volDiff = Math.round((actual.distanceKm - planned.totalKm) * 10) / 10;
+    if (Math.abs(volDiff) > 1) notes.push(volDiff > 0 ? `Volume +${volDiff}km rispetto al piano` : `Volume ${volDiff}km rispetto al piano`);
+  }
+
+  // Passo (40 punti) — confronto con zona target del tipo pianificato
+  const zoneForType = FIXED_ZONES[planned.type] ?? FIXED_ZONES.easy;
+  const targetPaceMid = (zoneForType.paceMin + zoneForType.paceMax) / 2;
+  const paceDiff = actual.avgPaceMinKm - targetPaceMid;
+  if (Math.abs(paceDiff) <= 0.25) {
+    score += 40;
+  } else if (Math.abs(paceDiff) <= 0.50) {
+    score += 20;
+    notes.push(paceDiff < 0 ? 'Passo più veloce della zona target' : 'Passo più lento della zona target');
+  } else {
+    notes.push(paceDiff < -0.5 ? `Partito troppo veloce (${_paceStr(actual.avgPaceMinKm)}/km vs target ${_paceStr(targetPaceMid)}/km)` : `Passo lento (${_paceStr(actual.avgPaceMinKm)}/km)`);
+  }
+
+  // FC (20 punti)
+  if (actual.avgHeartRate && zoneForType.fc) {
+    // Estrae i valori FC dalla stringa "FC 140–150" o "FC < 145"
+    const fcMatch = zoneForType.fc.match(/(\d+)[–-](\d+)/);
+    const fcLtMatch = zoneForType.fc.match(/< (\d+)/);
+    let fcOk = false;
+    if (fcMatch) {
+      fcOk = actual.avgHeartRate >= parseInt(fcMatch[1]) - 10 && actual.avgHeartRate <= parseInt(fcMatch[2]) + 10;
+    } else if (fcLtMatch) {
+      fcOk = actual.avgHeartRate < parseInt(fcLtMatch[1]) + 10;
+    }
+    if (fcOk) {
+      score += 20;
+    } else {
+      notes.push(actual.avgHeartRate > (fcMatch ? parseInt(fcMatch[2]) : parseInt(fcLtMatch?.[1] ?? 200))
+        ? `FC alta (${actual.avgHeartRate} bpm)`
+        : `FC bassa (${actual.avgHeartRate} bpm)`);
+    }
+  } else {
+    score += 10; // bonus parziale se no dati FC
+  }
+
+  score = Math.round(Math.max(0, Math.min(100, score)));
+  if (score >= 85) notes.unshift('Sessione eseguita ottimamente');
+  else if (score >= 65) notes.unshift('Buona esecuzione');
+  else if (score >= 40) notes.unshift('Esecuzione parziale');
+  else notes.unshift('Sessione molto diversa dal piano');
+
+  return { score, notes };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODULO 6 — Week Review
+// ─────────────────────────────────────────────────────────────────────────────
+/** Confronta le sessioni pianificate della settimana scorsa con le corse effettivamente fatte. */
+function generateWeekReview(classifiedRuns, weeklyPlan) {
+  if (!weeklyPlan?.sessions?.length) return null;
+  const now = new Date();
+
+  // Sessioni pianificate nella settimana scorsa (daysFromNow da -7 a -1, o per data assoluta)
+  const plannedPast = weeklyPlan.sessions.filter(s => {
+    if (s.isoDate) {
+      const d = new Date(s.isoDate + 'T00:00:00');
+      const age = Math.round((now - d) / 86400000);
+      return age >= 1 && age <= 8;
+    }
+    return false;
+  });
+
+  if (!plannedPast.length) return null;
+
+  const reviewed = plannedPast.map(planned => {
+    if (planned.type === 'rest') return { planned, actual: null, compliance: { score: 100, notes: ['Giorno di riposo'] } };
+
+    // Trova la corsa più vicina alla data pianificata (entro ±1 giorno)
+    const target = new Date(planned.isoDate + 'T00:00:00');
+    const actual = classifiedRuns.find(r => {
+      const d = new Date(r.date);
+      return Math.abs(d - target) <= 86400000 * 1.5;
+    }) ?? null;
+
+    const compliance = calcComplianceScore(planned, actual);
+    return { planned, actual, compliance };
+  });
+
+  const runsReviewed = reviewed.filter(r => r.planned.type !== 'rest' && r.actual);
+  const avgCompliance = runsReviewed.length
+    ? Math.round(runsReviewed.reduce((s,r) => s + r.compliance.score, 0) / runsReviewed.length)
+    : null;
+
+  const summary = avgCompliance === null ? 'Nessuna sessione trovata per la settimana scorsa'
+    : avgCompliance >= 85 ? `Ottima settimana! Compliance media: ${avgCompliance}/100`
+    : avgCompliance >= 65 ? `Buona settimana. Compliance media: ${avgCompliance}/100`
+    : `Settimana al di sotto del piano. Compliance: ${avgCompliance}/100`;
+
+  return { sessions: reviewed, avgCompliance, summary };
+}
+
 /** Calcola le zone di ritmo personalizzate basate sulla stima di ritmo mezza maratona.
  *  Usa la formula di Daniels: le zone sono offset dal ritmo gara target (HMP).
  *  Ogni zona include range passo (min/km) e velocità (km/h) per il Garmin. */
@@ -1028,7 +1291,7 @@ function calcPaceZones(metrics) {
  *  - race_week (< 7gg):  Settimana gara (13–19 aprile)
  *  - post_race (< 0):    Dopo la gara
  */
-function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
+function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readinessScore) {
   // ── Zone di ritmo FISSE (valori assoluti calibrati sull'atleta) ──
   // NON derivate da paceZones — sovrascrivono qualsiasi calcolo dinamico.
   const ZONES = {
@@ -1287,7 +1550,10 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
   ];
 
   // ── Filtra le sessioni da mostrare (domani → +7 giorni + gara se entro 21gg) ──
-  const sessions = ALL_SESSIONS
+  const rsScore = readinessScore?.score ?? 70;
+  const isHardType = t => ['tempo','threshold','interval','race_pace','long_run'].includes(t);
+
+  let sessions = ALL_SESSIONS
     .map(s => {
       const dfn = daysFrom(s.isoDate);
       return { ...s, day: dayLabel(dfn), daysFromNow: dfn };
@@ -1297,6 +1563,63 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
       return s.daysFromNow >= 1 && s.daysFromNow <= 7;
     })
     .sort((a, b) => a.daysFromNow - b.daysFromNow);
+
+  // ── MODULO 7 — Risk guardrails ──
+  // 1. Vincolo: max 2 qualità/settimana
+  let hardCount = 0;
+  sessions = sessions.map(s => {
+    if (s.type === 'rest' || s.type === 'race') return s;
+    if (isHardType(s.type)) {
+      hardCount++;
+      if (hardCount > 2) {
+        return { ...s, type: 'easy', title: 'Corsa facile (piano adattato)',
+          structure: [{ phase: `Easy ${s.totalKm}km`, km: s.totalKm, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange }],
+          garminNote: `Easy ${s.totalKm}km. FC 140–150. Piano adattato: max 2 sessioni dure/settimana.`,
+          rationale: 'Guardrail attivo: già 2 sessioni di qualità questa settimana.', _downgraded: true };
+      }
+    }
+    return s;
+  });
+
+  // 2. Vincolo: 48h tra lungo e interval/tempo
+  const longIdx = sessions.findIndex(s => s.type === 'long_run');
+  if (longIdx >= 0) {
+    sessions = sessions.map((s, i) => {
+      if (i === longIdx || s.type === 'rest' || s.type === 'race') return s;
+      const gap = Math.abs(s.daysFromNow - sessions[longIdx].daysFromNow);
+      if (gap < 2 && ['interval','tempo','threshold'].includes(s.type)) {
+        return { ...s, type: 'easy', title: 'Corsa facile (vicina al lungo)',
+          structure: [{ phase: `Easy ${s.totalKm}km`, km: s.totalKm, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange }],
+          garminNote: `Easy ${s.totalKm}km. Piano adattato: lungo e qualità separati da almeno 48h.`,
+          rationale: 'Guardrail: lungo e interval/tempo devono essere separati di almeno 2 giorni.', _downgraded: true };
+      }
+      return s;
+    });
+  }
+
+  // 3. Readiness-based downgrade
+  if (rsScore < 60) {
+    let firstHardDowngraded = false;
+    sessions = sessions.map(s => {
+      if (s.type === 'rest' || s.type === 'race' || s._downgraded) return s;
+      if (isHardType(s.type) && !firstHardDowngraded) {
+        firstHardDowngraded = true;
+        const newType = rsScore < 40 ? 'recovery' : 'easy';
+        const newZone = rsScore < 40 ? ZONES.recovery : ZONES.easy;
+        return { ...s, type: newType, title: rsScore < 40 ? 'Corsa rigenerativa (readiness basso)' : 'Corsa facile (readiness ridotto)',
+          structure: [{ phase: `${newType === 'recovery' ? 'Recovery' : 'Easy'} ${s.totalKm}km`, km: s.totalKm, pace: newZone.paceRange, speed: newZone.speedRange }],
+          garminNote: `${newType === 'recovery' ? 'Recovery' : 'Easy'} ${s.totalKm}km. Readiness score: ${rsScore}/100 — recupera prima di caricare.`,
+          rationale: `Readiness score ${rsScore}/100 (${readinessScore?.label ?? 'Affaticato'}). Piano adattato per recupero.`, _downgraded: true };
+      }
+      return s;
+    });
+  }
+
+  // 4. Volume warning
+  const weekKm = sessions.filter(s => s.type !== 'rest').reduce((s,r) => s + (r.totalKm||0), 0);
+  const avgWeekly = metrics.monthlyVolumeKm / 4;
+  const volumeWarning = avgWeekly > 0 && weekKm > avgWeekly * 1.4
+    ? `⚠️ Volume pianificato (${Math.round(weekKm)}km) supera del 40% la media (${Math.round(avgWeekly)}km/sett)` : null;
 
   // ── weekTarget = somma km sessioni non-riposo della settimana corrente ──
   const weekTarget = sessions
@@ -1317,12 +1640,13 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns) {
     weekTarget: Math.round(weekTarget),
     phase,
     daysToRace,
-    note: phaseNote,
+    note: volumeWarning ?? phaseNote,
+    readinessLabel: readinessScore?.label ?? null,
   };
 }
 
 /** Costruisce una stringa di contesto sintetica da passare al system prompt di Claude. */
-function buildRunningContext(classifiedRuns, metrics, insights, paceZones, weeklyPlan) {
+function buildRunningContext(classifiedRuns, metrics, insights, paceZones, weeklyPlan, readinessScore, weekReview) {
   const {
     weeklyVolumeKm, monthlyVolumeKm, runsLast7Days, runsLast30Days,
     consistencyScore, fatigueTrend, estimated10kTime,
@@ -1362,8 +1686,10 @@ ${recentLabels}
 STIME: ${stime}
 ${zoneStr}
 ${pianStr}
+READINESS: ${readinessScore ? `${readinessScore.score}/100 (${readinessScore.label})${readinessScore.flags.length ? ' — ' + readinessScore.flags[0] : ''}` : 'N/D'}
+${weekReview?.avgCompliance != null ? `COMPLIANCE SETT. SCORSA: ${weekReview.avgCompliance}/100 — ${weekReview.summary}` : ''}
 FORZE: ${insights.strengths.join(' | ') || 'nessuna'}
-AREE: ${insights.weaknesses.join(' | ') || 'nessuna'}`.slice(0, 1800);
+AREE: ${insights.weaknesses.join(' | ') || 'nessuna'}`.slice(0, 1900);
 }
 
 // ── PESO VIEW ─────────────────────────────────────────────────
@@ -2433,6 +2759,90 @@ function PaceZonesCard({ paceZones }) {
   );
 }
 
+/** Readiness score: stato di freschezza dell'atleta. */
+function ReadinessCard({ readinessScore }) {
+  if (!readinessScore) return null;
+  const { score, label, flags } = readinessScore;
+  const color = score >= 80 ? '#4ade80' : score >= 60 ? '#facc15' : '#f87171';
+  const cardStyle = { background:'var(--card)', borderRadius:8, padding:'14px 16px', marginBottom:8, border:'1px solid var(--border)' };
+  return (
+    <div style={cardStyle}>
+      <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+        <div style={{width:52,height:52,borderRadius:'50%',border:`3px solid ${color}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+          <span style={{fontSize:'15px',fontWeight:700,color}}>{score}</span>
+          <span style={{fontSize:'8px',color:'var(--text3)',lineHeight:1}}>/ 100</span>
+        </div>
+        <div>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>READINESS</div>
+          <div style={{fontSize:'14px',fontWeight:700,color,marginTop:2}}>{label}</div>
+        </div>
+      </div>
+      {flags.length > 0 && (
+        <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:4}}>
+          {flags.map((f,i) => (
+            <div key={i} style={{fontSize:'11px',color:'var(--text3)',display:'flex',gap:'6px'}}>
+              <span style={{color:color,flexShrink:0}}>•</span>{f}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Compliance settimana scorsa: pianificato vs eseguito. */
+function WeekReviewCard({ weekReview }) {
+  if (!weekReview?.sessions?.length) return null;
+  const cardStyle = { background:'var(--card)', borderRadius:8, padding:'14px 16px', marginBottom:8, border:'1px solid var(--border)' };
+  const scoreColor = s => s >= 85 ? '#4ade80' : s >= 65 ? '#facc15' : '#f87171';
+  const runSessions = weekReview.sessions.filter(s => s.planned.type !== 'rest');
+  if (!runSessions.length) return null;
+  return (
+    <div style={cardStyle}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+        <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>SETTIMANA SCORSA</div>
+        {weekReview.avgCompliance != null && (
+          <span style={{fontSize:'12px',fontWeight:700,color:scoreColor(weekReview.avgCompliance)}}>
+            {weekReview.avgCompliance}/100
+          </span>
+        )}
+      </div>
+      <div style={{fontSize:'11px',color:'var(--text3)',marginBottom:'8px'}}>{weekReview.summary}</div>
+      <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+        {runSessions.map((item, i) => {
+          const { planned, actual, compliance } = item;
+          return (
+            <div key={i} style={{display:'flex',alignItems:'flex-start',gap:'8px',padding:'6px 0',borderTop:'1px solid var(--border)'}}>
+              <div style={{minWidth:72}}>
+                <span style={{fontSize:'10px',fontWeight:700,background:WORKOUT_COLORS[planned.type]??'#666',color:'#fff',borderRadius:4,padding:'2px 5px'}}>
+                  {WORKOUT_LABELS[planned.type]??planned.type}
+                </span>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:'11px',color:'var(--text)',fontWeight:600}}>{planned.title}</div>
+                {actual ? (
+                  <div style={{fontSize:'10px',color:'var(--text3)',marginTop:2}}>
+                    Eseguito: {actual.distanceKm.toFixed(1)}km @ {_paceStr(actual.avgPaceMinKm)}/km
+                    {actual.avgHeartRate ? ` · FC ${actual.avgHeartRate}` : ''}
+                  </div>
+                ) : (
+                  <div style={{fontSize:'10px',color:'#f87171',marginTop:2}}>Non eseguito</div>
+                )}
+                {compliance.notes.slice(1).map((n,j) => (
+                  <div key={j} style={{fontSize:'10px',color:'var(--text3)',marginTop:1}}>↳ {n}</div>
+                ))}
+              </div>
+              <div style={{minWidth:36,textAlign:'right'}}>
+                <span style={{fontSize:'12px',fontWeight:700,color:scoreColor(compliance.score)}}>{compliance.score}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** Piano di allenamento settimanale con sessioni dettagliate per Garmin. */
 function WeeklyPlanCard({ weeklyPlan }) {
   if (!weeklyPlan) return null;
@@ -2536,7 +2946,7 @@ const WORKOUT_LABELS = {
   race_pace:'Gara', progression:'Progressione', unknown:'?',
 };
 
-function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan }) {
+function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, readinessScore, weekReview }) {
   const {
     weeklyVolumeKm, monthlyVolumeKm, runsLast7Days,
     consistencyScore, estimatedHalfMarathonTime, estimatedHalfMarathonPace,
@@ -2618,11 +3028,17 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan }
           </div>
         )}
 
+        {/* Readiness */}
+        <ReadinessCard readinessScore={readinessScore} />
+
         {/* Zone di ritmo */}
         <PaceZonesCard paceZones={paceZones} />
 
         {/* Piano settimanale */}
         <WeeklyPlanCard weeklyPlan={weeklyPlan} />
+
+        {/* Settimana scorsa — compliance */}
+        <WeekReviewCard weekReview={weekReview} />
 
         {/* Ultime 5 corse classificate */}
         <div style={cardStyle}>
@@ -2738,9 +3154,23 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
     trainingMetrics ? calcPaceZones(trainingMetrics) : null,
     [trainingMetrics]);
 
+  const readinessScore = useMemo(() =>
+    classifiedRuns.length ? calcReadinessScore(classifiedRuns) : null,
+    [classifiedRuns]);
+
+  const dynamicPaceZones = useMemo(() =>
+    trainingMetrics ? calcDynamicPaceZones(classifiedRuns, trainingMetrics) : null,
+    [classifiedRuns, trainingMetrics]);
+
   const weeklyPlan = useMemo(() =>
-    trainingMetrics && paceZones ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZones, classifiedRuns) : null,
-    [trainingMetrics, paceZones, coachingInsights, classifiedRuns]);
+    trainingMetrics && paceZones
+      ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZones, classifiedRuns, readinessScore)
+      : null,
+    [trainingMetrics, paceZones, coachingInsights, classifiedRuns, readinessScore]);
+
+  const weekReview = useMemo(() =>
+    weeklyPlan && classifiedRuns.length ? generateWeekReview(classifiedRuns, weeklyPlan) : null,
+    [classifiedRuns, weeklyPlan]);
 
   // Legge il ?code= dall'URL dopo il redirect OAuth Strava
   useEffect(()=>{
@@ -2866,7 +3296,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
     setChatMessages(newMessages);setChatInput('');setChatLoading(true);setError('');
     try{
       const runningContext = classifiedRuns.length>=3 && trainingMetrics && coachingInsights
-        ? buildRunningContext(classifiedRuns, trainingMetrics, coachingInsights, paceZones, weeklyPlan) : null;
+        ? buildRunningContext(classifiedRuns, trainingMetrics, coachingInsights, paceZones, weeklyPlan, readinessScore, weekReview) : null;
       const res=await fetch('/.netlify/functions/ai-chat',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({messages:newMessages,activities:stravaActivities,runningContext})
@@ -3075,7 +3505,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 
       {/* Running Insights Panel */}
       {isConnected && classifiedRuns.length >= 3 && trainingMetrics && coachingInsights && (
-        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights} paceZones={paceZones} weeklyPlan={weeklyPlan}/>
+        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights} paceZones={paceZones} weeklyPlan={weeklyPlan} readinessScore={readinessScore} weekReview={weekReview}/>
       )}
 
       {/* Chat AI */}
