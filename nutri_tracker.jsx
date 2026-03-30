@@ -2418,6 +2418,7 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,
   const rs=readinessScore?.score??null;
   const rsLabel=readinessScore?.label??null;
   const rsColor=rs==null?'var(--text3)':rs>=75?'#00C49A':rs>=50?'#FBA828':'#e05c5c';
+  const [showReadinessInfo,setShowReadinessInfo]=useState(false);
 
   // Colori tipo sessione
   const sessColors={interval:'#4c8cde',tempo:'#e05c5c',easy:'#00C49A',long_run:'#FBA828',recovery:'#5A6888',race_pace:'#FF6B35',threshold:'#c44c9a',rest:'#2a2f3e'};
@@ -2457,13 +2458,28 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
           {/* Readiness */}
           {rs!=null&&(
-            <div style={{...S.card(),padding:'14px'}}>
-              <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>READINESS</div>
+            <div style={{...S.card(),padding:'14px',cursor:'pointer'}} onClick={()=>setShowReadinessInfo(v=>!v)}>
+              <div style={{fontSize:'10px',color:'var(--text3)',letterSpacing:'0.6px',fontWeight:600,marginBottom:'6px'}}>
+                READINESS <span style={{color:'var(--accent)'}}>*</span>
+              </div>
               <div style={{fontFamily:'var(--display)',fontSize:'28px',lineHeight:1,color:rsColor}}>{rs}</div>
               <div style={{fontSize:'10px',color:rsColor,marginTop:'2px',fontWeight:600}}>{rsLabel??''}</div>
               <div style={{marginTop:'8px',height:'3px',borderRadius:'3px',background:'var(--chip)',overflow:'hidden'}}>
                 <div style={{height:'100%',width:`${rs}%`,background:rsColor,borderRadius:'3px'}}/>
               </div>
+              {showReadinessInfo&&(
+                <div style={{marginTop:'10px',borderTop:'1px solid var(--border)',paddingTop:'8px',fontSize:'10px',color:'var(--text3)',lineHeight:1.6}}>
+                  <div style={{marginBottom:'4px',color:'var(--text2)',fontWeight:600}}>Come si calcola:</div>
+                  <div>score = 100 − fatica + recupero</div>
+                  <div style={{marginTop:'3px'}}>Fatica = somma effort 7gg, dove effort = km × (pace_gara / pace_run). Normalizzato su 120.</div>
+                  <div style={{marginTop:'3px'}}>Recupero = +5pt/giorno dall'ultima sessione dura (max +20).</div>
+                  {readinessScore?.flags?.length>0&&(
+                    <div style={{marginTop:'6px',color:'#FBA828'}}>
+                      {readinessScore.flags.map((f,i)=><div key={i}>· {f}</div>)}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {/* Volume settimana */}
