@@ -3343,26 +3343,40 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
         {/* Piano settimanale */}
         <WeeklyPlanCard weeklyPlan={weeklyPlan} raceGoal={raceGoal} saveRaceGoal={saveRaceGoal} />
 
-        {/* Settimana scorsa — compliance */}
-        <WeekReviewCard weekReview={weekReview} />
-
-        {/* Ultime 5 corse classificate */}
-        <div style={cardStyle}>
-          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'8px'}}>ULTIME CORSE</div>
-          <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-            {runs.slice(0, 5).map(r => {
-              const type = r.classification?.workoutType ?? 'unknown';
-              return (
-                <div key={r.id} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
-                  <span style={badgeStyle(type)}>{WORKOUT_LABELS[type]??type}</span>
-                  <span style={{fontSize:'12px',color:'var(--text)',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.title}</span>
-                  <span style={{fontSize:'11px',color:'var(--text2)',whiteSpace:'nowrap'}}>{r.distanceKm.toFixed(1)}km</span>
-                  <span style={{fontSize:'11px',color:'var(--text3)',whiteSpace:'nowrap'}}>{_paceStr(r.avgPaceMinKm)}/km</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        {/* Settimana scorsa — corse effettivamente fatte (Lun–Dom precedente) */}
+        {(()=>{
+          const lm=new Date();
+          lm.setDate(lm.getDate()-((lm.getDay()+6)%7)-7);
+          lm.setHours(0,0,0,0);
+          const ls=new Date(lm);ls.setDate(lm.getDate()+6);ls.setHours(23,59,59,999);
+          const lastWeekRuns=runs
+            .filter(r=>{const d=new Date(r.date);return d>=lm&&d<=ls;})
+            .sort((a,b)=>a.date.localeCompare(b.date));
+          const giorni=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+          return(
+            <div style={cardStyle}>
+              <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'8px'}}>SETTIMANA SCORSA</div>
+              {lastWeekRuns.length===0
+                ? <div style={{fontSize:'11px',color:'var(--text3)'}}>Nessuna corsa registrata la settimana scorsa</div>
+                : <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                    {lastWeekRuns.map(r=>{
+                      const type=r.classification?.workoutType??'unknown';
+                      const dayName=giorni[new Date(r.date).getDay()];
+                      return(
+                        <div key={r.id??r.date} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                          <span style={{fontSize:'11px',color:'var(--text3)',minWidth:'70px'}}>{dayName}</span>
+                          <span style={badgeStyle(type)}>{WORKOUT_LABELS[type]??type}</span>
+                          <span style={{flex:1}}/>
+                          <span style={{fontSize:'11px',color:'var(--text2)',whiteSpace:'nowrap'}}>{r.distanceKm.toFixed(1)}km</span>
+                          <span style={{fontSize:'11px',color:'var(--text3)',whiteSpace:'nowrap'}}>{_paceStr(r.avgPaceMinKm)}/km</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+              }
+            </div>
+          );
+        })()}
 
         {/* Forze e debolezze */}
         {(insights.strengths.length > 0 || insights.weaknesses.length > 0) && (
