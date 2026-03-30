@@ -892,6 +892,16 @@ function calcTrainingMetrics(classifiedRuns) {
     estimatedHalfMarathonPace = estimatedHalfMarathonTime / 21.0975;
   }
 
+  // Race pace reale da storico (media ultimi 3 quality runs)
+  const racePace = calcRacePace(classifiedRuns) ?? null;
+
+  // Fatigue score = rolling sum effort scores ultimi 7gg
+  // effortScore potrebbe non essere ancora aggiunto al run (primo calcolo), usa distanza/pace come proxy
+  const rp = racePace ?? FIXED_ZONES.race_pace.paceMin;
+  const fatigueScore = Math.round(
+    runs7.reduce((s, r) => s + (r.effortScore ?? (r.distanceKm * (rp / r.avgPaceMinKm))), 0) * 10
+  ) / 10;
+
   return {
     weeklyVolumeKm,
     monthlyVolumeKm,
@@ -906,6 +916,8 @@ function calcTrainingMetrics(classifiedRuns) {
     estimated10kTime,
     estimatedHalfMarathonPace,
     estimatedHalfMarathonTime,
+    racePace,
+    fatigueScore,
   };
 }
 
@@ -988,61 +1000,75 @@ function generateCoachingInsights(classifiedRuns, metrics) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MODULO 0 — Race Pace da storico reale
+// ─────────────────────────────────────────────────────────────────────────────
+/** Calcola il race_pace di riferimento come media delle ultime 3 sessioni di qualità
+ *  (tempo/race_pace/threshold) negli ultimi 60 giorni.
+ *  Questo valore è il fulcro da cui derivano tutte le zone dinamiche. */
+function calcRacePace(classifiedRuns) {
+  const now = new Date();
+  const ms60 = 60 * 86400000;
+  const recentQuality = classifiedRuns
+    .filter(r => ['tempo', 'race_pace', 'threshold'].includes(r.classification?.workoutType))
+    .filter(r => new Date(r.date) >= new Date(now - ms60))
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 3);
+  if (!recentQuality.length) return null;
+  return recentQuality.reduce((s, r) => s + r.avgPaceMinKm, 0) / recentQuality.length;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MODULO 2 — Readiness Score
 // ─────────────────────────────────────────────────────────────────────────────
 /** Calcola uno score 0-100 che misura la prontezza dell'atleta ad allenarsi.
- *  Basato su: volume recente, densità sessioni hard, freschezza post-lungo, gg di riposo. */
+ *  Formula: readiness = 100 - fatigue_normalized + recovery_factor
+ *  - fatigue = rolling sum effort scores ultimi 7gg (ogni run = distKm * racePace/avgPace)
+ *  - recovery_factor = +5pt per ogni giorno dall'ultima sessione hard (max +20)
+ *  - Flag aggiuntivi: hard density, long freshness, HR drift */
 function calcReadinessScore(classifiedRuns) {
   const now = new Date();
   const ms3  = 3  * 86400000;
   const ms7  = 7  * 86400000;
-  const ms21 = 21 * 86400000;
 
-  const runs21 = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - ms21));
   const runs7  = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - ms7));
   const runs3  = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - ms3));
-
   const isHard = t => ['tempo','threshold','interval','race_pace','long_run'].includes(t);
-  const sumDist = arr => arr.reduce((s,r) => s + r.distanceKm, 0);
 
-  let score = 60;
   const flags = [];
 
-  // Volume 7gg vs media 21gg
-  const vol7  = sumDist(runs7);
-  const avg21 = sumDist(runs21) / 3; // media settimanale su 3 settimane
-  if (avg21 > 0) {
-    const ratio = vol7 / avg21;
-    if (ratio < 0.80) { score += 15; flags.push('Volume ridotto questa settimana — gambe fresche'); }
-    else if (ratio > 1.40) { score -= 15; flags.push('Volume molto alto questa settimana — attenzione al recupero'); }
-  }
+  // ── Fatigue: rolling sum effort scores 7gg ──
+  // effort_score = distanceKm * (race_pace / avg_pace) — già calcolato su ogni run
+  // Normalizzazione: 120 effort = readiness 0 (iper-carico), 0 effort = readiness 100
+  const rp = calcRacePace(classifiedRuns) ?? FIXED_ZONES.race_pace.paceMin;
+  const fatigue7 = runs7.reduce((s, r) => s + (r.effortScore ?? (r.distanceKm * (rp / r.avgPaceMinKm))), 0);
+  const fatigueNorm = Math.min(100, (fatigue7 / 1.2)); // 120 effort = 100% fatica
 
-  // Hard session density ultimi 3 giorni
+  // ── Recovery factor: +5pt/giorno dall'ultima sessione hard (max +20) ──
+  const hardRuns = classifiedRuns.filter(r => isHard(r.classification?.workoutType));
+  const lastHard = hardRuns[0];
+  const daysSinceHard = lastHard ? Math.round((now - new Date(lastHard.date)) / 86400000) : 7;
+  const recoveryFactor = Math.min(20, daysSinceHard * 5);
+
+  let score = Math.round(100 - fatigueNorm + recoveryFactor);
+
+  // ── Flag informativi ──
+  if (fatigue7 > 90) flags.push(`Carico settimanale elevato (effort ${Math.round(fatigue7)}) — gambe cariche`);
+  else if (fatigue7 < 20 && runs7.length > 0) flags.push('Carico leggero questa settimana — gambe fresche');
+  else if (runs7.length === 0) flags.push('Nessuna corsa negli ultimi 7 giorni — ripartenza graduale');
+
+  // Hard density ultimi 3 giorni
   const hard3 = runs3.filter(r => isHard(r.classification?.workoutType));
   if (hard3.length >= 2) {
-    score -= 20;
-    flags.push('2+ sessioni dure negli ultimi 3 giorni — rischio sovraccarico');
-  } else if (hard3.length === 1) {
-    score -= 5;
-  }
-
-  // Penalità extra: 2 hard entro 72h (stessa cosa ma più precisa)
-  const hardRuns21 = runs21.filter(r => isHard(r.classification?.workoutType))
-    .sort((a,b) => new Date(b.date) - new Date(a.date));
-  if (hardRuns21.length >= 2) {
-    const gap = (new Date(hardRuns21[0].date) - new Date(hardRuns21[1].date)) / 86400000;
-    if (Math.abs(gap) < 1) { // stesso giorno o giorni adiacenti
-      score -= 20;
-      flags.push('Due sessioni dure consecutive — recupero insufficiente');
-    }
+    score -= 15;
+    flags.push('2 sessioni dure negli ultimi 3 giorni — rischio sovraccarico');
   }
 
   // Long run freshness
   const lastLong = classifiedRuns.find(r => r.classification?.workoutType === 'long_run');
   if (lastLong) {
     const daysSinceLong = Math.round((now - new Date(lastLong.date)) / 86400000);
-    if (daysSinceLong < 4) { score -= 10; flags.push(`Lungo fatto ${daysSinceLong}gg fa — gambe ancora cariche`); }
-    else if (daysSinceLong >= 10) { flags.push('Nessun lungo recente — buon momento per il lungo'); }
+    if (daysSinceLong < 3) { score -= 10; flags.push(`Lungo fatto ${daysSinceLong}gg fa — gambe ancora cariche`); }
+    else if (daysSinceLong >= 10) flags.push('Nessun lungo recente — buon momento per il lungo');
   }
 
   // Days since last run
@@ -1053,13 +1079,13 @@ function calcReadinessScore(classifiedRuns) {
   // HR drift: ultima easy con HR > 158
   const lastEasy = classifiedRuns.find(r => r.classification?.workoutType === 'easy');
   if (lastEasy?.avgHeartRate > 158) {
-    score -= 10;
+    score -= 8;
     flags.push(`FC alta nell'ultima easy (${lastEasy.avgHeartRate} bpm) — possibile affaticamento`);
   }
 
   score = Math.max(0, Math.min(100, score));
   const label = score >= 80 ? 'Pronto' : score >= 60 ? 'Discreto' : 'Affaticato';
-  return { score, label, flags };
+  return { score, label, flags, fatigue7: Math.round(fatigue7), recoveryFactor };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1075,62 +1101,55 @@ const FIXED_ZONES = {
   interval:  { paceMin: 4.42, paceMax: 4.58, fc: 'FC fino a 169' },
 };
 
-/** Aggiorna HMP solo se ENTRAMBI i segnali migliorano:
- *  (a) long run recente con FC < 150 e passo stabile
- *  (b) HM-pace session con FC < 158
- *  Intervals da soli non giustificano una revisione. */
+/** Zone di ritmo dinamiche derivate dallo storico reale dell'atleta.
+ *  Formula (dal modello fisiologico):
+ *  - race_pace = avg(last 3 quality runs) — oppure FIXED_ZONES fallback
+ *  - threshold = race_pace - 0.20
+ *  - tempo     = race_pace ± 0.05
+ *  - easy      = race_pace + 0.30 → + 0.45
+ *  - long      = race_pace + 0.15 → + 0.30
+ *  - recovery  = race_pace + 0.50 → + 0.75
+ *  - interval  = race_pace - 0.50 → - 0.40
+ *  Aggiorna HMP solo se entrambi i segnali (long HR<150 + HM-pace HR<158) migliorano. */
 function calcDynamicPaceZones(classifiedRuns, metrics) {
+  // Calcola race_pace da storico reale
+  const rpFromHistory = calcRacePace(classifiedRuns);
+  const rp = rpFromHistory ?? FIXED_ZONES.race_pace.paceMin;
+
+  // Zone derivate dalla formula del modello
+  const zones = {
+    recovery:  { paceMin: rp + 0.50, paceMax: rp + 0.75, fc: 'FC < 145', updated: !!rpFromHistory },
+    easy:      { paceMin: rp + 0.30, paceMax: rp + 0.45, fc: 'FC 140–150', updated: !!rpFromHistory },
+    long_run:  { paceMin: rp + 0.15, paceMax: rp + 0.30, fc: 'FC 145–152', updated: !!rpFromHistory },
+    race_pace: { paceMin: rp - 0.05, paceMax: rp + 0.05, fc: 'FC 150–158', updated: !!rpFromHistory },
+    tempo:     { paceMin: rp - 0.20, paceMax: rp - 0.05, fc: 'FC 158–165', updated: !!rpFromHistory },
+    interval:  { paceMin: rp - 0.50, paceMax: rp - 0.35, fc: 'FC fino a 169', updated: !!rpFromHistory },
+  };
+
+  // Verifica ulteriore: aggiorna solo se entrambi i segnali di fitness migliorano
+  // Segnale A: long run con FC < 150
   const now = new Date();
   const ms30 = 30 * 86400000;
-  const recent = classifiedRuns.filter(r => new Date(r.date) >= new Date(now - ms30));
-
-  // Segnale A: long run recente con FC controllata
-  const recentLongs = recent
-    .filter(r => r.classification?.workoutType === 'long_run' && r.distanceKm >= 15)
+  const recentLongs = classifiedRuns
+    .filter(r => r.classification?.workoutType === 'long_run' && r.distanceKm >= 15 && new Date(r.date) >= new Date(now - ms30))
     .sort((a,b) => new Date(b.date) - new Date(a.date));
-  const longOk = recentLongs.length > 0
-    && recentLongs[0].avgHeartRate
-    && recentLongs[0].avgHeartRate < 150
-    && recentLongs[0].avgPaceMinKm < 5.6; // passo ragionevole
-
-  // Segnale B: HM-pace session con FC controllata
-  const recentHMSessions = recent
-    .filter(r => r.classification?.workoutType === 'race_pace' && r.distanceKm >= 8)
+  // Segnale B: HM-pace session con FC < 158
+  const recentHM = classifiedRuns
+    .filter(r => r.classification?.workoutType === 'race_pace' && r.distanceKm >= 8 && new Date(r.date) >= new Date(now - ms30))
     .sort((a,b) => new Date(b.date) - new Date(a.date));
-  const hmOk = recentHMSessions.length > 0
-    && recentHMSessions[0].avgHeartRate
-    && recentHMSessions[0].avgHeartRate < 158;
 
-  // Entrambi i segnali necessari per aggiornare HMP
-  if (longOk && hmOk) {
-    // Stima HMP dalle sessioni recenti (media pesata)
-    const longPace = recentLongs[0].avgPaceMinKm - 0.25; // long→HM adjustment
-    const hmPace   = recentHMSessions[0].avgPaceMinKm;
-    const newHMP   = (longPace + hmPace) / 2;
+  const longOk = recentLongs[0]?.avgHeartRate < 150;
+  const hmOk   = recentHM[0]?.avgHeartRate < 158;
+  const bothSignalsOk = longOk && hmOk;
 
-    // Ritorna zone aggiornate se migliorano (HMP più basso = più veloce)
-    const currentHMP = metrics.estimatedHalfMarathonPace ?? FIXED_ZONES.race_pace.paceMin;
-    if (newHMP < currentHMP - 0.05) {
-      const delta = currentHMP - newHMP;
-      return {
-        ...Object.fromEntries(Object.entries(FIXED_ZONES).map(([k, z]) => [k, {
-          ...z,
-          paceMin: z.paceMin - delta,
-          paceMax: z.paceMax - delta,
-          updated: true,
-        }])),
-        hmp: newHMP,
-        updated: true,
-        reason: `HMP aggiornato a ${_paceStr(newHMP)}/km (lungo FC ${recentLongs[0].avgHeartRate} + HM-pace controllata)`,
-      };
-    }
-  }
-
-  // Fallback: zone fisse
   return {
-    ...Object.fromEntries(Object.entries(FIXED_ZONES).map(([k, z]) => [k, { ...z, updated: false }])),
-    hmp: metrics.estimatedHalfMarathonPace ?? FIXED_ZONES.race_pace.paceMin,
-    updated: false,
+    ...zones,
+    hmp: rp,
+    updated: !!rpFromHistory,
+    bothSignalsOk,
+    reason: rpFromHistory
+      ? `Race pace calcolato da storico: ${_paceStr(rp)}/km (media ultimi quality runs)`
+      : 'Zone fisse (nessun quality run recente)',
   };
 }
 
@@ -1564,6 +1583,65 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     })
     .sort((a, b) => a.daysFromNow - b.daysFromNow);
 
+  // ── MODULO 7 — Next-session logic (dal modello fisiologico) ──
+  const fatigueScore = metrics.fatigueScore ?? 0;
+  const racePaceVal  = metrics.racePace ?? null;
+
+  // Ultima corsa classificata
+  const lastRun = classifiedRuns?.[0] ?? null;
+  const lastType = lastRun?.classification?.workoutType ?? null;
+
+  // Giorni dall'ultima sessione interval/threshold
+  const daysSinceInterval = (() => {
+    const last = classifiedRuns?.find(r => ['interval','threshold'].includes(r.classification?.workoutType));
+    if (!last) return 99;
+    return Math.round((new Date() - new Date(last.date)) / 86400000);
+  })();
+
+  // Numero di sessioni dure già questa settimana (nei prossimi 7gg del piano)
+  const qualityThisWeek = sessions.filter(s => isHardType(s.type)).length;
+
+  // Regola A: se ultima sessione era interval → la prossima deve essere easy/recovery
+  const forceEasyNext = lastType === 'interval' && daysSinceInterval <= 1;
+
+  // Regola B: se fatigue > 120 → aggiungi riposo (converti prima sessione hard in rest)
+  const forcedRestByFatigue = fatigueScore > 120;
+
+  // Regola C: se readiness > 75 && quality questa settimana < 2 → mantieni le sessioni dure (nessun downgrade automatico)
+  const allowQuality = rsScore > 75 && qualityThisWeek < 2;
+
+  if (forcedRestByFatigue) {
+    // Converti la prima sessione hard in riposo
+    let applied = false;
+    sessions = sessions.map(s => {
+      if (applied || s.type === 'rest' || s.type === 'race') return s;
+      if (isHardType(s.type)) {
+        applied = true;
+        return { ...s, type: 'rest', title: 'Riposo (fatica elevata)',
+          totalKm: 0, structure: [],
+          garminNote: '',
+          rationale: `Guardrail fatica: effort score settimanale ${fatigueScore.toFixed(1)} > 120. Recupera prima di caricare.`, _downgraded: true };
+      }
+      return s;
+    });
+  }
+
+  if (forceEasyNext) {
+    // La prima sessione non-rest del piano diventa easy
+    let applied = false;
+    sessions = sessions.map(s => {
+      if (applied || s.type === 'rest' || s.type === 'race') return s;
+      if (isHardType(s.type)) {
+        applied = true;
+        return { ...s, type: 'easy', title: 'Corsa facile (dopo interval)',
+          structure: [{ phase: `Easy ${s.totalKm}km`, km: s.totalKm, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange }],
+          garminNote: `Easy ${s.totalKm}km. FC 140–150. Recupero attivo dopo la sessione di ripetute.`,
+          rationale: 'Regola sequenza: dopo interval → sessione easy obbligatoria.', _downgraded: true };
+      }
+      return s;
+    });
+  }
+
   // ── MODULO 7 — Risk guardrails ──
   // 1. Vincolo: max 2 qualità/settimana
   let hardCount = 0;
@@ -1650,7 +1728,8 @@ function buildRunningContext(classifiedRuns, metrics, insights, paceZones, weekl
   const {
     weeklyVolumeKm, monthlyVolumeKm, runsLast7Days, runsLast30Days,
     consistencyScore, fatigueTrend, estimated10kTime,
-    estimatedHalfMarathonTime, estimatedHalfMarathonPace
+    estimatedHalfMarathonTime, estimatedHalfMarathonPace,
+    racePace, fatigueScore,
   } = metrics;
 
   const recentLabels = classifiedRuns.slice(0, 5).map(r => {
@@ -1679,8 +1758,16 @@ Ripetute: ${_paceStr(paceZones.interval.paceMin)}–${_paceStr(paceZones.interva
       ).join('\n')
     : '';
 
+  const fatigueStr = fatigueScore != null
+    ? `Fatica 7gg: ${fatigueScore} effort pts${fatigueScore > 120 ? ' ⚠️ sovraccarico' : fatigueScore > 80 ? ' (carico elevato)' : ' (ok)'}`
+    : '';
+  const racePaceStr = racePace != null
+    ? `Race pace stimato: ${_paceStr(racePace)}/km (da ultime 3 sessioni qualità)`
+    : '';
+
   return `=== ANALISI CORSA ===
 Volume: ${weeklyVolumeKm}km/sett | ${monthlyVolumeKm}km/mese | Uscite: ${runsLast7Days}(7gg) | Costanza: ${consistencyScore}/10 | Carico: ${fatigueTrend}
+${fatigueStr}${fatigueStr && racePaceStr ? ' | ' : ''}${racePaceStr}
 ULTIME 5 CORSE:
 ${recentLabels}
 STIME: ${stime}
@@ -3138,9 +3225,31 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
       .sort((a, b) => b.date.localeCompare(a.date)),
     [stravaActivities, activityDetails]);
 
-  const classifiedRuns = useMemo(() =>
-    normalizedRuns.map(r => ({ ...r, classification: classifyRun(r) })),
-    [normalizedRuns]);
+  const classifiedRuns = useMemo(() => {
+    // Passo 1: classificazione base
+    const base = normalizedRuns.map(r => ({ ...r, classification: classifyRun(r) }));
+    // Passo 2: calcola race_pace reale dalle sessioni di qualità
+    const rp = calcRacePace(base) ?? FIXED_ZONES.race_pace.paceMin;
+    // Passo 3: aggiungi effortScore e override classificazione borderline
+    return base.map(r => {
+      const effortScore = Math.round(r.distanceKm * (rp / r.avgPaceMinKm) * 10) / 10;
+      // Override classificazione se confidence bassa — usa pace relativa a race_pace
+      let classification = r.classification;
+      if (classification.confidence < 0.70) {
+        const p = r.avgPaceMinKm, d = r.distanceKm;
+        let overrideType = null;
+        if (d >= 18) overrideType = 'long_run';
+        else if (p <= rp - 0.20) overrideType = 'threshold';
+        else if (p <= rp + 0.05) overrideType = 'tempo';
+        else if (p > rp + 0.30) overrideType = 'easy';
+        else overrideType = 'easy'; // steady → easy come fallback
+        if (overrideType && overrideType !== classification.workoutType) {
+          classification = { ...classification, workoutType: overrideType, _reclassified: true };
+        }
+      }
+      return { ...r, classification, effortScore };
+    });
+  }, [normalizedRuns]);
 
   const trainingMetrics = useMemo(() =>
     classifiedRuns.length >= 1 ? calcTrainingMetrics(classifiedRuns) : null,
