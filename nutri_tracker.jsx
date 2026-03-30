@@ -1617,7 +1617,7 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     })
     .filter(s => {
       if (s.type === 'race') return false; // la gara si mostra nel banner, non nella lista
-      return s.daysFromNow >= 1 && s.daysFromNow <= endOfWeek;
+      return s.daysFromNow >= 0 && s.daysFromNow <= endOfWeek;
     })
     .sort((a, b) => a.daysFromNow - b.daysFromNow);
 
