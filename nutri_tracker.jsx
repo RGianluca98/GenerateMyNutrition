@@ -1606,7 +1606,11 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
   const endOfWeek = daysUntilSunday; // includi domenica della settimana corrente
 
   const rsScore = readinessScore?.score ?? 70;
-  const isHardType = t => ['tempo','threshold','interval','race_pace','long_run'].includes(t);
+  // isIntensityType: sessioni ad alta intensità metabolica (max 2/sett, soggette a downgrade readiness)
+  // long_run è ESCLUSO: è volume aerobico, non intensità — non va mai downgraded per "troppa qualità"
+  const isIntensityType = t => ['tempo','threshold','interval','race_pace'].includes(t);
+  // isHardType: include long_run — usato solo per conteggio qualityThisWeek e 48h rule
+  const isHardType = t => isIntensityType(t) || t === 'long_run';
 
   const allSessWithOptional = [...ALL_SESSIONS, ...OPTIONAL_SESSIONS];
 
@@ -1649,11 +1653,11 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
   const allowQuality = rsScore > 75 && qualityThisWeek < 2;
 
   if (forcedRestByFatigue) {
-    // Converti la prima sessione hard in riposo
+    // Converti la prima sessione di INTENSITÀ in riposo (long_run protetto)
     let applied = false;
     sessions = sessions.map(s => {
       if (applied || s.type === 'rest' || s.type === 'race') return s;
-      if (isHardType(s.type)) {
+      if (isIntensityType(s.type)) {
         applied = true;
         return { ...s, type: 'rest', title: 'Riposo (fatica elevata)',
           totalKm: 0, structure: [],
@@ -1665,11 +1669,11 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
   }
 
   if (forceEasyNext) {
-    // La prima sessione non-rest del piano diventa easy
+    // La prima sessione di INTENSITÀ diventa easy (long_run protetto)
     let applied = false;
     sessions = sessions.map(s => {
       if (applied || s.type === 'rest' || s.type === 'race') return s;
-      if (isHardType(s.type)) {
+      if (isIntensityType(s.type)) {
         applied = true;
         return { ...s, type: 'easy', title: 'Corsa facile (dopo interval)',
           structure: [{ phase: `Easy ${s.totalKm}km`, km: s.totalKm, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange }],
@@ -1681,16 +1685,16 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
   }
 
   // ── MODULO 7 — Risk guardrails ──
-  // 1. Vincolo: max 2 qualità/settimana
-  let hardCount = 0;
+  // 1. Vincolo: max 2 sessioni di INTENSITÀ/settimana (long_run escluso — è volume, non qualità)
+  let intensityCount = 0;
   sessions = sessions.map(s => {
     if (s.type === 'rest' || s.type === 'race') return s;
-    if (isHardType(s.type)) {
-      hardCount++;
-      if (hardCount > 2) {
+    if (isIntensityType(s.type)) {
+      intensityCount++;
+      if (intensityCount > 2) {
         return { ...s, type: 'easy', title: 'Corsa facile (piano adattato)',
           structure: [{ phase: `Easy ${s.totalKm}km`, km: s.totalKm, pace: ZONES.easy.paceRange, speed: ZONES.easy.speedRange }],
-          garminNote: `Easy ${s.totalKm}km. FC 140–150. Piano adattato: max 2 sessioni dure/settimana.`,
+          garminNote: `Easy ${s.totalKm}km. FC 140–150. Piano adattato: max 2 sessioni di intensità/settimana.`,
           rationale: 'Guardrail attivo: già 2 sessioni di qualità questa settimana.', _downgraded: true };
       }
     }
@@ -1732,12 +1736,12 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     return s;
   });
 
-  // 3. Readiness-based downgrade
+  // 3. Readiness-based downgrade — solo prima sessione di INTENSITÀ (long_run protetto)
   if (rsScore < 60) {
     let firstHardDowngraded = false;
     sessions = sessions.map(s => {
       if (s.type === 'rest' || s.type === 'race' || s._downgraded) return s;
-      if (isHardType(s.type) && !firstHardDowngraded) {
+      if (isIntensityType(s.type) && !firstHardDowngraded) {
         firstHardDowngraded = true;
         const newType = rsScore < 40 ? 'recovery' : 'easy';
         const newZone = rsScore < 40 ? ZONES.recovery : ZONES.easy;
