@@ -3225,8 +3225,9 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
             // Ordine cronologico lun–dom (passate prima, poi oggi, poi future)
             const allSessions = [...weeklyPlan.sessions].sort((a,b) => a.daysFromNow - b.daysFromNow);
 
-            // Corse extra: eseguite in questa settimana su giorni senza sessione di corsa pianificata
-            const plannedDates = new Set(allSessions.map(s => s.isoDate));
+            // Corse extra: eseguite in questa settimana su giorni senza sessione di CORSA pianificata
+            // (incluse le corse fatte in giorni di riposo pianificato)
+            const plannedRunDates = new Set(allSessions.filter(s => s.type !== 'rest').map(s => s.isoDate));
             const now = new Date();
             const todayDow = now.getDay();
             const daysSinceMonday = todayDow === 0 ? 6 : todayDow - 1;
@@ -3234,7 +3235,7 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
             const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6); weekEnd.setHours(23,59,59,999);
             const extraRuns = (classifiedRuns ?? []).filter(r => {
               const d = new Date(r.date + 'T00:00:00');
-              return d >= weekStart && d <= weekEnd && !plannedDates.has(r.date);
+              return d >= weekStart && d <= weekEnd && !plannedRunDates.has(r.date);
             });
             const extraSessions = extraRuns.map(r => ({
               isoDate: r.date,
