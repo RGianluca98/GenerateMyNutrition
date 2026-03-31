@@ -877,21 +877,31 @@ function calcTrainingMetrics(classifiedRuns) {
   let estimatedHalfMarathonTime = null;
   let estimatedBasedOn = null;
 
+  // Stima su tutte le corse non-recovery degli ultimi 60gg, distanza >= 3km, passo < 7:30
+  // Score = sqrt(km) / pace — premia distanza e velocità, penalizza le corte
+  // Usa la migliore degli ultimi 14gg se esiste (dati "freschi"), altrimenti la migliore degli ultimi 60gg
+  const perfScore = r => Math.sqrt(r.distanceKm) / r.avgPaceMinKm;
+  const ms14 = 14 * 86400000;
   const candidateRuns = runs60.filter(r =>
     r.distanceKm >= 3 &&
     r.classification?.workoutType !== 'recovery' &&
-    r.avgPaceMinKm < 7.5  // esclude corse troppo lente (camminata)
+    r.avgPaceMinKm < 7.5
   );
   if (candidateRuns.length > 0) {
-    // Miglior run = quello con passo più veloce pesato per distanza (simula il "perf score")
-    // Formula: score = distanceKm^0.5 / avgPaceMinKm  (penalizza le corte, premia le veloci)
-    const best = candidateRuns.sort((a, b) =>
-      (Math.sqrt(b.distanceKm) / b.avgPaceMinKm) - (Math.sqrt(a.distanceKm) / a.avgPaceMinKm)
-    )[0];
+    const sorted = [...candidateRuns].sort((a, b) => perfScore(b) - perfScore(a));
+    const bestOverall = sorted[0];
+    // Cerca la migliore corsa recente (ultimi 14gg) se il suo score è ≥ 75% del best overall
+    const recentRuns = candidateRuns.filter(r => new Date() - new Date(r.date) <= ms14);
+    const bestRecent = recentRuns.length > 0
+      ? [...recentRuns].sort((a, b) => perfScore(b) - perfScore(a))[0]
+      : null;
+    const best = (bestRecent && perfScore(bestRecent) >= perfScore(bestOverall) * 0.75)
+      ? bestRecent
+      : bestOverall;
     const t1 = best.movingTimeMin;
     const d1 = best.distanceKm;
     const riegelFn = (d2) => t1 * Math.pow(d2 / d1, 1.06);
-    estimated10kTime          = d1 < 10 ? riegelFn(10) : (d1 > 10 ? riegelFn(10) : t1);
+    estimated10kTime          = d1 < 10 ? riegelFn(10) : riegelFn(10);
     estimatedHalfMarathonTime = d1 < 21.0975 ? riegelFn(21.0975) : t1;
     estimatedHalfMarathonPace = estimatedHalfMarathonTime / 21.0975;
     estimatedBasedOn = `${best.distanceKm.toFixed(1)}km @ ${_paceStr(best.avgPaceMinKm)}/km (${new Date(best.date+'T00:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})})`;
@@ -3038,13 +3048,12 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
 
   const isDone = (session) => {
     if (!session.isoDate || !classifiedRuns?.length) return false;
-    const target = new Date(session.isoDate + 'T00:00:00');
-    return classifiedRuns.some(r => Math.abs(new Date(r.date) - target) <= 86400000 * 1.5);
+    // Confronta per data stringa YYYY-MM-DD (stesso giorno esatto)
+    return classifiedRuns.some(r => r.date === session.isoDate);
   };
   const getDoneRun = (session) => {
     if (!session.isoDate || !classifiedRuns?.length) return null;
-    const target = new Date(session.isoDate + 'T00:00:00');
-    return classifiedRuns.find(r => Math.abs(new Date(r.date) - target) <= 86400000 * 1.5) || null;
+    return classifiedRuns.find(r => r.date === session.isoDate) || null;
   };
   const [showGoalForm, setShowGoalForm] = React.useState(false);
   const [formName, setFormName] = React.useState('');
