@@ -881,7 +881,6 @@ function calcTrainingMetrics(classifiedRuns) {
   // Score = sqrt(km) / pace — premia distanza e velocità, penalizza le corte
   // Usa la migliore degli ultimi 14gg se esiste (dati "freschi"), altrimenti la migliore degli ultimi 60gg
   const perfScore = r => Math.sqrt(r.distanceKm) / r.avgPaceMinKm;
-  const ms14 = 14 * 86400000;
   const candidateRuns = runs60.filter(r =>
     r.distanceKm >= 3 &&
     r.classification?.workoutType !== 'recovery' &&
