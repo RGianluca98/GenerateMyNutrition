@@ -871,25 +871,30 @@ function calcTrainingMetrics(classifiedRuns) {
   }
 
   // Stime performance con formula di Riegel: T2 = T1 * (D2/D1)^1.06
+  // Usa tutte le corse recenti >= 3km, privilegiando distanza e velocità (effort = km/pace)
   let estimated10kTime = null;
   let estimatedHalfMarathonPace = null;
   let estimatedHalfMarathonTime = null;
+  let estimatedBasedOn = null;
 
-  const qualityRuns = runs60.filter(r =>
-    ['tempo', 'threshold', 'race_pace', 'interval'].includes(r.classification?.workoutType)
-    && r.distanceKm >= 5  // soglia minima: proiettare da < 5km a 21km è troppo speculativo
+  const candidateRuns = runs60.filter(r =>
+    r.distanceKm >= 3 &&
+    r.classification?.workoutType !== 'recovery' &&
+    r.avgPaceMinKm < 7.5  // esclude corse troppo lente (camminata)
   );
-  if (qualityRuns.length > 0) {
-    // Prendi il run con il miglior "effort score" = dist / pace (più km a passo più veloce)
-    const best = qualityRuns.sort((a, b) => (b.distanceKm / b.avgPaceMinKm) - (a.distanceKm / a.avgPaceMinKm))[0];
+  if (candidateRuns.length > 0) {
+    // Miglior run = quello con passo più veloce pesato per distanza (simula il "perf score")
+    // Formula: score = distanceKm^0.5 / avgPaceMinKm  (penalizza le corte, premia le veloci)
+    const best = candidateRuns.sort((a, b) =>
+      (Math.sqrt(b.distanceKm) / b.avgPaceMinKm) - (Math.sqrt(a.distanceKm) / a.avgPaceMinKm)
+    )[0];
     const t1 = best.movingTimeMin;
     const d1 = best.distanceKm;
-    // Riegel proietta in avanti: usare solo se d2 > d1
     const riegelFn = (d2) => t1 * Math.pow(d2 / d1, 1.06);
-    estimated10kTime          = d1 < 10 ? riegelFn(10) : null;
-    // Se l'utente ha già corso una mezza, usa il suo tempo reale (più preciso di Riegel)
-    estimatedHalfMarathonTime = d1 < 21.0975 ? riegelFn(21.0975) : best.movingTimeMin;
+    estimated10kTime          = d1 < 10 ? riegelFn(10) : (d1 > 10 ? riegelFn(10) : t1);
+    estimatedHalfMarathonTime = d1 < 21.0975 ? riegelFn(21.0975) : t1;
     estimatedHalfMarathonPace = estimatedHalfMarathonTime / 21.0975;
+    estimatedBasedOn = `${best.distanceKm.toFixed(1)}km @ ${_paceStr(best.avgPaceMinKm)}/km (${new Date(best.date+'T00:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})})`;
   }
 
   // Race pace reale da storico (media ultimi 3 quality runs)
@@ -916,6 +921,7 @@ function calcTrainingMetrics(classifiedRuns) {
     estimated10kTime,
     estimatedHalfMarathonPace,
     estimatedHalfMarathonTime,
+    estimatedBasedOn,
     racePace,
     fatigueScore,
   };
@@ -3292,7 +3298,7 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
   const {
     weeklyVolumeKm, monthlyVolumeKm, runsLast7Days,
     consistencyScore, estimatedHalfMarathonTime, estimatedHalfMarathonPace,
-    estimated10kTime, fatigueTrend,
+    estimated10kTime, fatigueTrend, estimatedBasedOn,
   } = metrics;
 
   const cardStyle = {
@@ -3366,7 +3372,9 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
                 </div>
               )}
             </div>
-            <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px'}}>Stima tramite formula di Riegel — indicativa</div>
+            <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px'}}>
+              Riegel — basata su: {estimatedBasedOn ?? 'migliore corsa recente'}
+            </div>
           </div>
         )}
 
