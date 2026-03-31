@@ -662,6 +662,31 @@ function normalizeRun(activity, detail) {
   };
 }
 
+/** Calcola VDOT (Jack Daniels) da distanza e tempo.
+ *  VDOT è una stima del VO2max "efficace" che combina capacità aerobica + economia di corsa. */
+function calcVDOT(distanceKm, timeMin) {
+  if (!distanceKm || !timeMin || timeMin <= 0 || distanceKm <= 0) return null;
+  const V = (distanceKm * 1000) / timeMin; // m/min
+  const T = timeMin;
+  const num = -4.60 + 0.182258 * V + 0.000104 * V * V;
+  const den = 0.8 + 0.1894393 * Math.exp(-0.012778 * T) + 0.2989558 * Math.exp(-0.1932605 * T);
+  if (den <= 0 || num <= 0) return null;
+  return num / den;
+}
+
+/** Dato un VDOT target e una distanza (km), restituisce il tempo previsto (minuti) via ricerca binaria. */
+function vdotToTime(vdotTarget, distanceKm) {
+  if (!vdotTarget || !distanceKm || vdotTarget <= 0) return null;
+  let lo = 10, hi = 600;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    const v = calcVDOT(distanceKm, mid);
+    if (v === null) return null;
+    if (v > vdotTarget) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 /** Converte minuti decimali in stringa "M:SS" per la visualizzazione del passo. */
 function _paceStr(minKm) {
   if (!minKm || !isFinite(minKm)) return '--';
@@ -870,40 +895,37 @@ function calcTrainingMetrics(classifiedRuns) {
     else if (deltaSec < -5) recentProgress = `Ritmo facile rallentato di ${Math.abs(deltaSec)}s/km recentemente`;
   }
 
-  // Stime performance con formula di Riegel: T2 = T1 * (D2/D1)^1.06
-  // Usa tutte le corse recenti >= 3km, privilegiando distanza e velocità (effort = km/pace)
+  // Stima prestazione con VDOT (Jack Daniels) pesato per freschezza
+  // Ogni corsa degli ultimi 60gg contribuisce con peso e^(-giorni/21): corse recenti pesano molto di più
   let estimated10kTime = null;
   let estimatedHalfMarathonPace = null;
   let estimatedHalfMarathonTime = null;
   let estimatedBasedOn = null;
 
-  // Stima su tutte le corse non-recovery degli ultimi 60gg, distanza >= 3km, passo < 7:30
-  // Score = sqrt(km) / pace — premia distanza e velocità, penalizza le corte
-  // Usa la migliore degli ultimi 14gg se esiste (dati "freschi"), altrimenti la migliore degli ultimi 60gg
-  const perfScore = r => Math.sqrt(r.distanceKm) / r.avgPaceMinKm;
-  const candidateRuns = runs60.filter(r =>
+  const vdotCandidates = runs60.filter(r =>
     r.distanceKm >= 3 &&
     r.classification?.workoutType !== 'recovery' &&
-    r.avgPaceMinKm < 7.5
+    r.avgPaceMinKm < 7.5 &&
+    r.movingTimeMin > 0
   );
-  if (candidateRuns.length > 0) {
-    const sorted = [...candidateRuns].sort((a, b) => perfScore(b) - perfScore(a));
-    const bestOverall = sorted[0];
-    // Cerca la migliore corsa recente (ultimi 14gg) se il suo score è ≥ 75% del best overall
-    const recentRuns = candidateRuns.filter(r => new Date() - new Date(r.date) <= ms14);
-    const bestRecent = recentRuns.length > 0
-      ? [...recentRuns].sort((a, b) => perfScore(b) - perfScore(a))[0]
-      : null;
-    const best = (bestRecent && perfScore(bestRecent) >= perfScore(bestOverall) * 0.75)
-      ? bestRecent
-      : bestOverall;
-    const t1 = best.movingTimeMin;
-    const d1 = best.distanceKm;
-    const riegelFn = (d2) => t1 * Math.pow(d2 / d1, 1.06);
-    estimated10kTime          = d1 < 10 ? riegelFn(10) : riegelFn(10);
-    estimatedHalfMarathonTime = d1 < 21.0975 ? riegelFn(21.0975) : t1;
-    estimatedHalfMarathonPace = estimatedHalfMarathonTime / 21.0975;
-    estimatedBasedOn = `${best.distanceKm.toFixed(1)}km @ ${_paceStr(best.avgPaceMinKm)}/km (${new Date(best.date+'T00:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})})`;
+  if (vdotCandidates.length > 0) {
+    const refNow = new Date();
+    let weightSum = 0, vdotSum = 0;
+    vdotCandidates.forEach(r => {
+      const vdot = calcVDOT(r.distanceKm, r.movingTimeMin);
+      if (!vdot || vdot <= 0) return;
+      const daysSince = Math.max(0, (refNow - new Date(r.date + 'T00:00:00')) / 86400000);
+      const weight = Math.exp(-daysSince / 21); // half-life ~15gg: corsa di ieri pesa ~14× una di 2 sett fa
+      vdotSum += vdot * weight;
+      weightSum += weight;
+    });
+    if (weightSum > 0) {
+      const vdotAvg = vdotSum / weightSum;
+      estimatedHalfMarathonTime = vdotToTime(vdotAvg, 21.0975);
+      estimated10kTime = vdotToTime(vdotAvg, 10);
+      estimatedHalfMarathonPace = estimatedHalfMarathonTime ? estimatedHalfMarathonTime / 21.0975 : null;
+      estimatedBasedOn = `VDOT ${vdotAvg.toFixed(1)} · media pesata di ${vdotCandidates.length} corse`;
+    }
   }
 
   // Race pace reale da storico (media ultimi 3 quality runs)
