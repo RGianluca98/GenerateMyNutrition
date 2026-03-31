@@ -1605,11 +1605,12 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     },
   ];
 
-  // ── Filtra le sessioni della settimana corrente (da oggi a domenica prossima) ──
-  // Calcola quanti giorni mancano a domenica (fine settimana corrente)
+  // ── Filtra le sessioni della settimana corrente (lun–dom intera) ──
   const todayDow = now.getDay(); // 0=Dom, 1=Lun, ..., 6=Sab
-  const daysUntilSunday = todayDow === 0 ? 7 : 7 - todayDow; // giorni fino a domenica inclusa
-  const endOfWeek = daysUntilSunday; // includi domenica della settimana corrente
+  const daysSinceMonday = todayDow === 0 ? 6 : todayDow - 1; // quanti giorni fa era lunedì
+  const startOfWeek = -daysSinceMonday; // negativo = giorni passati (lunedì scorso)
+  const daysUntilSunday = todayDow === 0 ? 0 : 7 - todayDow;
+  const endOfWeek = daysUntilSunday;
 
   const rsScore = readinessScore?.score ?? 70;
   // isIntensityType: sessioni ad alta intensità metabolica (max 2/sett, soggette a downgrade readiness)
@@ -1627,7 +1628,7 @@ function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readiness
     })
     .filter(s => {
       if (s.type === 'race') return false; // la gara si mostra nel banner, non nella lista
-      return s.daysFromNow >= 0 && s.daysFromNow <= endOfWeek;
+      return s.daysFromNow >= startOfWeek && s.daysFromNow <= endOfWeek;
     })
     .sort((a, b) => a.daysFromNow - b.daysFromNow);
 
@@ -3190,25 +3191,39 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
           </div>
         )}
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-          {weeklyPlan.sessions.map((s, i) => {
+          {(()=>{
+            const future = weeklyPlan.sessions.filter(s => s.daysFromNow >= 0);
+            const past = weeklyPlan.sessions.filter(s => s.daysFromNow < 0)
+              .sort((a,b) => b.daysFromNow - a.daysFromNow);
+            const ordered = [...future, ...past];
+            return ordered;
+          })().map((s, i) => {
             const isOpen = openIdx === i;
             const color = typeColors[s.type] ?? '#5A6888';
             const done = s.type !== 'rest' && isDone(s);
             const doneRun = done ? getDoneRun(s) : null;
+            const past = s.daysFromNow < 0;
+            const skipped = past && !done && s.type !== 'rest';
             return (
-              <div key={i} style={{borderRadius:'12px',border:`1px solid ${isOpen ? color : done ? '#00C49A' : s.optional ? 'rgba(251,168,40,0.3)' : 'var(--border)'}`,overflow:'hidden',
-                opacity: s.optional && !done ? 0.85 : 1}}>
+              <div key={i} style={{borderRadius:'12px',border:`1px solid ${isOpen ? color : done ? '#00C49A' : skipped ? 'rgba(90,104,136,0.3)' : s.optional ? 'rgba(251,168,40,0.3)' : 'var(--border)'}`,overflow:'hidden',
+                opacity: skipped ? 0.55 : s.optional && !done ? 0.85 : 1}}>
                 {/* Header sessione */}
                 <div onClick={()=>setOpenIdx(isOpen ? null : i)}
                   style={{padding:'10px 12px',display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',
-                    background: isOpen ? 'var(--surface)' : done ? 'rgba(0,196,154,0.06)' : s.optional ? 'rgba(251,168,40,0.04)' : 'transparent'}}>
+                    background: isOpen ? 'var(--surface)' : done ? 'rgba(0,196,154,0.06)' : skipped ? 'rgba(90,104,136,0.04)' : s.optional ? 'rgba(251,168,40,0.04)' : 'transparent'}}>
                   {done && (
                     <span style={{fontSize:'9px',fontWeight:700,color:'#00C49A',background:'rgba(0,196,154,0.15)',
                       borderRadius:'5px',padding:'2px 5px',whiteSpace:'nowrap',flexShrink:0}}>
                       ✓ FATTO
                     </span>
                   )}
-                  {!done && s.optional && (
+                  {skipped && (
+                    <span style={{fontSize:'9px',fontWeight:700,color:'#5A6888',background:'rgba(90,104,136,0.2)',
+                      borderRadius:'5px',padding:'2px 5px',whiteSpace:'nowrap',flexShrink:0}}>
+                      SALTATO
+                    </span>
+                  )}
+                  {!done && !skipped && s.optional && (
                     <span style={{fontSize:'9px',fontWeight:700,color:'#FBA828',background:'rgba(251,168,40,0.15)',
                       borderRadius:'5px',padding:'2px 5px',whiteSpace:'nowrap',flexShrink:0}}>
                       OPZIONALE
@@ -3282,7 +3297,7 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
   );
 }
 
-// ── RUNNING INSIGHTS PANEL ─────────────────────────────────────
+// ── RUNNING INSIGHTS PANEL ──────────────────────────────────────
 const WORKOUT_COLORS = {
   easy:'#00C49A', recovery:'#5A6888', long_run:'#FBA828',
   tempo:'#e05c5c', threshold:'#c44c9a', interval:'#4c8cde',
