@@ -2906,6 +2906,7 @@ function QtyEditor({value,uom,onSave,onCancel}){
 /** Leggenda visiva delle zone di ritmo, calibrata sulla stima mezza maratona. */
 function PaceZonesCard({ paceZones }) {
   if (!paceZones) return null;
+  const [expanded, setExpanded] = React.useState(false);
 
   const zones = [
     { key: 'recovery',    color: '#5A6888' },
@@ -2918,52 +2919,80 @@ function PaceZonesCard({ paceZones }) {
   ];
 
   return (
-    <div style={{background:'var(--card)',borderRadius:'16px',border:'1px solid var(--border)',padding:'14px'}}>
-      <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'4px'}}>
-        ZONE DI RITMO — TARGET: MEZZA MARATONA
+    <div style={{background:'var(--card)',borderRadius:'16px',border:'1px solid var(--border)',overflow:'hidden'}}>
+      {/* Header cliccabile */}
+      <div onClick={()=>setExpanded(v=>!v)}
+        style={{padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'}}>
+        <div>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>
+            ZONE DI RITMO — TARGET: MEZZA MARATONA
+          </div>
+          <div style={{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}}>
+            HM pace: <span style={{color:'var(--accent)',fontWeight:700}}>{_paceStr(paceZones.hmp)}/km</span>
+            <span style={{marginLeft:'8px',color:'var(--text3)'}}>· {zones.length} zone</span>
+          </div>
+        </div>
+        <span style={{fontSize:'11px',color:'var(--text3)'}}>{expanded ? '▲' : '▼'}</span>
       </div>
-      <div style={{fontSize:'11px',color:'var(--text3)',marginBottom:'10px'}}>
-        Basato su stima gara: <span style={{color:'var(--accent)',fontWeight:700}}>
-          {_paceStr(paceZones.hmp)}/km
-        </span>
-      </div>
-      <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
-        {zones.map(({key,color})=>{
-          const z = paceZones[key];
-          if (!z) return null;
-          const isTarget = key === 'halfMarathon';
-          return (
-            <div key={key} style={{
-              display:'flex', alignItems:'center', gap:'10px',
-              padding:'7px 10px', borderRadius:'10px',
-              background: isTarget ? 'var(--accent-soft)' : 'var(--surface)',
-              border: isTarget ? '1px solid var(--accent)' : '1px solid transparent',
-            }}>
-              {/* Barra colorata */}
-              <div style={{width:'4px',height:'36px',borderRadius:'2px',background:color,flexShrink:0}}/>
-              {/* Nome zona */}
-              <div style={{minWidth:'110px'}}>
-                <div style={{fontSize:'12px',fontWeight:700,color: isTarget ? 'var(--accent)' : 'var(--text)'}}>
-                  {z.label}
-                </div>
-                <div style={{fontSize:'10px',color:'var(--text3)',lineHeight:'1.3'}}>{z.desc}</div>
+
+      {/* Vista compressa: pill colorate con passo */}
+      {!expanded && (
+        <div style={{padding:'0 14px 12px',display:'flex',flexWrap:'wrap',gap:'6px'}}>
+          {zones.map(({key,color})=>{
+            const z = paceZones[key];
+            if (!z) return null;
+            return (
+              <div key={key} style={{
+                display:'flex',alignItems:'center',gap:'5px',
+                padding:'4px 8px',borderRadius:'20px',
+                background:'var(--surface)',border:`1px solid ${color}33`,
+              }}>
+                <div style={{width:'6px',height:'6px',borderRadius:'50%',background:color,flexShrink:0}}/>
+                <span style={{fontSize:'11px',fontWeight:600,color:'var(--text2)'}}>{z.label}</span>
+                <span style={{fontSize:'11px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}}>
+                  {_paceStr(z.paceMin)}–{_paceStr(z.paceMax)}
+                </span>
               </div>
-              {/* Range passo */}
-              <div style={{flex:1,textAlign:'right'}}>
-                <div style={{fontSize:'13px',fontWeight:700,color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>
-                  {_paceStr(z.paceMin)}–{_paceStr(z.paceMax)}<span style={{fontSize:'10px',fontWeight:400,color:'var(--text3)'}}>/km</span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Vista espansa: dettaglio completo */}
+      {expanded && (
+        <div style={{borderTop:'1px solid var(--border)',padding:'10px 14px 14px',display:'flex',flexDirection:'column',gap:'5px'}}>
+          {zones.map(({key,color})=>{
+            const z = paceZones[key];
+            if (!z) return null;
+            const isTarget = key === 'halfMarathon';
+            return (
+              <div key={key} style={{
+                display:'flex', alignItems:'center', gap:'10px',
+                padding:'7px 10px', borderRadius:'10px',
+                background: isTarget ? 'var(--accent-soft)' : 'var(--surface)',
+                border: isTarget ? '1px solid var(--accent)' : '1px solid transparent',
+              }}>
+                <div style={{width:'4px',height:'36px',borderRadius:'2px',background:color,flexShrink:0}}/>
+                <div style={{minWidth:'110px'}}>
+                  <div style={{fontSize:'12px',fontWeight:700,color: isTarget ? 'var(--accent)' : 'var(--text)'}}>{z.label}</div>
+                  <div style={{fontSize:'10px',color:'var(--text3)',lineHeight:'1.3'}}>{z.desc}</div>
                 </div>
-                <div style={{fontSize:'10px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}}>
-                  {z.speedMin}–{z.speedMax} km/h
+                <div style={{flex:1,textAlign:'right'}}>
+                  <div style={{fontSize:'13px',fontWeight:700,color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>
+                    {_paceStr(z.paceMin)}–{_paceStr(z.paceMax)}<span style={{fontSize:'10px',fontWeight:400,color:'var(--text3)'}}>/km</span>
+                  </div>
+                  <div style={{fontSize:'10px',color:'var(--text3)',fontVariantNumeric:'tabular-nums'}}>
+                    {z.speedMin}–{z.speedMax} km/h
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'8px',lineHeight:'1.5'}}>
-        Le zone si ricalcolano automaticamente ad ogni nuova attività. Inserisci la velocità in km/h sul Garmin.
-      </div>
+            );
+          })}
+          <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px',lineHeight:'1.5'}}>
+            Le zone si ricalcolano automaticamente ad ogni nuova attività. Inserisci la velocità in km/h sul Garmin.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
