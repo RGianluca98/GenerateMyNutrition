@@ -3200,20 +3200,41 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
         )}
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
           {(()=>{
-            const future = weeklyPlan.sessions.filter(s => s.daysFromNow >= 0);
-            const past = weeklyPlan.sessions.filter(s => s.daysFromNow < 0)
-              .sort((a,b) => b.daysFromNow - a.daysFromNow);
-            const ordered = [...future, ...past];
-            return ordered;
+            // Ordine cronologico lun–dom (passate prima, poi oggi, poi future)
+            const allSessions = [...weeklyPlan.sessions].sort((a,b) => a.daysFromNow - b.daysFromNow);
+
+            // Corse extra: eseguite in questa settimana su giorni senza sessione di corsa pianificata
+            const plannedDates = new Set(allSessions.map(s => s.isoDate));
+            const now = new Date();
+            const todayDow = now.getDay();
+            const daysSinceMonday = todayDow === 0 ? 6 : todayDow - 1;
+            const weekStart = new Date(now); weekStart.setDate(now.getDate() - daysSinceMonday); weekStart.setHours(0,0,0,0);
+            const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6); weekEnd.setHours(23,59,59,999);
+            const extraRuns = (classifiedRuns ?? []).filter(r => {
+              const d = new Date(r.date + 'T00:00:00');
+              return d >= weekStart && d <= weekEnd && !plannedDates.has(r.date);
+            });
+            const extraSessions = extraRuns.map(r => ({
+              isoDate: r.date,
+              type: r.classification?.workoutType ?? 'easy',
+              title: r.title ?? 'Corsa',
+              totalKm: r.distanceKm,
+              structure: [],
+              daysFromNow: Math.round((new Date(r.date+'T00:00:00') - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000),
+              _extraRun: r,
+            }));
+
+            return [...allSessions, ...extraSessions].sort((a,b) => a.daysFromNow - b.daysFromNow);
           })().map((s, i) => {
             const isOpen = openIdx === i;
+            const isExtra = !!s._extraRun;
             const color = typeColors[s.type] ?? '#5A6888';
-            const done = s.type !== 'rest' && isDone(s);
-            const doneRun = done ? getDoneRun(s) : null;
+            const done = isExtra || (s.type !== 'rest' && isDone(s));
+            const doneRun = isExtra ? s._extraRun : (done ? getDoneRun(s) : null);
             const past = s.daysFromNow < 0;
             const skipped = past && !done && s.type !== 'rest';
             return (
-              <div key={i} style={{borderRadius:'12px',border:`1px solid ${isOpen ? color : done ? '#00C49A' : skipped ? 'rgba(90,104,136,0.3)' : s.optional ? 'rgba(251,168,40,0.3)' : 'var(--border)'}`,overflow:'hidden',
+              <div key={s.isoDate+i} style={{borderRadius:'12px',border:`1px solid ${isOpen ? color : done ? '#00C49A' : skipped ? 'rgba(90,104,136,0.3)' : s.optional ? 'rgba(251,168,40,0.3)' : 'var(--border)'}`,overflow:'hidden',
                 opacity: skipped ? 0.55 : s.optional && !done ? 0.85 : 1}}>
                 {/* Header sessione */}
                 <div onClick={()=>setOpenIdx(isOpen ? null : i)}
@@ -3222,7 +3243,7 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
                   {done && (
                     <span style={{fontSize:'9px',fontWeight:700,color:'#00C49A',background:'rgba(0,196,154,0.15)',
                       borderRadius:'5px',padding:'2px 5px',whiteSpace:'nowrap',flexShrink:0}}>
-                      ✓ FATTO
+                      {isExtra ? '+ EXTRA' : '✓ FATTO'}
                     </span>
                   )}
                   {skipped && (
