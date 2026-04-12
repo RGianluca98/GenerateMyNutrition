@@ -1350,15 +1350,39 @@ function calcPaceZones(metrics) {
  * @param {object} raceGoal  { name, date (YYYY-MM-DD), distanceKm, targetTime }
  */
 function buildWeeklyPlan(metrics, insights, paceZones, classifiedRuns, readinessScore, raceGoal) {
-  // ── Zone di ritmo FISSE (valori assoluti calibrati sull'atleta) ──
-  // NON derivate da paceZones — sovrascrivono qualsiasi calcolo dinamico.
+  // ── Zone di ritmo DINAMICHE (da paceZones calcolate da VDOT), con fallback fissi ──
+  const _zRange = (zMin, zMax, fallback) => {
+    if (zMin != null && zMax != null && isFinite(zMin) && isFinite(zMax))
+      return `${_paceStr(zMin)}–${_paceStr(zMax)}/km`;
+    return fallback;
+  };
+  const _sRange = (zMin, zMax, fallback) => {
+    if (zMin != null && zMax != null && isFinite(zMin) && isFinite(zMax)) {
+      const sMin = Math.round((60/zMax)*10)/10;
+      const sMax = Math.round((60/zMin)*10)/10;
+      return `${sMin}–${sMax} km/h`;
+    }
+    return fallback;
+  };
   const ZONES = {
-    recovery:   { label: 'Recovery',    paceRange: '5:45–6:00/km', speedRange: '10.0–10.4 km/h', fc: 'FC < 145' },
-    easy:       { label: 'Easy',        paceRange: '5:30–5:45/km', speedRange: '10.4–10.9 km/h', fc: 'FC 140–150' },
-    long_run:   { label: 'Lungo',       paceRange: '5:20–5:35/km', speedRange: '10.7–11.3 km/h', fc: 'FC 145–152' },
-    race_pace:  { label: 'Ritmo mezza', paceRange: '5:00–5:05/km', speedRange: '11.8–12.0 km/h', fc: 'FC 150–158' },
-    tempo:      { label: 'Soglia',      paceRange: '4:50–4:58/km', speedRange: '12.1–12.4 km/h', fc: 'FC 158–165' },
-    interval:   { label: 'Ripetute',    paceRange: '4:25–4:35/km', speedRange: '13.1–13.6 km/h', fc: 'FC fino a 169' },
+    recovery: { label: 'Recovery',    fc: 'FC < 145',
+      paceRange:  _zRange(paceZones?.recovery?.paceMin,  paceZones?.recovery?.paceMax,  '5:45–6:00/km'),
+      speedRange: _sRange(paceZones?.recovery?.paceMin,  paceZones?.recovery?.paceMax,  '10.0–10.4 km/h') },
+    easy:     { label: 'Easy',        fc: 'FC 140–150',
+      paceRange:  _zRange(paceZones?.easy?.paceMin,      paceZones?.easy?.paceMax,      '5:30–5:45/km'),
+      speedRange: _sRange(paceZones?.easy?.paceMin,      paceZones?.easy?.paceMax,      '10.4–10.9 km/h') },
+    long_run: { label: 'Lungo',       fc: 'FC 145–152',
+      paceRange:  _zRange(paceZones?.longRun?.paceMin,   paceZones?.longRun?.paceMax,   '5:20–5:35/km'),
+      speedRange: _sRange(paceZones?.longRun?.paceMin,   paceZones?.longRun?.paceMax,   '10.7–11.3 km/h') },
+    race_pace:{ label: 'Ritmo mezza', fc: 'FC 150–158',
+      paceRange:  _zRange(paceZones?.halfMarathon?.paceMin, paceZones?.halfMarathon?.paceMax, '5:00–5:05/km'),
+      speedRange: _sRange(paceZones?.halfMarathon?.paceMin, paceZones?.halfMarathon?.paceMax, '11.8–12.0 km/h') },
+    tempo:    { label: 'Soglia',      fc: 'FC 158–165',
+      paceRange:  _zRange(paceZones?.tempo?.paceMin,     paceZones?.tempo?.paceMax,     '4:50–4:58/km'),
+      speedRange: _sRange(paceZones?.tempo?.paceMin,     paceZones?.tempo?.paceMax,     '12.1–12.4 km/h') },
+    interval: { label: 'Ripetute',    fc: 'FC fino a 169',
+      paceRange:  _zRange(paceZones?.interval?.paceMin,  paceZones?.interval?.paceMax,  '4:25–4:35/km'),
+      speedRange: _sRange(paceZones?.interval?.paceMin,  paceZones?.interval?.paceMax,  '13.1–13.6 km/h') },
   };
 
   // ── Fase periodizzazione ──
@@ -2413,6 +2437,129 @@ function SaveAsRecipeModal({meal,items,onSave,onClose}){
   );
 }
 
+/** Consigli nutrizionali dinamici in base all'allenamento del giorno e ai giorni alla gara. */
+function RunningNutritionCard({ weeklyPlan, readinessScore }) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (!weeklyPlan) return null;
+
+  const dtr = weeklyPlan.daysToRace ?? null;
+  const now = new Date();
+  const todayISO = now.toISOString().slice(0, 10);
+  const todaySession = weeklyPlan.sessions?.find(s => s.isoDate === todayISO) ?? null;
+  const sessionType = todaySession?.type ?? 'rest';
+
+  // Determina il contesto principale
+  let title = '';
+  let icon = '🥗';
+  let color = '#00C49A';
+  let tips = [];
+
+  if (dtr != null && dtr >= 0 && dtr <= 3) {
+    // Prossimi giorni pre-gara: carbo-loading
+    if (dtr === 0) {
+      icon = '🏁'; color = '#FF6B35'; title = 'Giorno gara — nutrizione';
+      tips = [
+        'Colazione 3h prima: 80–100g carboidrati (pane, banana, marmellata). Niente grassi.',
+        'Gel/gomme ogni 30–40 min in gara. Inizia dal primo gel a 30min.',
+        'Idratazione: 500–700ml/h in gara. Bevi ai ristori.',
+        'Post-gara: recovery meal con 1.2g CHO/kg + 0.4g proteine/kg entro 30min.',
+      ];
+    } else if (dtr === 1) {
+      icon = '🍝'; color = '#FF6B35'; title = 'Giorno prima della gara';
+      tips = [
+        'Cena leggera ma ricca di CHO: pasta/riso in bianco, pollo o uova, niente verdure crude.',
+        'Evita cibi nuovi, fibre in eccesso, legumi, fritti.',
+        'Idratati bene tutto il giorno: 2–2.5L acqua.',
+        'Ultima cena entro le 20:00. Colazione domani 3h prima della partenza.',
+      ];
+    } else if (dtr === 2) {
+      icon = '🍚'; color = '#FBA828'; title = 'Carbo-loading (2 giorni alla gara)';
+      tips = [
+        'Aumenta i carboidrati: 8–10g CHO/kg oggi. Pasto principale: pasta/riso abbondante.',
+        'Riduci grassi e fibre. Proteine moderate (0.3g/kg).',
+        'Spuntino pomeriggio: banana + pane + miele.',
+        'Evita alcol e bevande gassate.',
+      ];
+    } else if (dtr === 3) {
+      icon = '🍌'; color = '#FBA828'; title = 'Inizio carbo-loading (3 giorni)';
+      tips = [
+        'Inizia ad aumentare i carboidrati: +50g CHO extra rispetto al solito (pasta, riso, patate).',
+        'Riduci volume allenamento — meno calorie bruciate, più glicogeno accumulato.',
+        'Idratazione elevata: urina chiara durante il giorno.',
+      ];
+    }
+  } else if (sessionType === 'long_run' || sessionType === 'progression') {
+    icon = '⛽'; color = '#FBA828'; title = 'Giorno di lungo — nutrizione';
+    tips = [
+      'Pre-corsa (2–3h prima): 60–90g carboidrati (avena, pane, banana). Niente grassi.',
+      'Durante (se >75min): gel ogni 40–45min + acqua. Prova i gel che userai in gara.',
+      'Post-corsa (entro 30min): 1.2g CHO/kg + 0.4g PRO/kg (es. riso + pollo o recovery shake).',
+      'Idratazione: pesati prima e dopo — reintegra 1.5× il peso perso in liquidi.',
+    ];
+  } else if (sessionType === 'tempo' || sessionType === 'threshold') {
+    icon = '🔥'; color = '#e05c5c'; title = 'Sessione di soglia — nutrizione';
+    tips = [
+      'Pre-allenamento: 40–60g carboidrati 1.5–2h prima (pasta, riso, pane).',
+      'Se l\'allenamento è mattutino: colazione leggera 1h prima (banana + caffè).',
+      'Post-allenamento: recovery meal con 20–25g proteine + carboidrati (es. uova + pane).',
+    ];
+  } else if (sessionType === 'interval') {
+    icon = '⚡'; color = '#4c8cde'; title = 'Ripetute — nutrizione';
+    tips = [
+      'Pre-allenamento: carboidrati veloci 1h prima (banana, gel, succo).',
+      'Caffè 45min prima: migliora la performance del 3–4%.',
+      'Post: proteine entro 30min (20g) + carboidrati per recupero.',
+    ];
+  } else if (sessionType === 'recovery') {
+    icon = '🫁'; color = '#5A6888'; title = 'Recovery — supporto nutrizionale';
+    tips = [
+      'Enfatizza le proteine: 1.6–2g/kg oggi (carne, pesce, uova, legumi).',
+      'Antiossidanti: verdure colorate, frutti di bosco, spinaci.',
+      'Omega-3: salmone o integratore per ridurre l\'infiammazione muscolare.',
+    ];
+  } else if (sessionType === 'rest') {
+    icon = '😴'; color = '#5A6888'; title = 'Giorno di riposo — alimentazione';
+    tips = [
+      'Giorno di recupero: calorie leggermente ridotte (–200 kcal), proteine elevate.',
+      'Focus su antiossidanti e minerali: verdure, frutta, noci.',
+      readinessScore?.score < 60
+        ? 'Readiness bassa: aggiungi ferro (carne rossa) e vitamina C per assorbimento.'
+        : 'Mantieni l\'idratazione: 2L acqua anche nei giorni di riposo.',
+    ].filter(Boolean);
+  } else {
+    icon = '🏃'; color = '#00C49A'; title = 'Allenamento oggi';
+    tips = [
+      'Pre: carboidrati 1.5–2h prima. Post: proteine + CHO entro 30min.',
+      'Idratazione: 500ml/h durante l\'allenamento.',
+    ];
+  }
+
+  if (!tips.length) return null;
+
+  return (
+    <div style={{background:'var(--card)',borderRadius:'16px',border:`1px solid ${color}33`,overflow:'hidden'}}>
+      <div onClick={()=>setExpanded(v=>!v)} style={{padding:'12px 14px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer'}}>
+        <span style={{fontSize:'18px',flexShrink:0}}>{icon}</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.7px'}}>NUTRIZIONE RUNNING</div>
+          <div style={{fontSize:'12px',fontWeight:600,color,marginTop:'1px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title}</div>
+        </div>
+        <span style={{fontSize:'11px',color:'var(--text3)',flexShrink:0}}>{expanded?'▲':'▼'}</span>
+      </div>
+      {expanded && (
+        <div style={{borderTop:`1px solid ${color}33`,padding:'10px 14px 14px',display:'flex',flexDirection:'column',gap:'7px'}}>
+          {tips.map((tip,i)=>(
+            <div key={i} style={{display:'flex',gap:'8px',alignItems:'flex-start'}}>
+              <span style={{color,fontSize:'12px',flexShrink:0,marginTop:'1px'}}>·</span>
+              <span style={{fontSize:'11px',color:'var(--text3)',lineHeight:'1.5'}}>{tip}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,setSelectedDayIndex,setWeekStart,weeklyPlan,readinessScore,stravaActivities,raceGoal}){
   const iso=toISO(weekDates[selectedDayIndex]);
   const di=selectedDayIndex;
@@ -2554,6 +2701,9 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,
           )}
         </div>
       )}
+
+      {/* Nutrizione running */}
+      <RunningNutritionCard weeklyPlan={weeklyPlan} readinessScore={readinessScore} />
 
       {/* Calendario allenamenti */}
       <div style={{...S.card(),padding:'14px 0 8px'}}>
@@ -3096,13 +3246,18 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
   if (!weeklyPlan) return null;
   const [openIdx, setOpenIdx] = React.useState(null);
 
+  // Verifica se una sessione non-rest è stata completata (tolleranza mezzanotte stessa data)
   const isDone = (session) => {
-    if (!session.isoDate || !classifiedRuns?.length) return false;
-    // Confronta per data stringa YYYY-MM-DD (stesso giorno esatto)
+    if (!session.isoDate || !classifiedRuns?.length || session.type === 'rest') return false;
     return classifiedRuns.some(r => r.date === session.isoDate);
   };
   const getDoneRun = (session) => {
     if (!session.isoDate || !classifiedRuns?.length) return null;
+    return classifiedRuns.find(r => r.date === session.isoDate) || null;
+  };
+  // Cerca corse effettuate in un giorno previsto come riposo (corsa extra non pianificata)
+  const getExtraRun = (session) => {
+    if (!session.isoDate || !classifiedRuns?.length || session.type !== 'rest') return null;
     return classifiedRuns.find(r => r.date === session.isoDate) || null;
   };
   const [showGoalForm, setShowGoalForm] = React.useState(false);
@@ -4342,9 +4497,13 @@ export default function App(){
   const [selectedDayIndex,setSelectedDayIndex]=useState(()=>{const g=new Date().getDay();return g===0?6:g-1;});
   const [dayTypes,setDayTypes]=useState({});
   const [stravaTokens,setStravaTokens]=useState(null);
+  const [stravaTokensLoaded,setStravaTokensLoaded]=useState(false);
   const [stravaActivities,setStravaActivities]=useState([]);
   const [activityDetails,setActivityDetails]=useState({});
   const [showStravaPopup,setShowStravaPopup]=useState(false);
+  // Orologio al minuto — forza ricalcolo useMemo che dipendono da "ora" (countdown gara, piano)
+  const [_now,_setNow]=useState(()=>new Date());
+  useEffect(()=>{ const t=setInterval(()=>_setNow(new Date()),60000); return()=>clearInterval(t); },[]);
   const [weightLog,setWeightLog]=useState([]);
   const [raceGoal,setRaceGoal]=useState(null); // { name, date, distanceKm, targetTime }
   const saveRaceGoal=async g=>{setRaceGoal(g);try{await window.storage.set('nt_raceGoal',JSON.stringify(g));}catch(e){}};
@@ -4397,7 +4556,7 @@ export default function App(){
     trainingMetrics && paceZonesGlobal
       ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZonesGlobal, classifiedRuns, readinessScoreGlobal, raceGoal)
       : null,
-    [trainingMetrics, paceZonesGlobal, coachingInsights, classifiedRuns, readinessScoreGlobal, raceGoal]);
+    [trainingMetrics, paceZonesGlobal, coachingInsights, classifiedRuns, readinessScoreGlobal, raceGoal, _now]);
   const saveWeightLog=async log=>{setWeightLog(log);try{await window.storage.set('nt_weightLog',JSON.stringify(log));}catch(e){}};
   const [userRecipes,setUserRecipes]=useState([]);
   const saveRecipes=async list=>{setUserRecipes(list);try{await window.storage.set('nt_recipes',JSON.stringify(list));}catch(e){}};
@@ -4425,6 +4584,7 @@ export default function App(){
         if(dt?.value)setDayTypes(JSON.parse(dt.value));
         const st=await window.storage.get('nt_stravaTokens');
         if(st?.value){const v=JSON.parse(st.value);if(v)setStravaTokens(v);}
+        setStravaTokensLoaded(true);
         const wl=await window.storage.get('nt_weightLog');
         if(wl?.value)setWeightLog(JSON.parse(wl.value));
         const rr=await window.storage.get('nt_recipes');
@@ -4436,7 +4596,9 @@ export default function App(){
   },[]);
 
   // Carica automaticamente le attività Strava al boot (non richiede di visitare la tab Sport)
+  // Aspetta stravaTokensLoaded=true per essere sicuri che lo storage sia stato letto
   useEffect(()=>{
+    if(!stravaTokensLoaded)return;
     if(!stravaTokens?.access_token)return;
     const expired=stravaTokens.expires_at&&(stravaTokens.expires_at*1000)<Date.now();
     if(expired)return; // il refresh avviene dentro TrainingsView
@@ -4445,7 +4607,7 @@ export default function App(){
     }).then(r=>r.json()).then(data=>{
       if(Array.isArray(data))setStravaActivities(data);
     }).catch(()=>{});
-  },[stravaTokens?.access_token]);
+  },[stravaTokensLoaded,stravaTokens?.access_token]);
 
   if(!unlocked){
     return(
