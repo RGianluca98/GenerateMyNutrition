@@ -586,6 +586,20 @@ function getWeekStart(d=new Date()){
 }
 function getWeekDates(ws){return Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d;});}
 function toISO(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
+/** Restituisce le 7 date ISO (YYYY-MM-DD) lun–dom della settimana corrente. */
+function getWeekISOs() {
+  const now = new Date();
+  const dow = now.getDay();
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + mondayOffset);
+  monday.setHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return toISO(d);
+  });
+}
 function getDayType(dayTypes,weekPlan,dateISO,dayIndex){
   return dayTypes?.[dateISO]??weekPlan.types[dayIndex];
 }
@@ -3242,7 +3256,7 @@ function WeekReviewCard({ weekReview }) {
 }
 
 /** Piano di allenamento settimanale con sessioni dettagliate per Garmin. */
-function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) {
+function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns, aiPlanLoading, aiPlanError, aiWeeklyPlan, onRegeneratePlan }) {
   if (!weeklyPlan) return null;
   const [openIdx, setOpenIdx] = React.useState(null);
 
@@ -3391,14 +3405,43 @@ function WeeklyPlanCard({ weeklyPlan, raceGoal, saveRaceGoal, classifiedRuns }) 
 
       {/* ── Header piano settimana ── */}
       <div style={{background:'var(--card)',borderRadius:'16px',border:'1px solid var(--border)',padding:'14px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>
-            PIANO SETTIMANA
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+            <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px'}}>PIANO SETTIMANA</div>
+            {aiWeeklyPlan?.generatedAt&&(
+              <span style={{fontSize:'9px',fontWeight:700,color:'#00C49A',background:'rgba(0,196,154,0.15)',
+                borderRadius:'5px',padding:'2px 6px',letterSpacing:'0.3px'}}>AI</span>
+            )}
           </div>
-          <div style={{fontSize:'11px',color:'var(--text3)'}}>
-            Target: <span style={{color:'var(--accent)',fontWeight:700}}>{weeklyPlan.weekTarget} km</span>
+          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+            <div style={{fontSize:'11px',color:'var(--text3)'}}>
+              Target: <span style={{color:'var(--accent)',fontWeight:700}}>{weeklyPlan.weekTarget} km</span>
+            </div>
+            {onRegeneratePlan&&(
+              <button onClick={onRegeneratePlan} disabled={aiPlanLoading}
+                style={{background:aiPlanLoading?'var(--surface)':'var(--accent-soft)',
+                  border:'1px solid var(--border)',borderRadius:'8px',padding:'3px 8px',
+                  color:aiPlanLoading?'var(--text3)':'var(--accent)',
+                  fontSize:'10px',fontWeight:700,cursor:aiPlanLoading?'default':'pointer',whiteSpace:'nowrap'}}>
+                {aiPlanLoading?'…':'⟳ AI'}
+              </button>
+            )}
           </div>
         </div>
+        {aiWeeklyPlan?.generatedAt&&(
+          <div style={{fontSize:'10px',color:'var(--text3)',marginBottom:'6px'}}>
+            Piano generato da AI {(()=>{
+              const ageMin=Math.round((Date.now()-new Date(aiWeeklyPlan.generatedAt))/60000);
+              return ageMin<60?`${ageMin}m fa`:`${Math.round(ageMin/60)}h fa`;
+            })()}
+          </div>
+        )}
+        {aiPlanError&&(
+          <div style={{fontSize:'10px',color:'#e05c5c',marginBottom:'6px',padding:'4px 8px',
+            background:'rgba(224,92,92,0.1)',borderRadius:'6px'}}>
+            Errore AI: {aiPlanError}
+          </div>
+        )}
         {weeklyPlan.note && (
           <div style={{fontSize:'11px',color:'var(--text3)',marginBottom:'10px',padding:'6px 10px',background:'var(--surface)',borderRadius:'8px',lineHeight:'1.4'}}>
             💡 {weeklyPlan.note}
@@ -3545,7 +3588,7 @@ const WORKOUT_LABELS = {
   race_pace:'Gara', progression:'Progressione', unknown:'?',
 };
 
-function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, readinessScore, weekReview, raceGoal, saveRaceGoal }) {
+function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, readinessScore, weekReview, raceGoal, saveRaceGoal, aiPlanLoading, aiPlanError, aiWeeklyPlan, onRegeneratePlan }) {
   const {
     weeklyVolumeKm, monthlyVolumeKm, runsLast7Days,
     consistencyScore, estimatedHalfMarathonTime, estimatedHalfMarathonPace,
@@ -3636,7 +3679,7 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
         <PaceZonesCard paceZones={paceZones} />
 
         {/* Piano settimanale */}
-        <WeeklyPlanCard weeklyPlan={weeklyPlan} raceGoal={raceGoal} saveRaceGoal={saveRaceGoal} classifiedRuns={runs} />
+        <WeeklyPlanCard weeklyPlan={weeklyPlan} raceGoal={raceGoal} saveRaceGoal={saveRaceGoal} classifiedRuns={runs} aiPlanLoading={aiPlanLoading} aiPlanError={aiPlanError} aiWeeklyPlan={aiWeeklyPlan} onRegeneratePlan={onRegeneratePlan}/>
 
         {/* Settimana scorsa — corse effettivamente fatte (Lun–Dom precedente) */}
         {(()=>{
@@ -3781,7 +3824,7 @@ const STRAVA_CLIENT_ID_PLACEHOLDER='YOUR_CLIENT_ID'; // sostituito da Netlify en
 const STRAVA_SCOPE='activity:read_all';
 const STRAVA_REDIRECT=typeof window!=='undefined'?`${window.location.origin}/strava-callback`:'';
 
-function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal,normalizedRuns,classifiedRuns,trainingMetrics,coachingInsights,paceZones,readinessScore,weeklyPlan,showStravaPopup,setShowStravaPopup}){
+function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,stravaActivities,setStravaActivities,activityDetails,setActivityDetails,raceGoal,saveRaceGoal,normalizedRuns,classifiedRuns,trainingMetrics,coachingInsights,paceZones,readinessScore,weeklyPlan,showStravaPopup,setShowStravaPopup,aiPlanLoading,aiPlanError,aiWeeklyPlan,onRegeneratePlan}){
   const [loadingAct,setLoadingAct]=useState(false);
   const [expandedActivity,setExpandedActivity]=useState(null);
   const [loadingDetail,setLoadingDetail]=useState(null);
@@ -4089,7 +4132,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 
       {/* Running Insights Panel */}
       {isConnected && classifiedRuns.length >= 3 && trainingMetrics && coachingInsights && (
-        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights} paceZones={paceZones} weeklyPlan={weeklyPlan} readinessScore={readinessScore} weekReview={weekReview} raceGoal={raceGoal} saveRaceGoal={saveRaceGoal}/>
+        <RunningInsightsPanel runs={classifiedRuns} metrics={trainingMetrics} insights={coachingInsights} paceZones={paceZones} weeklyPlan={weeklyPlan} readinessScore={readinessScore} weekReview={weekReview} raceGoal={raceGoal} saveRaceGoal={saveRaceGoal} aiPlanLoading={aiPlanLoading} aiPlanError={aiPlanError} aiWeeklyPlan={aiWeeklyPlan} onRegeneratePlan={onRegeneratePlan}/>
       )}
 
       {/* Chat AI */}
@@ -4507,6 +4550,11 @@ export default function App(){
   const [weightLog,setWeightLog]=useState([]);
   const [raceGoal,setRaceGoal]=useState(null); // { name, date, distanceKm, targetTime }
   const saveRaceGoal=async g=>{setRaceGoal(g);try{await window.storage.set('nt_raceGoal',JSON.stringify(g));}catch(e){}};
+  // Piano AI generato da Claude
+  const [aiWeeklyPlan,setAiWeeklyPlan]=useState(null); // { plan, generatedAt }
+  const [aiPlanLoading,setAiPlanLoading]=useState(false);
+  const [aiPlanError,setAiPlanError]=useState(null);
+  const aiPlanDebounceRef=React.useRef(null);
   // Pipeline analisi corsa — disponibile al boot, reattiva a stravaActivities
   const normalizedRuns = useMemo(() =>
     stravaActivities.filter(a=>a.type==='Run')
@@ -4552,11 +4600,34 @@ export default function App(){
     classifiedRuns.length ? calcReadinessScore(classifiedRuns) : null,
     [classifiedRuns]);
 
-  const weeklyPlanGlobal = useMemo(() =>
-    trainingMetrics && paceZonesGlobal
+  const weeklyPlanGlobal = useMemo(() => {
+    // Preferisce piano AI se fresco (< 24h)
+    if (aiWeeklyPlan?.plan && aiWeeklyPlan?.generatedAt) {
+      const ageH = (Date.now() - new Date(aiWeeklyPlan.generatedAt)) / 3600000;
+      if (ageH < 24) {
+        // Ricalcola daysFromNow e daysToRace con _now aggiornato
+        const today = new Date(_now); today.setHours(0,0,0,0);
+        const daysToRace = raceGoal?.date
+          ? Math.round((new Date(raceGoal.date+'T00:00:00') - today) / 86400000)
+          : aiWeeklyPlan.plan.daysToRace;
+        return {
+          ...aiWeeklyPlan.plan,
+          daysToRace,
+          raceName: raceGoal?.name ?? aiWeeklyPlan.plan.raceName,
+          raceDate: raceGoal?.date ?? aiWeeklyPlan.plan.raceDate,
+          sessions: aiWeeklyPlan.plan.sessions.map(s => ({
+            ...s,
+            daysFromNow: Math.round((new Date(s.isoDate+'T00:00:00') - today) / 86400000),
+          })),
+        };
+      }
+    }
+    // Fallback piano hardcoded
+    return trainingMetrics && paceZonesGlobal
       ? buildWeeklyPlan(trainingMetrics, coachingInsights, paceZonesGlobal, classifiedRuns, readinessScoreGlobal, raceGoal)
-      : null,
-    [trainingMetrics, paceZonesGlobal, coachingInsights, classifiedRuns, readinessScoreGlobal, raceGoal, _now]);
+      : null;
+  }, [trainingMetrics, paceZonesGlobal, coachingInsights, classifiedRuns, readinessScoreGlobal, raceGoal, _now, aiWeeklyPlan]);
+
   const saveWeightLog=async log=>{setWeightLog(log);try{await window.storage.set('nt_weightLog',JSON.stringify(log));}catch(e){}};
   const [userRecipes,setUserRecipes]=useState([]);
   const saveRecipes=async list=>{setUserRecipes(list);try{await window.storage.set('nt_recipes',JSON.stringify(list));}catch(e){}};
@@ -4591,6 +4662,12 @@ export default function App(){
         if(rr?.value)setUserRecipes(JSON.parse(rr.value));
         const rg=await window.storage.get('nt_raceGoal');
         if(rg?.value)setRaceGoal(JSON.parse(rg.value));
+        const ap=await window.storage.get('nt_aiWeeklyPlan');
+        if(ap?.value){
+          const parsed=JSON.parse(ap.value);
+          const ageH=(Date.now()-new Date(parsed.generatedAt))/3600000;
+          if(ageH<48)setAiWeeklyPlan(parsed); // scarta piani più vecchi di 48h
+        }
       }catch(e){}
     })();
   },[]);
@@ -4608,6 +4685,59 @@ export default function App(){
       if(Array.isArray(data))setStravaActivities(data);
     }).catch(()=>{});
   },[stravaTokensLoaded,stravaTokens?.access_token]);
+
+  // ── Genera piano AI via Claude ──────────────────────────────────────────────
+  const generateAIPlan = React.useCallback(async (force=false) => {
+    if(!trainingMetrics||!paceZonesGlobal||!classifiedRuns.length)return;
+    if(aiPlanLoading)return;
+    // Rispetta cache 6h se non forzato
+    if(!force&&aiWeeklyPlan?.generatedAt){
+      const ageH=(Date.now()-new Date(aiWeeklyPlan.generatedAt))/3600000;
+      if(ageH<6)return;
+    }
+    setAiPlanLoading(true);
+    setAiPlanError(null);
+    const weekDates=getWeekISOs();
+    const cutoff=new Date(Date.now()-60*86400000).toISOString().slice(0,10);
+    const recentRuns=classifiedRuns
+      .filter(r=>r.date>=cutoff)
+      .map(r=>({date:r.date,distanceKm:r.distanceKm,avgPaceMinKm:r.avgPaceMinKm,
+        movingTimeMin:r.movingTimeMin,effortScore:r.effortScore,
+        classification:{workoutType:r.classification?.workoutType}}));
+    try{
+      const res=await fetch('/.netlify/functions/generate-training-plan',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({classifiedRuns:recentRuns,trainingMetrics,
+          readinessScore:readinessScoreGlobal,paceZones:paceZonesGlobal,raceGoal,weekDates}),
+      });
+      const data=await res.json();
+      if(!res.ok||data.error){setAiPlanError(data.error??'Errore generazione piano');return;}
+      const today=new Date();today.setHours(0,0,0,0);
+      const dayNames=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+      const plan={
+        ...data.plan,
+        sessions:data.plan.sessions.map(s=>{
+          const d=new Date(s.isoDate+'T00:00:00');
+          return{...s,day:s.dayName??dayNames[d.getDay()],
+            daysFromNow:Math.round((d-today)/86400000)};
+        }),
+        daysToRace:raceGoal?.date?Math.round((new Date(raceGoal.date+'T00:00:00')-today)/86400000):null,
+        raceName:raceGoal?.name??null,raceDate:raceGoal?.date??null,
+      };
+      const record={plan,generatedAt:new Date().toISOString()};
+      setAiWeeklyPlan(record);
+      try{await window.storage.set('nt_aiWeeklyPlan',JSON.stringify(record));}catch(e){}
+    }catch(err){setAiPlanError(err.message??'Errore di rete');}
+    finally{setAiPlanLoading(false);}
+  },[trainingMetrics,paceZonesGlobal,classifiedRuns,readinessScoreGlobal,raceGoal,aiPlanLoading,aiWeeklyPlan]);
+
+  // Auto-trigger con debounce 5s quando arriva una nuova corsa
+  useEffect(()=>{
+    if(!trainingMetrics||!paceZonesGlobal||!classifiedRuns.length)return;
+    clearTimeout(aiPlanDebounceRef.current);
+    aiPlanDebounceRef.current=setTimeout(()=>generateAIPlan(false),5000);
+    return()=>clearTimeout(aiPlanDebounceRef.current);
+  },[classifiedRuns.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if(!unlocked){
     return(
@@ -4815,6 +4945,8 @@ export default function App(){
           trainingMetrics={trainingMetrics} coachingInsights={coachingInsights}
           paceZones={paceZonesGlobal} readinessScore={readinessScoreGlobal}
           weeklyPlan={weeklyPlanGlobal}
+          aiPlanLoading={aiPlanLoading} aiPlanError={aiPlanError} aiWeeklyPlan={aiWeeklyPlan}
+          onRegeneratePlan={()=>generateAIPlan(true)}
           showStravaPopup={showStravaPopup} setShowStravaPopup={setShowStravaPopup}/>}
         {tab==='peso'&&<PesoView weightLog={weightLog} saveWeightLog={saveWeightLog}/>}
       </div>
