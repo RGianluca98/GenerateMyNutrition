@@ -916,20 +916,37 @@ function calcTrainingMetrics(classifiedRuns) {
   let estimatedHalfMarathonTime = null;
   let estimatedBasedOn = null;
 
-  const vdotCandidates = runs60.filter(r =>
-    r.distanceKm >= 3 &&
-    r.classification?.workoutType !== 'recovery' &&
-    r.avgPaceMinKm < 7.5 &&
-    r.movingTimeMin > 0
-  );
+  // VDOT pesato per recency + qualità corsa
+  // Le corse di qualità (tempo/threshold/race_pace/interval) pesano 3× più delle easy
+  // Le long_run pesano 1.5× (dati affidabili per distanza)
+  // Le easy/sconosciute pesano 1× ma solo se ≥8km (passo rappresentativo)
+  const TYPE_QUALITY_WEIGHT = {
+    tempo: 3, threshold: 3, race_pace: 3,
+    interval: 2.5,
+    long_run: 1.5, progression: 1.5,
+    easy: 1, unknown: 0.8,
+    recovery: 0, // escluse
+  };
+  const vdotCandidates = runs60.filter(r => {
+    const wt = r.classification?.workoutType;
+    if (wt === 'recovery') return false;
+    if (r.avgPaceMinKm >= 7.0) return false;
+    if (r.movingTimeMin <= 0) return false;
+    // Per le easy: richiedi almeno 8km (altrimenti il passo non è stabile)
+    if ((wt === 'easy' || wt === 'unknown' || !wt) && r.distanceKm < 8) return false;
+    return r.distanceKm >= 5;
+  });
   if (vdotCandidates.length > 0) {
     const refNow = new Date();
     let weightSum = 0, vdotSum = 0;
     vdotCandidates.forEach(r => {
       const vdot = calcVDOT(r.distanceKm, r.movingTimeMin);
       if (!vdot || vdot <= 0) return;
+      const wt = r.classification?.workoutType ?? 'easy';
+      const qualityW = TYPE_QUALITY_WEIGHT[wt] ?? 1;
       const daysSince = Math.max(0, (refNow - new Date(r.date + 'T00:00:00')) / 86400000);
-      const weight = Math.exp(-daysSince / 21); // half-life ~15gg: corsa di ieri pesa ~14× una di 2 sett fa
+      const recencyW = Math.exp(-daysSince / 21);
+      const weight = qualityW * recencyW;
       vdotSum += vdot * weight;
       weightSum += weight;
     });
@@ -3667,7 +3684,7 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
               )}
             </div>
             <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px'}}>
-              Riegel — basata su: {estimatedBasedOn ?? 'migliore corsa recente'}
+              {estimatedBasedOn ?? 'VDOT — corse recenti'}
             </div>
           </div>
         )}
