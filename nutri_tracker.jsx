@@ -10,20 +10,30 @@ import { useState, useEffect, useRef, useMemo } from "react";
   s.textContent = `
     *{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg:#0C0E14;--surface:#161A23;--card:#1E2338;--border:#262C3E;
-      --accent:#FBA828;--accent-soft:rgba(251,168,40,0.12);
+      --bg:#07090F;--surface:#0D1018;--card:#131824;--border:#1A2234;
+      --accent:#E8732A;--accent-soft:rgba(232,115,42,0.11);
       --accent2:#00C49A;
-      --text:#EFF1F8;--text2:#94A8BA;--text3:#5A6888;
+      --text:#EEF1F8;--text2:#7A8BA0;--text3:#3D4F66;
       --font:'Manrope',sans-serif;--display:'Manrope',sans-serif;
-      --chip:#1E2338;--muted:#161A23;
-      --shadow:0 1px 2px rgba(0,0,0,0.4),0 8px 24px rgba(0,0,0,0.32);
+      --chip:#131824;--muted:#0D1018;
+      --shadow:0 1px 3px rgba(0,0,0,0.5),0 8px 28px rgba(0,0,0,0.38);
+      --shadow-lg:0 4px 16px rgba(0,0,0,0.55),0 24px 64px rgba(0,0,0,0.42);
+      --radius:14px;--sidebar-w:224px;
     }
     html,body{background:var(--bg);color:var(--text);font-family:var(--font)}
     input:focus{outline:none}
+    input,select,textarea{color:var(--text)}
     button{cursor:pointer;font-family:var(--font)}
-    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar{width:5px}
     ::-webkit-scrollbar-track{background:transparent}
-    ::-webkit-scrollbar-thumb{background:#262C3E;border-radius:6px}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px}
+    .app-shell{display:flex;min-height:100vh;background:var(--bg)}
+    .sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;z-index:100;display:flex;flex-direction:column}
+    .main-area{margin-left:var(--sidebar-w);flex:1;min-height:100vh}
+    .nav-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;text-align:left;width:100%;transition:color 0.15s,background 0.15s;position:relative;font-family:var(--font)}
+    .nav-item:hover{background:rgba(255,255,255,0.04);color:var(--text)}
+    .nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:700}
+    .nav-item.active::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;background:var(--accent);border-radius:0 3px 3px 0}
   `;
   document.head.appendChild(s);
 })();
@@ -641,7 +651,7 @@ function calcKcal(item){
 
 // ── STYLES HELPERS ────────────────────────────────────────────
 const S={
-  card:(extra={})=>({background:'var(--card)',borderRadius:'14px',boxShadow:'var(--shadow)',...extra}),
+  card:(extra={})=>({background:'var(--card)',borderRadius:'var(--radius)',boxShadow:'var(--shadow)',border:'1px solid var(--border)',...extra}),
   btn:(color='var(--text2)',extra={})=>({background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',color,padding:'6px 14px',fontSize:'12px',fontWeight:500,...extra}),
 };
 
@@ -2008,7 +2018,7 @@ function PesoView({weightLog,saveWeightLog}){
   const delta=sorted.length>=2?(sorted[sorted.length-1].weight-sorted[0].weight).toFixed(1):null;
 
   return(
-    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'100px'}}>
+    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
       {/* Form inserimento */}
       <div style={{background:'var(--card)',borderRadius:'16px',padding:'16px',border:'1px solid var(--border)'}}>
         <div style={{fontFamily:'var(--display)',fontSize:'16px',color:'var(--text)',marginBottom:'12px'}}>
@@ -2097,14 +2107,14 @@ function NavGlyph({id,active}){
   const stroke=active?'var(--accent)':'var(--text3)';
   if(id==='home'){
     return(
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <path d="M2.5 7.2L8 3l5.5 4.2v5.8a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V7.2z" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round"/>
       </svg>
     );
   }
   if(id==='planner'){
     return(
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <rect x="2.25" y="3" width="11.5" height="10.75" rx="2" stroke={stroke} strokeWidth="1.5"/>
         <line x1="2.5" y1="6.25" x2="13.5" y2="6.25" stroke={stroke} strokeWidth="1.5"/>
       </svg>
@@ -2112,16 +2122,19 @@ function NavGlyph({id,active}){
   }
   if(id==='dashboard'){
     return(
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <line x1="3" y1="13" x2="3" y2="8" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
-        <line x1="8" y1="13" x2="8" y2="5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
-        <line x1="13" y1="13" x2="13" y2="2.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2" y="3" width="12" height="11" rx="2" stroke={stroke} strokeWidth="1.5"/>
+        <line x1="2" y1="6.5" x2="14" y2="6.5" stroke={stroke} strokeWidth="1.5"/>
+        <line x1="5.5" y1="1.5" x2="5.5" y2="4.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="10.5" y1="1.5" x2="10.5" y2="4.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
+        <rect x="4.5" y="9" width="2" height="2" rx="0.5" fill={stroke}/>
+        <rect x="9" y="9" width="2" height="2" rx="0.5" fill={stroke}/>
       </svg>
     );
   }
   if(id==='calendario'){
     return(
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <rect x="2" y="3" width="12" height="11" rx="2" stroke={stroke} strokeWidth="1.5"/>
         <line x1="2" y1="6.5" x2="14" y2="6.5" stroke={stroke} strokeWidth="1.5"/>
         <line x1="5.5" y1="1.5" x2="5.5" y2="4.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
@@ -2133,15 +2146,24 @@ function NavGlyph({id,active}){
   }
   if(id==='trainings'){
     return(
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <circle cx="8" cy="8" r="5.5" stroke={stroke} strokeWidth="1.5"/>
-        <path d="M5.5 8.5l1.5 1.5 3.5-3.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M3 13l3-4 2.5 2 3-5 2 4" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="3" cy="13" r="1" fill={stroke}/>
+        <circle cx="13" cy="10" r="1" fill={stroke}/>
+      </svg>
+    );
+  }
+  if(id==='oggi'){
+    return(
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M8 2C5.239 2 3 4.239 3 7c0 1.8.955 3.378 2.387 4.256L6 14h4l.613-2.744C12.045 10.378 13 8.8 13 7c0-2.761-2.239-5-5-5z" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round"/>
+        <line x1="6" y1="14" x2="10" y2="14" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     );
   }
   if(id==='peso'){
     return(
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <rect x="2" y="7" width="12" height="7" rx="1.5" stroke={stroke} strokeWidth="1.5"/>
         <path d="M5 7c0-1.657 1.343-3 3-3s3 1.343 3 3" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
         <line x1="8" y1="9" x2="8" y2="11" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
@@ -2151,7 +2173,7 @@ function NavGlyph({id,active}){
   }
   if(id==='ricette'){
     return(
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <rect x="2" y="1.5" width="10" height="13" rx="1.5" stroke={stroke} strokeWidth="1.5"/>
         <line x1="4.5" y1="5" x2="9.5" y2="5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
         <line x1="4.5" y1="7.5" x2="9.5" y2="7.5" stroke={stroke} strokeWidth="1.5" strokeLinecap="round"/>
@@ -2160,7 +2182,7 @@ function NavGlyph({id,active}){
     );
   }
   return(
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3" stroke={stroke} strokeWidth="1.5"/>
       <path d="M5 8l2 2 4-4" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
@@ -2225,7 +2247,7 @@ function RecipesView({userRecipes,saveRecipes,weekDates,setTab,setSelectedDayInd
   };
 
   return(
-    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'8px'}}>
+    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
       {/* Category filter */}
       <div style={{display:'flex',gap:'6px',overflowX:'auto',paddingBottom:'4px',paddingTop:'4px'}}>
         <button onClick={()=>setCatFilter('tutte')}
@@ -2641,7 +2663,7 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,
   const sessLabels={interval:'Ripetute',tempo:'Tempo',easy:'Facile',long_run:'Lungo',recovery:'Recovery',race_pace:'Ritmo gara',threshold:'Soglia',rest:'Riposo'};
 
   return(
-    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px',paddingBottom:'8px'}}>
+    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
 
       {/* Header giorno */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:'4px'}}>
@@ -2886,7 +2908,7 @@ function OggiView({
   },0);
 
   return(
-    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
       {/* Day type & progress banner */}
       <div style={{...S.card(),padding:'16px'}}>
         {/* Day selector */}
@@ -4005,7 +4027,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
   const isConnected=!!(stravaTokens?.access_token);
 
   return(
-    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
 
       {/* Popup Strava — position:fixed, si apre dall'icona nell'header */}
       {showStravaPopup&&(
@@ -4202,7 +4224,7 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 // ── DASHBOARD VIEW ─────────────────────────────────────────────
 function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayConsumedKcal,dayTypes}){
   return(
-    <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
+    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
       {/* Daily compliance grid */}
       <div style={S.card({padding:'14px'})}>
         <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px',marginBottom:'12px'}}>COMPLIANCE SETTIMANALE</div>
@@ -4761,7 +4783,7 @@ export default function App(){
       <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'28px',padding:'24px'}}>
         <div style={{textAlign:'center'}}>
           <img src="./logo_kronos.png" alt="KRONOS" style={{width:'110px',height:'auto',display:'block',margin:'0 auto 14px',mixBlendMode:'screen'}}/>
-          <div style={{fontFamily:'var(--display)',fontSize:'32px',fontWeight:900,color:'var(--accent)',letterSpacing:'3px'}}>KRONOS</div>
+          <div style={{fontFamily:'var(--display)',fontSize:'28px',fontWeight:900,color:'var(--accent)',letterSpacing:'3px'}}>KRONOS</div>
           <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'6px',letterSpacing:'0.5px'}}>Keep Records Of Nutrition, Objectives &amp; Sport</div>
         </div>
         {/* Dots */}
@@ -4895,50 +4917,60 @@ export default function App(){
   const weeklyTotals=getWeeklyTotals();
 
   return(
-    <div style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)',fontFamily:'var(--font)',paddingBottom:'80px'}}>
-      {/* Header */}
-      <div style={{padding:'20px 20px 12px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,background:'var(--bg)',zIndex:10}}>
-        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-          <img src="./logo_kronos.png" alt="" style={{width:'28px',height:'auto',mixBlendMode:'screen'}}/>
-          <span style={{fontFamily:'var(--display)',fontSize:'18px',letterSpacing:'2px',fontWeight:900,color:'var(--accent)'}}>KRONOS</span>
-        </div>
-        {tab==='home'&&(
-          <div style={{fontSize:'12px',color:'var(--text2)'}}>
-            Il tuo percorso
+    <div className="app-shell" style={{color:'var(--text)',fontFamily:'var(--font)'}}>
+
+      {/* ── SIDEBAR ── */}
+      <aside className="sidebar">
+        {/* Brand */}
+        <div style={{padding:'22px 18px 18px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+          <img src="./logo_kronos.png" alt="" style={{width:'32px',height:'auto',mixBlendMode:'screen',flexShrink:0}}/>
+          <div>
+            <div style={{fontFamily:'var(--display)',fontSize:'15px',letterSpacing:'2.5px',fontWeight:900,color:'var(--accent)',lineHeight:1}}>KRONOS</div>
+            <div style={{fontSize:'9px',color:'var(--text3)',letterSpacing:'0.4px',marginTop:'4px',fontWeight:500}}>Nutrizione &amp; Sport</div>
           </div>
-        )}
-        {tab==='trainings'&&(
+        </div>
+
+        {/* Nav items */}
+        <nav style={{flex:1,padding:'12px 10px',display:'flex',flexDirection:'column',gap:'2px',overflowY:'auto'}}>
+          {[
+            {id:'home',     label:'Home'},
+            {id:'trainings',label:'Allenamento'},
+            {id:'oggi',     label:'Nutrizione'},
+            {id:'dashboard',label:'Piano settimanale'},
+            {id:'ricette',  label:'Ricettario'},
+            {id:'peso',     label:'Peso'},
+          ].map(t=>(
+            <button key={t.id} className={`nav-item${tab===t.id?' active':''}`} onClick={()=>setTab(t.id)}>
+              <NavGlyph id={t.id} active={tab===t.id}/>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        {/* Strava + footer */}
+        <div style={{padding:'12px 10px 16px',borderTop:'1px solid var(--border)',flexShrink:0}}>
           <button onClick={()=>setShowStravaPopup(true)}
-            style={{background:'none',border:'none',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center',gap:'6px'}}>
-            <div style={{width:'28px',height:'28px',borderRadius:'8px',background:'#FC4C02',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+            style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'9px 13px',
+              borderRadius:'10px',border:'1px solid var(--border)',
+              background:stravaTokens?.access_token?'rgba(252,76,2,0.08)':'var(--card)',
+              cursor:'pointer',marginBottom:'12px',fontFamily:'var(--font)'}}>
+            <div style={{width:'22px',height:'22px',borderRadius:'6px',background:'#FC4C02',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
                 <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
               </svg>
             </div>
-            <span style={{fontSize:'11px',color:stravaTokens?.access_token?'var(--accent)':'var(--text3)',fontWeight:600}}>
-              {stravaTokens?.access_token?'Connesso':'Connetti'}
+            <span style={{fontSize:'12px',color:stravaTokens?.access_token?'#FC4C02':'var(--text3)',fontWeight:600}}>
+              {stravaTokens?.access_token?'Strava connesso':'Connetti Strava'}
             </span>
           </button>
-        )}
-        {tab==='oggi'&&(
-          <div style={{fontSize:'12px',color:'var(--text2)'}}>
-            Nutri Tracker
+          <div style={{fontSize:'10px',color:'var(--text3)',textAlign:'center',lineHeight:1.5,letterSpacing:'0.2px'}}>
+            Keep Records Of Nutrition,<br/>Objectives &amp; Sport
           </div>
-        )}
-        {tab==='ricette'&&(
-          <div style={{fontSize:'12px',color:'var(--text2)'}}>
-            Ricettario
-          </div>
-        )}
-        {tab==='dashboard'&&(
-          <div style={{fontSize:'12px',color:'var(--text2)'}}>
-            {weekDates[0].toLocaleDateString('it-IT',{day:'numeric',month:'short'})} – {weekDates[6].toLocaleDateString('it-IT',{day:'numeric',month:'short'})}
-          </div>
-        )}
-      </div>
+        </div>
+      </aside>
 
-      {/* Content */}
-      <div style={{paddingTop:'12px'}}>
+      {/* ── MAIN CONTENT ── */}
+      <main className="main-area">
         {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes} setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart} weeklyPlan={weeklyPlanGlobal} readinessScore={readinessScoreGlobal} stravaActivities={stravaActivities} raceGoal={raceGoal}/>}
         {tab==='oggi'&&<OggiView weekPlan={weekPlan} weekDates={weekDates} todayISO={todayISO}
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
@@ -4966,20 +4998,7 @@ export default function App(){
           onRegeneratePlan={()=>generateAIPlan(true)}
           showStravaPopup={showStravaPopup} setShowStravaPopup={setShowStravaPopup}/>}
         {tab==='peso'&&<PesoView weightLog={weightLog} saveWeightLog={saveWeightLog}/>}
-      </div>
-
-      {/* Bottom nav */}
-      <div style={{position:'fixed',bottom:0,left:0,right:0,background:'var(--surface)',borderTop:'1px solid var(--border)',display:'flex',zIndex:100,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'home',label:'Home'},{id:'trainings',label:'Sport'},{id:'oggi',label:'Nutri Tracker'},{id:'dashboard',label:'Weekly food portions'},{id:'ricette',label:'Ricette'},{id:'peso',label:'Weight Tracker'}].map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)}
-            style={{flex:1,padding:'10px 0 8px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'}}>
-            <NavGlyph id={t.id} active={tab===t.id}/>
-            <span style={{fontSize:'10px',fontWeight:tab===t.id?600:500,letterSpacing:'0.2px',
-              color:tab===t.id?'var(--text)':'var(--text3)'}}>{t.label}</span>
-            <span style={{width:'16px',height:'2px',borderRadius:'2px',background:tab===t.id?'var(--accent)':'transparent'}}/>
-          </button>
-        ))}
-      </div>
+      </main>
 
       {swapModal&&<SwapModal modal={swapModal} weekPlan={weekPlan} onSwap={swapFood} onClose={()=>setSwapModal(null)}/>}
       {addModal&&<AddFoodModal modal={addModal} onAdd={addFood} onClose={()=>setAddModal(null)}/>}
