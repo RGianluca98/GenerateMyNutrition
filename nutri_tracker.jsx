@@ -3629,185 +3629,253 @@ const WORKOUT_LABELS = {
 
 function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, readinessScore, weekReview, raceGoal, saveRaceGoal, aiPlanLoading, aiPlanError, aiWeeklyPlan, onRegeneratePlan }) {
   const {
-    weeklyVolumeKm, monthlyVolumeKm, runsLast7Days,
-    consistencyScore, estimatedHalfMarathonTime, estimatedHalfMarathonPace,
-    estimated10kTime, fatigueTrend, estimatedBasedOn,
+    weeklyVolumeKm, runsLast7Days,
+    estimatedHalfMarathonTime, estimatedHalfMarathonPace,
+    estimated10kTime, fatigueTrend,
   } = metrics;
 
-  const cardStyle = {
-    background:'var(--card)', borderRadius:'16px',
-    border:'1px solid var(--border)', padding:'14px',
-  };
-  const chipStyle = (bg) => ({
-    background: bg ?? 'var(--surface)',
-    borderRadius:'10px', padding:'8px 12px',
-    display:'flex', flexDirection:'column', alignItems:'center', gap:'2px',
-    flex:1, minWidth:0,
-  });
-  const badgeStyle = (type) => ({
-    background: WORKOUT_COLORS[type] ?? '#5A6888',
-    color:'#fff', fontSize:'10px', fontWeight:700,
-    borderRadius:'6px', padding:'2px 6px', letterSpacing:'0.5px',
-    whiteSpace:'nowrap',
-  });
-  const fatigueLabelMap = { improving:'↓ In recupero', stable:'→ Stabile', declining:'↑ In crescita' };
-  const fatigueColorMap = { improving:'var(--accent)', stable:'var(--text2)', declining:'#e05c5c' };
+  const lastRun = runs[0] ?? null;
 
-  return (
-    <details open style={{display:'flex',flexDirection:'column',gap:'0'}}>
-      <summary style={{
-        listStyle:'none', cursor:'pointer',
-        fontSize:'11px', fontWeight:700, color:'var(--text2)',
-        letterSpacing:'0.8px', padding:'4px 2px 10px',
-        display:'flex', alignItems:'center', justifyContent:'space-between',
-      }}>
-        <span>ANALISI CORSA 🏃</span>
-        <span style={{fontSize:'10px', color:'var(--text3)', fontWeight:500}}>tocca per espandere/comprimere</span>
-      </summary>
+  const weeklyChart = useMemo(() => {
+    const weeks = [];
+    for (let i = 9; i >= 0; i--) {
+      const ws = new Date();
+      ws.setDate(ws.getDate() - ((ws.getDay()+6)%7) - i*7);
+      ws.setHours(0,0,0,0);
+      const we = new Date(ws); we.setDate(ws.getDate()+6); we.setHours(23,59,59,999);
+      const km = runs.filter(r=>{const d=new Date(r.date);return d>=ws&&d<=we;}).reduce((s,r)=>s+r.distanceKm,0);
+      weeks.push({label:ws.toLocaleDateString('it-IT',{day:'numeric',month:'short'}),km:Math.round(km*10)/10});
+    }
+    return weeks;
+  }, [runs]);
 
-      <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-        {/* Stats row */}
-        <div style={{display:'flex',gap:'8px'}}>
-          <div style={chipStyle('var(--surface)')}>
-            <div style={{fontSize:'16px',fontWeight:800,color:'var(--accent)'}}>{weeklyVolumeKm}</div>
-            <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:500}}>km/settimana</div>
-          </div>
-          <div style={chipStyle('var(--surface)')}>
-            <div style={{fontSize:'16px',fontWeight:800,color:'var(--text)'}}>{monthlyVolumeKm}</div>
-            <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:500}}>km/mese</div>
-          </div>
-          <div style={chipStyle('var(--surface)')}>
-            <div style={{fontSize:'16px',fontWeight:800,color:'var(--text)'}}>{runsLast7Days}</div>
-            <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:500}}>uscite 7gg</div>
-          </div>
-          <div style={chipStyle('var(--surface)')}>
-            <div style={{fontSize:'14px',fontWeight:800,color:fatigueColorMap[fatigueTrend]??'var(--text2)'}}>
-              {fatigueLabelMap[fatigueTrend]??'–'}
+  const sessColors={interval:'#4c8cde',tempo:'#e05c5c',easy:'#00C49A',long_run:'var(--accent)',recovery:'#5A6888',race_pace:'#FF6B35',threshold:'#c44c9a',rest:'#1A2234'};
+  const sessLabels={interval:'Ripetute',tempo:'Tempo',easy:'Facile',long_run:'Lungo',recovery:'Recovery',race_pace:'Ritmo gara',threshold:'Soglia',rest:'Riposo'};
+  const fatigueLabelMap={improving:'In recupero',stable:'Stabile',declining:'In crescita'};
+  const fatigueColorMap={improving:'var(--accent2)',stable:'var(--text2)',declining:'#e05c5c'};
+  const badgeSt=(type)=>({background:sessColors[type]??'#3D4F66',color:'#fff',fontSize:'10px',fontWeight:700,borderRadius:'6px',padding:'2px 7px',letterSpacing:'0.5px',whiteSpace:'nowrap'});
+
+  const daysToRace=weeklyPlan?.daysToRace??null;
+  const raceName=raceGoal?.name??weeklyPlan?.raceName??null;
+  const phase=weeklyPlan?.phase??null;
+  const phaseColors={load:'var(--accent)',taper:'var(--accent2)',race_week:'#FF6B35',post_race:'var(--text3)'};
+  const phaseLabels={load:'Fase carico',taper:'Tapering',race_week:'Settimana gara!',post_race:'Post gara'};
+
+  const W=300,H=90,Pt=8,Pr=8,Pb=22,Pl=8;
+  const cW=W-Pl-Pr,cH=H-Pt-Pb;
+  const maxKm=Math.max(...weeklyChart.map(w=>w.km),1);
+  const xOf=(i)=>Pl+i*(cW/Math.max(weeklyChart.length-1,1));
+  const yOf=(km)=>Pt+cH-(km/maxKm)*cH;
+  const chartPts=weeklyChart.map((w,i)=>`${xOf(i).toFixed(1)},${yOf(w.km).toFixed(1)}`).join(' ');
+  const areaD=`M${xOf(0).toFixed(1)},${(Pt+cH).toFixed(1)} ${weeklyChart.map((w,i)=>`L${xOf(i).toFixed(1)},${yOf(w.km).toFixed(1)}`).join(' ')} L${xOf(weeklyChart.length-1).toFixed(1)},${(Pt+cH).toFixed(1)} Z`;
+  const lblIdxs=[0,Math.floor((weeklyChart.length-1)/2),weeklyChart.length-1];
+  const giorni=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  const lastWeekRuns=(()=>{const lm=new Date();lm.setDate(lm.getDate()-((lm.getDay()+6)%7)-7);lm.setHours(0,0,0,0);const ls=new Date(lm);ls.setDate(lm.getDate()+6);ls.setHours(23,59,59,999);return runs.filter(r=>{const d=new Date(r.date);return d>=lm&&d<=ls;}).sort((a,b)=>a.date.localeCompare(b.date));})();
+  const reliability=Math.min(Math.max(runs.length*5,20),90);
+
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+
+      {/* ── 3 COLONNE HEADER ── */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1.5fr 1fr',gap:'16px',alignItems:'start'}}>
+
+        {/* Ultima corsa */}
+        <div style={S.card({padding:'16px',display:'flex',flexDirection:'column',gap:'10px'})}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text3)',letterSpacing:'0.7px'}}>ULTIMA CORSA</div>
+          {lastRun?(
+            <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+              <div>
+                <div style={{fontFamily:'var(--display)',fontSize:'26px',fontWeight:900,color:'var(--text)',lineHeight:1,letterSpacing:'-0.5px'}}>
+                  {lastRun.distanceKm.toFixed(1)}<span style={{fontSize:'13px',color:'var(--text3)',fontWeight:400,marginLeft:'4px'}}>km</span>
+                </div>
+                <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'3px'}}>{new Date(lastRun.date).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}</div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                {[
+                  {label:'PACE',val:`${_paceStr(lastRun.avgPaceMinKm)}/km`,color:'var(--text)'},
+                  {label:'DURATA',val:_timeStr(lastRun.movingTimeMin*60),color:'var(--text)'},
+                  ...(lastRun.elevationGain>0?[{label:'DISLIVELLO',val:`${Math.round(lastRun.elevationGain)}m`,color:'var(--text)'}]:[]),
+                  ...(lastRun.avgHeartRate?[{label:'FC MEDIA',val:`${Math.round(lastRun.avgHeartRate)} bpm`,color:'#e05c5c'}]:[]),
+                ].map((item,i)=>(
+                  <div key={i} style={{background:'var(--surface)',borderRadius:'8px',padding:'8px 10px'}}>
+                    <div style={{fontSize:'9px',color:'var(--text3)',fontWeight:700,letterSpacing:'0.5px'}}>{item.label}</div>
+                    <div style={{fontSize:'13px',fontWeight:700,color:item.color,marginTop:'2px'}}>{item.val}</div>
+                  </div>
+                ))}
+              </div>
+              {lastRun.classification?.workoutType&&lastRun.classification.workoutType!=='unknown'&&(
+                <div><span style={badgeSt(lastRun.classification.workoutType)}>{sessLabels[lastRun.classification.workoutType]??lastRun.classification.workoutType}</span></div>
+              )}
             </div>
-            <div style={{fontSize:'10px',color:'var(--text3)',fontWeight:500}}>carico</div>
+          ):(
+            <div style={{fontSize:'12px',color:'var(--text3)',padding:'8px 0'}}>Nessuna corsa registrata</div>
+          )}
+        </div>
+
+        {/* Andamento settimanale */}
+        <div style={S.card({padding:'16px',display:'flex',flexDirection:'column',gap:'12px'})}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{fontSize:'10px',fontWeight:700,color:'var(--text3)',letterSpacing:'0.7px'}}>ANDAMENTO SETTIMANALE</div>
+            <div style={{fontSize:'9px',color:'var(--text3)'}}>10 settimane</div>
+          </div>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto',display:'block'}}>
+            <defs>
+              <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.25"/>
+                <stop offset="100%" stopColor="var(--accent)" stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            {[0,0.5,1].map((v,i)=>(
+              <line key={i} x1={Pl} y1={Pt+cH*(1-v)} x2={W-Pr} y2={Pt+cH*(1-v)} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="2,3"/>
+            ))}
+            <path d={areaD} fill="url(#areaGrad)"/>
+            <polyline points={chartPts} fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"/>
+            <circle cx={xOf(weeklyChart.length-1)} cy={yOf(weeklyChart[weeklyChart.length-1]?.km??0)} r="3.5" fill="var(--accent)" stroke="var(--card)" strokeWidth="1.5"/>
+            {lblIdxs.map(i=>(
+              <text key={i} x={xOf(i)} y={H-2} fontSize="7" fill="var(--text3)" textAnchor={i===0?'start':i===weeklyChart.length-1?'end':'middle'}>{weeklyChart[i]?.label}</text>
+            ))}
+          </svg>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',borderTop:'1px solid var(--border)',paddingTop:'10px'}}>
+            {[
+              {val:weeklyVolumeKm,label:'KM SETTIMANA',color:'var(--accent)'},
+              {val:runsLast7Days,label:'USCITE 7gg',color:'var(--text)'},
+              {val:fatigueTrend==='improving'?'↓':fatigueTrend==='declining'?'↑':'→',label:fatigueLabelMap[fatigueTrend]??'CARICO',color:fatigueColorMap[fatigueTrend]??'var(--text2)'},
+            ].map((s,i)=>(
+              <div key={i} style={{textAlign:'center'}}>
+                <div style={{fontSize:'20px',fontWeight:800,color:s.color,lineHeight:1}}>{s.val}</div>
+                <div style={{fontSize:'9px',color:'var(--text3)',fontWeight:600,letterSpacing:'0.5px',marginTop:'3px'}}>{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Stima mezza maratona */}
-        {estimatedHalfMarathonTime && (
-          <div style={{...cardStyle, background:'var(--accent-soft)', border:'1px solid var(--accent)'}}>
-            <div style={{fontSize:'10px',fontWeight:700,color:'var(--accent)',letterSpacing:'0.8px',marginBottom:'6px'}}>STIMA PRESTAZIONE</div>
-            <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
-              <div>
-                <div style={{fontSize:'11px',color:'var(--text3)'}}>Mezza Maratona (21,1 km)</div>
-                <div style={{fontSize:'20px',fontWeight:800,color:'var(--text)'}}>{_timeStr(estimatedHalfMarathonTime)}</div>
-                <div style={{fontSize:'11px',color:'var(--text2)'}}>@ {_paceStr(estimatedHalfMarathonPace)}/km</div>
+        {/* Stima gara */}
+        <div style={S.card({padding:'16px',display:'flex',flexDirection:'column',gap:'10px'})}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text3)',letterSpacing:'0.7px'}}>STIMA TEMPO GARA</div>
+          {raceName&&daysToRace!=null&&daysToRace>0&&(
+            <div style={{background:'var(--surface)',borderRadius:'10px',padding:'10px',borderLeft:`3px solid ${phaseColors[phase]??'var(--accent)'}`}}>
+              <div style={{fontSize:'9px',color:phaseColors[phase]??'var(--accent)',fontWeight:700,letterSpacing:'0.5px',textTransform:'uppercase'}}>{phaseLabels[phase]??''}</div>
+              <div style={{fontWeight:700,color:'var(--text)',fontSize:'12px',marginTop:'2px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{raceName}</div>
+              <div style={{fontSize:'28px',fontWeight:900,color:phaseColors[phase]??'var(--accent)',lineHeight:1,marginTop:'4px',letterSpacing:'-1px'}}>
+                {daysToRace}<span style={{fontSize:'11px',fontWeight:600,marginLeft:'4px',color:'var(--text2)'}}>giorni</span>
               </div>
-              {estimated10kTime && (
-                <div>
-                  <div style={{fontSize:'11px',color:'var(--text3)'}}>10 km</div>
-                  <div style={{fontSize:'20px',fontWeight:800,color:'var(--text)'}}>{_timeStr(estimated10kTime)}</div>
+            </div>
+          )}
+          {estimatedHalfMarathonTime?(
+            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+              <div>
+                <div style={{fontSize:'9px',color:'var(--text3)',fontWeight:600,letterSpacing:'0.5px'}}>MEZZA MARATONA</div>
+                <div style={{fontFamily:'var(--display)',fontSize:'30px',fontWeight:900,color:'var(--text)',lineHeight:1,marginTop:'4px',letterSpacing:'-1.5px'}}>{_timeStr(estimatedHalfMarathonTime)}</div>
+                <div style={{fontSize:'11px',color:'var(--text2)',marginTop:'2px'}}>@ {_paceStr(estimatedHalfMarathonPace)}/km</div>
+              </div>
+              {estimated10kTime&&(
+                <div style={{paddingTop:'8px',borderTop:'1px solid var(--border)'}}>
+                  <div style={{fontSize:'9px',color:'var(--text3)',fontWeight:600,letterSpacing:'0.5px'}}>10 KM</div>
+                  <div style={{fontSize:'22px',fontWeight:800,color:'var(--text)',marginTop:'2px',letterSpacing:'-0.5px'}}>{_timeStr(estimated10kTime)}</div>
                 </div>
               )}
-            </div>
-            <div style={{fontSize:'10px',color:'var(--text3)',marginTop:'4px'}}>
-              {estimatedBasedOn ?? 'VDOT — corse recenti'}
-            </div>
-          </div>
-        )}
-
-        {/* Readiness */}
-        <ReadinessCard readinessScore={readinessScore} />
-
-        {/* Zone di ritmo */}
-        <PaceZonesCard paceZones={paceZones} />
-
-        {/* Piano settimanale */}
-        <WeeklyPlanCard weeklyPlan={weeklyPlan} raceGoal={raceGoal} saveRaceGoal={saveRaceGoal} classifiedRuns={runs} aiPlanLoading={aiPlanLoading} aiPlanError={aiPlanError} aiWeeklyPlan={aiWeeklyPlan} onRegeneratePlan={onRegeneratePlan}/>
-
-        {/* Settimana scorsa — corse effettivamente fatte (Lun–Dom precedente) */}
-        {(()=>{
-          const lm=new Date();
-          lm.setDate(lm.getDate()-((lm.getDay()+6)%7)-7);
-          lm.setHours(0,0,0,0);
-          const ls=new Date(lm);ls.setDate(lm.getDate()+6);ls.setHours(23,59,59,999);
-          const lastWeekRuns=runs
-            .filter(r=>{const d=new Date(r.date);return d>=lm&&d<=ls;})
-            .sort((a,b)=>a.date.localeCompare(b.date));
-          const giorni=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
-          return(
-            <div style={cardStyle}>
-              <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'8px'}}>SETTIMANA SCORSA</div>
-              {lastWeekRuns.length===0
-                ? <div style={{fontSize:'11px',color:'var(--text3)'}}>Nessuna corsa registrata la settimana scorsa</div>
-                : <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-                    {lastWeekRuns.map(r=>{
-                      const type=r.classification?.workoutType??'unknown';
-                      const dayName=giorni[new Date(r.date).getDay()];
-                      return(
-                        <div key={r.id??r.date} style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                          <span style={{fontSize:'11px',color:'var(--text3)',minWidth:'70px'}}>{dayName}</span>
-                          <span style={badgeStyle(type)}>{WORKOUT_LABELS[type]??type}</span>
-                          <span style={{flex:1}}/>
-                          <span style={{fontSize:'11px',color:'var(--text2)',whiteSpace:'nowrap'}}>{r.distanceKm.toFixed(1)}km</span>
-                          <span style={{fontSize:'11px',color:'var(--text3)',whiteSpace:'nowrap'}}>{_paceStr(r.avgPaceMinKm)}/km</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-              }
-            </div>
-          );
-        })()}
-
-        {/* Forze e debolezze */}
-        {(insights.strengths.length > 0 || insights.weaknesses.length > 0) && (
-          <div style={{display:'flex',gap:'8px'}}>
-            {insights.strengths.length > 0 && (
-              <div style={{...cardStyle,flex:1,minWidth:0}}>
-                <div style={{fontSize:'10px',fontWeight:700,color:'#00C49A',letterSpacing:'0.8px',marginBottom:'6px'}}>PUNTI DI FORZA</div>
-                {insights.strengths.map((s,i) => (
-                  <div key={i} style={{fontSize:'11px',color:'var(--text)',lineHeight:'1.5',marginBottom:'3px'}}>✓ {s}</div>
-                ))}
+              <div>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
+                  <div style={{fontSize:'9px',color:'var(--text3)',fontWeight:600,letterSpacing:'0.5px'}}>ATTENDIBILITÀ</div>
+                  <div style={{fontSize:'9px',color:'var(--text2)',fontWeight:700}}>{reliability}%</div>
+                </div>
+                <div style={{height:'3px',borderRadius:'3px',background:'var(--border)',overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${reliability}%`,background:'var(--accent2)',borderRadius:'3px',transition:'width 0.5s'}}/>
+                </div>
               </div>
-            )}
-            {insights.weaknesses.length > 0 && (
-              <div style={{...cardStyle,flex:1,minWidth:0}}>
-                <div style={{fontSize:'10px',fontWeight:700,color:'#e05c5c',letterSpacing:'0.8px',marginBottom:'6px'}}>AREE DI LAVORO</div>
-                {insights.weaknesses.map((w,i) => (
-                  <div key={i} style={{fontSize:'11px',color:'var(--text)',lineHeight:'1.5',marginBottom:'3px'}}>△ {w}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Messaggio coach */}
-        {insights.coachMessage && (
-          <div style={{...cardStyle, borderLeft:'3px solid var(--accent)'}}>
-            <div style={{fontSize:'10px',fontWeight:700,color:'var(--accent)',letterSpacing:'0.8px',marginBottom:'6px'}}>CONSIGLIO COACH</div>
-            <div style={{fontSize:'12px',color:'var(--text)',lineHeight:'1.6'}}>{insights.coachMessage}</div>
-          </div>
-        )}
-
-        {/* Prossimi allenamenti — derivati direttamente dal piano settimanale */}
-        {weeklyPlan && weeklyPlan.sessions.length > 0 && (
-          <div style={cardStyle}>
-            <div style={{fontSize:'10px',fontWeight:700,color:'var(--text2)',letterSpacing:'0.8px',marginBottom:'8px'}}>PROSSIMI ALLENAMENTI</div>
-            <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-              {weeklyPlan.sessions.slice(0, 2).map((s, i) => {
-                const daysLabel = s.daysFromNow === 1 ? 'domani'
-                  : s.daysFromNow === 7 ? 'domenica prossima'
-                  : `tra ${s.daysFromNow} giorni`;
-                return (
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
-                    <span style={badgeStyle(s.type)}>{WORKOUT_LABELS[s.type]??s.type}</span>
-                    <span style={{fontSize:'12px',color:'var(--text)',flex:1}}>{s.day} — {s.title}</span>
-                    <span style={{fontSize:'11px',color:'var(--text3)',whiteSpace:'nowrap'}}>{daysLabel}</span>
-                    <span style={{fontSize:'11px',color:'var(--accent)',fontWeight:600,whiteSpace:'nowrap'}}>{s.totalKm} km</span>
-                  </div>
-                );
-              })}
             </div>
-          </div>
-        )}
+          ):(
+            <div style={{fontSize:'11px',color:'var(--text3)'}}>Servono almeno 3 corse recenti per stimare il tempo</div>
+          )}
+        </div>
       </div>
-    </details>
+
+      {/* ── SUGGERIMENTI DEL MODELLO ── */}
+      {(insights.strengths.length>0||insights.weaknesses.length>0||insights.coachMessage)&&(
+        <div style={S.card({padding:'16px'})}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text3)',letterSpacing:'0.7px',marginBottom:'12px'}}>SUGGERIMENTI DEL MODELLO</div>
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+            {insights.strengths.map((s,i)=>(
+              <div key={`s${i}`} style={{display:'flex',alignItems:'flex-start',gap:'7px',background:'rgba(0,196,154,0.08)',border:'1px solid rgba(0,196,154,0.2)',borderRadius:'10px',padding:'8px 12px',flex:'1 1 180px',maxWidth:'calc(50% - 4px)'}}>
+                <span style={{width:'7px',height:'7px',borderRadius:'50%',background:'var(--accent2)',flexShrink:0,marginTop:'3px'}}/>
+                <span style={{fontSize:'12px',color:'var(--text)',lineHeight:'1.4'}}>{s}</span>
+              </div>
+            ))}
+            {insights.weaknesses.map((w,i)=>(
+              <div key={`w${i}`} style={{display:'flex',alignItems:'flex-start',gap:'7px',background:'rgba(232,115,42,0.08)',border:'1px solid rgba(232,115,42,0.2)',borderRadius:'10px',padding:'8px 12px',flex:'1 1 180px',maxWidth:'calc(50% - 4px)'}}>
+                <span style={{width:'7px',height:'7px',borderRadius:'50%',background:'var(--accent)',flexShrink:0,marginTop:'3px'}}/>
+                <span style={{fontSize:'12px',color:'var(--text)',lineHeight:'1.4'}}>{w}</span>
+              </div>
+            ))}
+          </div>
+          {insights.coachMessage&&(
+            <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid var(--border)',display:'flex',gap:'10px',alignItems:'flex-start'}}>
+              <div style={{width:'28px',height:'28px',borderRadius:'8px',background:'var(--accent-soft)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'14px'}}>🤖</div>
+              <div style={{fontSize:'12px',color:'var(--text2)',lineHeight:'1.6'}}>{insights.coachMessage}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── PIANO QUESTA SETTIMANA ── */}
+      {weeklyPlan&&weeklyPlan.sessions.length>0&&(
+        <div style={S.card({padding:'16px'})}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
+            <div style={{fontSize:'10px',fontWeight:700,color:'var(--text3)',letterSpacing:'0.7px'}}>COSA FARE QUESTA SETTIMANA</div>
+            {weeklyPlan.weekTarget&&<div style={{fontSize:'11px',color:'var(--accent)',fontWeight:700}}>Target {weeklyPlan.weekTarget} km</div>}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:`repeat(${Math.min(weeklyPlan.sessions.length,7)},1fr)`,gap:'8px'}}>
+            {weeklyPlan.sessions.slice(0,7).map((s,i)=>{
+              const isToday=s.daysFromNow===0;
+              const isPast=(s.daysFromNow??0)<0;
+              const col=sessColors[s.type]??'#3D4F66';
+              return(
+                <div key={i} style={{background:isToday?`${col}18`:'var(--surface)',border:`1px solid ${isToday?col:'var(--border)'}`,borderRadius:'10px',padding:'10px 6px',textAlign:'center',opacity:isPast?0.45:1,display:'flex',flexDirection:'column',gap:'5px',alignItems:'center'}}>
+                  <div style={{fontSize:'9px',color:isToday?col:'var(--text3)',fontWeight:700,letterSpacing:'0.4px'}}>{(s.day??'').slice(0,3).toUpperCase()}</div>
+                  <div style={{width:'8px',height:'8px',borderRadius:'50%',background:s.type==='rest'?'var(--border)':col}}/>
+                  <div style={{fontSize:'10px',color:'var(--text2)',fontWeight:600,lineHeight:1.2}}>{s.type==='rest'?'Riposo':(sessLabels[s.type]??s.type)}</div>
+                  {s.totalKm>0&&<div style={{fontSize:'11px',color:'var(--text)',fontWeight:700}}>{s.totalKm}km</div>}
+                </div>
+              );
+            })}
+          </div>
+          {weeklyPlan.phase&&(
+            <div style={{marginTop:'10px',padding:'8px 12px',background:'var(--surface)',borderRadius:'8px',display:'flex',alignItems:'center',gap:'8px'}}>
+              <span style={{width:'7px',height:'7px',borderRadius:'50%',background:phaseColors[weeklyPlan.phase]??'var(--accent)',flexShrink:0}}/>
+              <span style={{fontSize:'11px',color:'var(--text2)'}}>{phaseLabels[weeklyPlan.phase]??''}{weeklyPlan.rationale?` · ${weeklyPlan.rationale}`:''}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── READINESS ── */}
+      <ReadinessCard readinessScore={readinessScore}/>
+
+      {/* ── ZONE DI RITMO ── */}
+      <PaceZonesCard paceZones={paceZones}/>
+
+      {/* ── SETTIMANA SCORSA ── */}
+      {lastWeekRuns.length>0&&(
+        <div style={S.card({padding:'16px'})}>
+          <div style={{fontSize:'10px',fontWeight:700,color:'var(--text3)',letterSpacing:'0.7px',marginBottom:'12px'}}>SETTIMANA SCORSA</div>
+          <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
+            {lastWeekRuns.map((r,idx)=>{
+              const type=r.classification?.workoutType??'unknown';
+              const dayName=giorni[new Date(r.date).getDay()];
+              return(
+                <div key={r.id??r.date} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 0',borderTop:idx>0?'1px solid var(--border)':'none'}}>
+                  <span style={{fontSize:'11px',color:'var(--text3)',minWidth:'76px',fontWeight:500}}>{dayName}</span>
+                  <span style={badgeSt(type)}>{sessLabels[type]??type}</span>
+                  <span style={{flex:1}}/>
+                  <span style={{fontSize:'13px',color:'var(--text)',fontWeight:700}}>{r.distanceKm.toFixed(1)}<span style={{fontSize:'10px',color:'var(--text3)',fontWeight:400,marginLeft:'2px'}}>km</span></span>
+                  <span style={{fontSize:'11px',color:'var(--text3)',minWidth:'52px',textAlign:'right'}}>{_paceStr(r.avgPaceMinKm)}/km</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -4029,6 +4097,16 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
   return(
     <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
 
+      {/* Page header */}
+      <div style={{marginBottom:'4px'}}>
+        <div style={{fontFamily:'var(--display)',fontSize:'30px',fontWeight:900,color:'var(--text)',lineHeight:1.1,letterSpacing:'-0.5px'}}>La tua corsa,<br/>guidata dai dati.</div>
+        {stravaTokens?.athlete&&(
+          <div style={{fontSize:'13px',color:'var(--text2)',marginTop:'8px',fontWeight:500}}>
+            {stravaTokens.athlete.firstname} {stravaTokens.athlete.lastname}
+          </div>
+        )}
+      </div>
+
       {/* Popup Strava — position:fixed, si apre dall'icona nell'header */}
       {showStravaPopup&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:300,display:'flex',alignItems:'flex-end'}}
@@ -4164,8 +4242,16 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
       )}
 
       {!isConnected&&(
-        <div style={{textAlign:'center',padding:'40px 16px',color:'var(--text3)',fontSize:'14px'}}>
-          Connetti Strava tramite l'icona in alto a destra per vedere le tue attività.
+        <div style={{textAlign:'center',padding:'60px 20px',display:'flex',flexDirection:'column',alignItems:'center',gap:'16px'}}>
+          <div style={{width:'52px',height:'52px',borderRadius:'14px',background:'rgba(252,76,2,0.1)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="#FC4C02">
+              <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{fontSize:'16px',fontWeight:700,color:'var(--text)',marginBottom:'6px'}}>Connetti Strava</div>
+            <div style={{fontSize:'13px',color:'var(--text3)'}}>Collega il tuo account dalla barra laterale per importare le attività.</div>
+          </div>
         </div>
       )}
 
