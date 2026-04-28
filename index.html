@@ -14,7 +14,7 @@
         margin: 0;
         width: 100%;
         min-height: 100%;
-        background: #0C0E14;
+        background: #07090F;
       }
     </style>
   </head>
@@ -44,7 +44,7 @@
       };
 
       async function boot() {
-        const source = await fetch("./nutri_tracker.jsx").then((r) => r.text());
+        const source = await fetch("./nutri_tracker.jsx?v=" + Date.now()).then((r) => r.text());
         const transformedSource = source
           .replace('import { useState, useEffect, useRef, useMemo } from "react";', "const { useState, useEffect, useRef, useMemo } = React;")
           .replace("export default function App()", "function App()");
