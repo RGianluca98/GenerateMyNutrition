@@ -28,15 +28,34 @@ import { useState, useEffect, useRef, useMemo } from "react";
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px}
     .app-shell{display:flex;min-height:100vh;background:var(--bg)}
-    .sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;z-index:100;display:flex;flex-direction:column}
+    .sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;z-index:100;display:flex;flex-direction:column;transition:transform 0.25s ease}
     .main-area{margin-left:var(--sidebar-w);flex:1;min-height:100vh}
     .nav-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;text-align:left;width:100%;transition:color 0.15s,background 0.15s;position:relative;font-family:var(--font)}
     .nav-item:hover{background:rgba(255,255,255,0.04);color:var(--text)}
     .nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:700}
     .nav-item.active::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;background:var(--accent);border-radius:0 3px 3px 0}
+    .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99;cursor:pointer}
+    .mobile-header{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .hamburger-btn{background:none;border:none;color:var(--text2);padding:6px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .hamburger-btn:hover{background:rgba(255,255,255,0.06);color:var(--text)}
+    @media(max-width:767px){
+      .sidebar{transform:translateX(calc(-1 * var(--sidebar-w)))}
+      .sidebar.open{transform:translateX(0)}
+      .main-area{margin-left:0!important}
+    }
   `;
   document.head.appendChild(s);
 })();
+
+function useIsMobile(){
+  const [m,setM]=useState(typeof window!=='undefined'&&window.innerWidth<768);
+  useEffect(()=>{
+    const h=()=>setM(window.innerWidth<768);
+    window.addEventListener('resize',h);
+    return()=>window.removeEventListener('resize',h);
+  },[]);
+  return m;
+}
 
 // ── DATA ──────────────────────────────────────────────────────
 const DAYS = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
@@ -1947,6 +1966,7 @@ AREE: ${insights.weaknesses.join(' | ') || 'nessuna'}`.slice(0, 1900);
 
 // ── PESO VIEW ─────────────────────────────────────────────────
 function PesoView({weightLog,saveWeightLog}){
+  const isMobile=useIsMobile();
   const todayISO=toISO(new Date());
   const [inputDate,setInputDate]=useState(todayISO);
   const [inputWeight,setInputWeight]=useState('');
@@ -2018,7 +2038,7 @@ function PesoView({weightLog,saveWeightLog}){
   const delta=sorted.length>=2?(sorted[sorted.length-1].weight-sorted[0].weight).toFixed(1):null;
 
   return(
-    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
+    <div style={{padding:isMobile?'12px':'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
       {/* Form inserimento */}
       <div style={{background:'var(--card)',borderRadius:'16px',padding:'16px',border:'1px solid var(--border)'}}>
         <div style={{fontFamily:'var(--display)',fontSize:'16px',color:'var(--text)',marginBottom:'12px'}}>
@@ -2219,6 +2239,7 @@ function calcRecipeKcal(ingredients){
 
 // ── RECIPES VIEW ──────────────────────────────────────────────
 function RecipesView({userRecipes,saveRecipes,weekDates,setTab,setSelectedDayIndex,setWeekStart,setMealOverrides}){
+  const isMobile=useIsMobile();
   const [catFilter,setCatFilter]=useState('tutte');
   const [useModal,setUseModal]=useState(null);
   const [createModal,setCreateModal]=useState(false);
@@ -2247,7 +2268,7 @@ function RecipesView({userRecipes,saveRecipes,weekDates,setTab,setSelectedDayInd
   };
 
   return(
-    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
+    <div style={{padding:isMobile?'12px':'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
       {/* Category filter */}
       <div style={{display:'flex',gap:'6px',overflowX:'auto',paddingBottom:'4px',paddingTop:'4px'}}>
         <button onClick={()=>setCatFilter('tutte')}
@@ -2614,6 +2635,7 @@ function RunningNutritionCard({ weeklyPlan, readinessScore }) {
 }
 
 function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,setSelectedDayIndex,setWeekStart,weeklyPlan,readinessScore,stravaActivities,raceGoal}){
+  const isMobile=useIsMobile();
   const iso=toISO(weekDates[selectedDayIndex]);
   const di=selectedDayIndex;
   const type=getDayType(dayTypes,weekPlan,iso,di);
@@ -2663,7 +2685,7 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,
   const sessLabels={interval:'Ripetute',tempo:'Tempo',easy:'Facile',long_run:'Lungo',recovery:'Recovery',race_pace:'Ritmo gara',threshold:'Soglia',rest:'Riposo'};
 
   return(
-    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
+    <div style={{padding:isMobile?'16px':'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
 
       {/* Header giorno */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:'4px'}}>
@@ -2693,7 +2715,7 @@ function HomeView({weekDates,selectedDayIndex,dailyLog,weekPlan,dayTypes,setTab,
 
       {/* Readiness + Volume row */}
       {(rs!=null||weekTarget>0)&&(
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
           {/* Readiness */}
           {rs!=null&&(
             <div style={{...S.card(),padding:'14px',cursor:'pointer'}} onClick={()=>setShowReadinessInfo(v=>!v)}>
@@ -2893,6 +2915,7 @@ function OggiView({
   toggleLogItem,updateLogQty,editQty,setEditQty,setSwapModal,setAddModal,
   setExtraModal,dayTypes,changeDayType,removeFood,onSaveRecipe,stravaKcalForDay
 }){
+  const isMobile=useIsMobile();
   const di=selectedDayIndex>=0&&selectedDayIndex<7?selectedDayIndex:0;
   const selectedISO=toISO(weekDates[di]);
   const isToday=selectedISO===todayISO;
@@ -2908,7 +2931,7 @@ function OggiView({
   },0);
 
   return(
-    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
+    <div style={{padding:isMobile?'12px':'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
       {/* Day type & progress banner */}
       <div style={{...S.card(),padding:'16px'}}>
         {/* Day selector */}
@@ -3628,6 +3651,7 @@ const WORKOUT_LABELS = {
 };
 
 function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, readinessScore, weekReview, raceGoal, saveRaceGoal, aiPlanLoading, aiPlanError, aiWeeklyPlan, onRegeneratePlan }) {
+  const isMobile=useIsMobile();
   const {
     weeklyVolumeKm, runsLast7Days,
     estimatedHalfMarathonTime, estimatedHalfMarathonPace,
@@ -3677,7 +3701,7 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
     <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
 
       {/* ── 3 COLONNE HEADER ── */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1.5fr 1fr',gap:'16px',alignItems:'start'}}>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1.5fr 1fr',gap:'16px',alignItems:'start'}}>
 
         {/* Ultima corsa */}
         <div style={S.card({padding:'16px',display:'flex',flexDirection:'column',gap:'10px'})}>
@@ -3824,8 +3848,8 @@ function RunningInsightsPanel({ runs, metrics, insights, paceZones, weeklyPlan, 
             <div style={{fontSize:'10px',fontWeight:700,color:'var(--text3)',letterSpacing:'0.7px'}}>COSA FARE QUESTA SETTIMANA</div>
             {weeklyPlan.weekTarget&&<div style={{fontSize:'11px',color:'var(--accent)',fontWeight:700}}>Target {weeklyPlan.weekTarget} km</div>}
           </div>
-          <div style={{display:'grid',gridTemplateColumns:`repeat(${Math.min(weeklyPlan.sessions.length,7)},1fr)`,gap:'8px'}}>
-            {weeklyPlan.sessions.slice(0,7).map((s,i)=>{
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(4,1fr)':`repeat(${Math.min(weeklyPlan.sessions.length,7)},1fr)`,gap:'8px'}}>
+            {weeklyPlan.sessions.slice(0,isMobile?4:7).map((s,i)=>{
               const isToday=s.daysFromNow===0;
               const isPast=(s.daysFromNow??0)<0;
               const col=sessColors[s.type]??'#3D4F66';
@@ -4094,12 +4118,13 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 
   const isConnected=!!(stravaTokens?.access_token);
 
+  const isMobile=useIsMobile();
   return(
-    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
+    <div style={{padding:isMobile?'12px':'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
 
       {/* Page header */}
       <div style={{marginBottom:'4px'}}>
-        <div style={{fontFamily:'var(--display)',fontSize:'30px',fontWeight:900,color:'var(--text)',lineHeight:1.1,letterSpacing:'-0.5px'}}>La tua corsa,<br/>guidata dai dati.</div>
+        <div style={{fontFamily:'var(--display)',fontSize:isMobile?'22px':'30px',fontWeight:900,color:'var(--text)',lineHeight:1.1,letterSpacing:'-0.5px'}}>La tua corsa,<br/>guidata dai dati.</div>
         {stravaTokens?.athlete&&(
           <div style={{fontSize:'13px',color:'var(--text2)',marginTop:'8px',fontWeight:500}}>
             {stravaTokens.athlete.firstname} {stravaTokens.athlete.lastname}
@@ -4309,8 +4334,9 @@ function TrainingsView({stravaTokens,setStravaTokens,dailyLog,weekPlan,dayTypes,
 
 // ── DASHBOARD VIEW ─────────────────────────────────────────────
 function DashboardView({weeklyTotals,weekDates,weekPlan,dailyLog,getDayConsumedKcal,dayTypes}){
+  const isMobile=useIsMobile();
   return(
-    <div style={{padding:'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
+    <div style={{padding:isMobile?'12px':'28px 28px',display:'flex',flexDirection:'column',gap:'16px'}}>
       {/* Daily compliance grid */}
       <div style={S.card({padding:'14px'})}>
         <div style={{fontSize:'11px',color:'var(--text2)',fontWeight:600,letterSpacing:'0.8px',marginBottom:'12px'}}>COMPLIANCE SETTIMANALE</div>
@@ -4654,6 +4680,8 @@ export default function App(){
   const handleDel=()=>{if(!pinError)setPinInput(p=>p.slice(0,-1));};
 
   const [tab,setTab]=useState('home');
+  const [sidebarOpen,setSidebarOpen]=useState(false);
+  const isMobile=useIsMobile();
   const [weekStart,setWeekStart]=useState(()=>getWeekStart());
   const [weekPlan,setWeekPlan]=useState({types:['Riposo','Corsa','Riposo','Corsa','Calcio','Corsa','Riposo'],overrides:{}});
   const [dailyLog,setDailyLog]=useState({});
@@ -5005,8 +5033,11 @@ export default function App(){
   return(
     <div className="app-shell" style={{color:'var(--text)',fontFamily:'var(--font)'}}>
 
+      {/* ── SIDEBAR OVERLAY (mobile) ── */}
+      {isMobile&&sidebarOpen&&<div className="sidebar-overlay" onClick={()=>setSidebarOpen(false)}/>}
+
       {/* ── SIDEBAR ── */}
-      <aside className="sidebar">
+      <aside className={`sidebar${isMobile&&sidebarOpen?' open':''}`}>
         {/* Brand */}
         <div style={{padding:'22px 18px 18px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
           <img src="./logo_kronos.png" alt="" style={{width:'32px',height:'auto',mixBlendMode:'screen',flexShrink:0}}/>
@@ -5026,7 +5057,7 @@ export default function App(){
             {id:'ricette',  label:'Ricettario'},
             {id:'peso',     label:'Peso'},
           ].map(t=>(
-            <button key={t.id} className={`nav-item${tab===t.id?' active':''}`} onClick={()=>setTab(t.id)}>
+            <button key={t.id} className={`nav-item${tab===t.id?' active':''}`} onClick={()=>{setTab(t.id);if(isMobile)setSidebarOpen(false);}}>
               <NavGlyph id={t.id} active={tab===t.id}/>
               <span>{t.label}</span>
             </button>
@@ -5057,6 +5088,20 @@ export default function App(){
 
       {/* ── MAIN CONTENT ── */}
       <main className="main-area">
+        {isMobile&&(
+          <div className="mobile-header">
+            <button className="hamburger-btn" onClick={()=>setSidebarOpen(v=>!v)} aria-label="Menu">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+              <img src="./logo_kronos.png" alt="" style={{width:'22px',height:'auto',mixBlendMode:'screen'}}/>
+              <span style={{fontFamily:'var(--display)',fontSize:'13px',letterSpacing:'2px',fontWeight:900,color:'var(--accent)'}}>KRONOS</span>
+            </div>
+            <div style={{width:34}}/>
+          </div>
+        )}
         {tab==='home'&&<HomeView weekDates={weekDates} selectedDayIndex={selectedDayIndex} dailyLog={dailyLog} weekPlan={weekPlan} dayTypes={dayTypes} setTab={setTab} setSelectedDayIndex={setSelectedDayIndex} setWeekStart={setWeekStart} weeklyPlan={weeklyPlanGlobal} readinessScore={readinessScoreGlobal} stravaActivities={stravaActivities} raceGoal={raceGoal}/>}
         {tab==='oggi'&&<OggiView weekPlan={weekPlan} weekDates={weekDates} todayISO={todayISO}
           selectedDayIndex={selectedDayIndex} setSelectedDayIndex={setSelectedDayIndex}
