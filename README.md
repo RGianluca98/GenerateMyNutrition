@@ -1,4 +1,4 @@
-# KRONOS — Nutrizione & Sport
+# KRONOS: Nutrizione & Sport
 
 **KRONOS** è una web app personale per il monitoraggio integrato di allenamento e nutrizione, pensata per atleti amatoriali che vogliono gestire carico di allenamento, piani alimentari e progressi fisici in un unico posto.
 
